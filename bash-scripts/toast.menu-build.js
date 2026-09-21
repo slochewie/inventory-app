@@ -57,7 +57,7 @@ function main() {
     sourceRows: source.length,
     menuBuildRows: rows.length,
     scheduledRowsCollapsed,
-    migrationRowsExcluded: migration.held.filter((row) => row.migration_action === 'excluded').length,
+    migrationRowsOutOfScope: migration.held.filter((row) => row.migration_action === 'out_of_scope').length,
     obsoleteRowsHeld: migration.held.filter((row) => row.migration_action === 'obsolete').length,
     menuGroupsRenamed: migration.renamedCount
   }, null, 2));
