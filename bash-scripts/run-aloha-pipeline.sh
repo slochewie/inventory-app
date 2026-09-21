@@ -19,7 +19,16 @@ fi
 input="$1"
 base="$(basename "$input")"
 stem="${base%.*}"
-prefix="${2:-$stem}"
+if [[ -n "${2:-}" ]]; then
+  if [[ "$2" == */ || -d "$2" ]]; then
+    mkdir -p "$2"
+    prefix="${2%/}/$stem"
+  else
+    prefix="$2"
+  fi
+else
+  prefix="$stem"
+fi
 toast_template="${3:-}"
 
 normalized="${prefix}.normalized.csv"
