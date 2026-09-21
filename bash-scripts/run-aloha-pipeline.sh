@@ -29,6 +29,7 @@ toast_prep="${prefix}.toast-prep.csv"
 classified="${prefix}.classified.csv"
 mapped="${prefix}.mapped.csv"
 happy_hour_review="${prefix}.happy-hour-review.csv"
+validation="${prefix}.validation.csv"
 menu_build="${prefix}.toast-menu-build.csv"
 template_mapped="${prefix}.toast-template.csv"
 
@@ -52,6 +53,19 @@ node "$SCRIPT_DIR/aloha.map-fields.js" \
 node "$SCRIPT_DIR/happy-hour.review.js" \
   "$mapped" "$happy_hour_review"
 
+# Validation is a hard gate for malformed data. Warnings are written to the
+# report but do not stop the pipeline; errors stop before Toast output.
+set +e
+node "$SCRIPT_DIR/validate-intermediate.js" "$mapped" "$validation"
+validation_status=$?
+set -e
+if [[ $validation_status -eq 2 ]]; then
+  printf '\nValidation errors found. Review %s before generating Toast output.\n' "$validation" >&2
+  exit 2
+elif [[ $validation_status -ne 0 ]]; then
+  exit "$validation_status"
+fi
+
 node "$SCRIPT_DIR/toast.menu-build.js" \
   "$mapped" "$menu_build"
 
@@ -67,6 +81,7 @@ printf 'Toast candidates:        %s\n' "$toast_prep"
 printf 'Pricing classification:  %s\n' "$classified"
 printf 'Stable mapped records:   %s\n' "$mapped"
 printf 'Happy Hour review:       %s\n' "$happy_hour_review"
+printf 'Validation report:       %s\n' "$validation"
 printf 'Toast Menu Build:        %s\n' "$menu_build"
 if [[ -n "$toast_template" ]]; then
   printf 'Exact-template mapping:  %s\n' "$template_mapped"
