@@ -18,6 +18,7 @@ assert.deepEqual(mapRecord(source), {
   price: '9.00',
   category: 'Draft Beer',
   plu: '1234',
+  effective_time: '',
   pricing_program_classification: '',
   pricing_program_confidence: '',
   pricing_program_reason: '',
