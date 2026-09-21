@@ -19,6 +19,7 @@ assert.equal(guinness.item_name,'Guinness');
 const modelo=beer.find(r=>r.item_name.toLowerCase().startsWith('modelo'));
 assert.equal(modelo.can_12oz_price,'7.00');
 assert.equal(modelo.can_24oz_price,'9.00');
+assert.equal(modelo.item_name,'Modelo');
 assert.equal(liquor.length,1);
 assert.equal(liquor[0].liquor_type,'WHISKEY/BOURBON');
 console.log('Toast beverage build tests passed');
