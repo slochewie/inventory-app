@@ -12,7 +12,10 @@ Usage:
 Example:
   ./bash-scripts/normalize-aloha-for-review.sh "McCarthy's Pub Menu Items.csv" ./output 1.00
 
-The file to upload back to ChatGPT is:
+Primary Toast-facing output:
+  <output-directory>/<input-name>.toast-menu-build.csv
+
+Stable mapped records for debugging/review:
   <output-directory>/<input-name>.mapped.csv
 
 Also keep the validation CSV; it explains any rows that need attention before the Toast workbook is populated.
@@ -22,15 +25,13 @@ fi
 
 input="$1"
 output_dir="${2:-./output}"
-discount="1.00"
-
 mkdir -p "$output_dir"
 
 base="$(basename "$input")"
 stem="${base%.*}"
 prefix="$output_dir/$stem"
 
-bash "$PIPELINE" "$input" "$prefix" "$discount"
+bash "$PIPELINE" "$input" "$prefix"
 
 mapped="${prefix}.mapped.csv"
 validation="${prefix}.validation.csv"
@@ -38,5 +39,6 @@ validation="${prefix}.validation.csv"
 printf '\n============================================================\n'
 printf 'READY FOR REVIEW\n'
 printf '============================================================\n'
-printf 'Upload this file to ChatGPT:\n  %s\n' "$mapped"
+printf 'Toast-facing output:\n  %s\n' "${prefix}.toast-menu-build.csv"
+printf '\nMapped review data:\n  %s\n' "$mapped"
 printf '\nSupporting review file:\n  %s\n' "$validation"
