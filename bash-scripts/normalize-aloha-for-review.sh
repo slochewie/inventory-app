@@ -30,7 +30,7 @@ base="$(basename "$input")"
 stem="${base%.*}"
 prefix="$output_dir/$stem"
 
-"$PIPELINE" "$input" "$prefix" "$discount"
+bash "$PIPELINE" "$input" "$prefix" "$discount"
 
 mapped="${prefix}.mapped.csv"
 validation="${prefix}.validation.csv"
