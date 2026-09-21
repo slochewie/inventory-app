@@ -10,9 +10,11 @@ function main(){
  if(!input||!output)throw new Error('Usage: toast.wine-build.js mapped.csv output.csv');
  const rows=collapseScheduledPrices(records(parseCsv(fs.readFileSync(input,'utf8'))))
    .filter(r=>String(r.category||'').trim().toUpperCase()==='WINE GLASS');
- const out=[['Wine Name','Glass Price $','Happy Hour $']];
- for(const r of rows)out.push([r.item_name||'',/^ask$/i.test(r.price||'')?'':r.price||'',hh(r.price)]);
+ // Toast Wine tab uses 5-column category blocks: Name, Glass $, Happy Hour $, Bottle $, Happy Hour $.
+ // Aloha only identifies this venue's generic Wine button, so preserve it without inventing Red/White/etc.
+ const out=[['Wine','Glass $','Happy Hour $','Bottle $','Happy Hour $']];
+ for(const r of rows)out.push([r.item_name||'',/^ask$/i.test(r.price||'')?'':r.price||'',hh(r.price),'','']);
  fs.mkdirSync(path.dirname(path.resolve(output)),{recursive:true});fs.writeFileSync(output,stringifyCsv(out));
- console.log(JSON.stringify({input,output,wineItems:rows.length,note:'Wine glass Happy Hour is $1 off.'},null,2));
+ console.log(JSON.stringify({input,output,wineItems:rows.length,note:'Toast Wine-tab staging; generic Aloha Wine preserved, Glass HH is $1 off, bottle fields blank.'},null,2));
 }
 try{main();}catch(e){console.error('Error: '+e.message);process.exitCode=1;}
