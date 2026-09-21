@@ -5,11 +5,26 @@ function clean(value) {
 }
 
 const DEFAULT_RULES = {
-  excludedGroups: ['COCKTAILS'],
+  // Only these Aloha sections contain menu data needed for this migration.
+  includedGroups: [
+    'BOURB WHISK',
+    'BEER CAN',
+    'DRAFT REG PINT',
+    'DRAFT 10OZ',
+    'DRAFT IMP PINT',
+    'LIQUEURS',
+    'TEQUILA',
+    'SCOTCH',
+    'VODKA',
+    'RUM',
+    'GIN',
+  ],
   renamedGroups: {
-    'BOURBON/WHISKEY': 'WHISKEY/BOURBON',
+    'BOURB WHISK': 'WHISKEY/BOURBON',
   },
-  obsoleteGroups: ['DRAFT IMPERIAL PINT'],
+  // Keep Imperial Pint rows in the source scope for beer reconciliation, but
+  // do not emit the obsolete 20 oz serving format into Toast Menu Build.
+  obsoleteGroups: ['DRAFT IMP PINT'],
 };
 
 function normalizeGroup(value) {
@@ -17,7 +32,7 @@ function normalizeGroup(value) {
 }
 
 function applyMigrationRules(records, rules = DEFAULT_RULES) {
-  const excluded = new Set((rules.excludedGroups || []).map(normalizeGroup));
+  const included = new Set((rules.includedGroups || []).map(normalizeGroup));
   const obsolete = new Set((rules.obsoleteGroups || []).map(normalizeGroup));
   const renamed = new Map(
     Object.entries(rules.renamedGroups || {}).map(([from, to]) => [normalizeGroup(from), clean(to)])
@@ -30,8 +45,8 @@ function applyMigrationRules(records, rules = DEFAULT_RULES) {
   for (const record of records) {
     const group = normalizeGroup(record.category);
 
-    if (excluded.has(group)) {
-      held.push({ ...record, migration_action: 'excluded', migration_reason: 'group excluded from Toast migration' });
+    if (included.size && !included.has(group)) {
+      held.push({ ...record, migration_action: 'out_of_scope', migration_reason: 'group is outside the selected Aloha migration scope' });
       continue;
     }
 
