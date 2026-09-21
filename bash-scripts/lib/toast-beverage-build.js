@@ -21,6 +21,8 @@ const BEER_ALIASES = new Map(Object.entries({
   'russ rvr blind pig': 'russ rvr blind pig',
   'rr pliny the elder': 'pliny the elder',
   'r r pliny the elder': 'pliny the elder',
+  'rr pliney the elder': 'pliny the elder',
+  'r r pliney the elder': 'pliny the elder',
   'pliny the elder': 'pliny the elder',
   'fig mtn davy brown': 'davy brown',
   'fig mtn davy brwn': 'davy brown',
@@ -31,6 +33,8 @@ const BEER_ALIASES = new Map(Object.entries({
   'liquid gravity ipa': 'liquid gravity',
   'cali squeze': 'cali squeeze',
   'cali squeeze': 'cali squeeze',
+  'coors original': 'coors original',
+  'coors og': 'coors original',
   'weinstephan': 'weihenstephan',
   'weihensteph': 'weihenstephan',
 }));
