@@ -16,7 +16,8 @@ function toMenuBuildRow(record, config) {
   const row = Array(width).fill('');
 
   row[columns.itemName - 1] = clean(record.item_name);
-  row[columns.basePrice - 1] = clean(record.price);
+  const price = clean(record.price);
+  row[columns.basePrice - 1] = /^ask$/i.test(price) ? '' : price;
   row[columns.description - 1] = clean(record.description);
   row[columns.menuGroupName - 1] = clean(record.category);
 
