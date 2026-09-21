@@ -18,7 +18,6 @@ const OMIT_BEERS = new Set([
 const BEER_ALIASES = new Map(Object.entries({
   'russ rv happy hops': 'russ rvr happy hops',
   'russ rvr happy hops': 'russ rvr happy hops',
-  'russ rvr happy hops': 'russ rvr happy hops',
   'russ rvr blind pig': 'russ rvr blind pig',
   'rr pliny the elder': 'pliny the elder',
   'r r pliny the elder': 'pliny the elder',
@@ -38,6 +37,7 @@ const BEER_ALIASES = new Map(Object.entries({
 
 function strippedName(value) {
   return clean(value)
+    .replace(/\btall\b/gi, '')
     .replace(/\b10\s*oz\.?\b/gi, '')
     .replace(/\b16\s*oz\.?\b/gi, '')
     .replace(/\bregular\s+pint\b/gi, '')
