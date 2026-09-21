@@ -66,6 +66,8 @@ function keyName(value) {
 
 function displayName(value) {
   const name = strippedName(value);
+  const key = keyName(value);
+  if (BEER_ALIASES.has(key)) return key.replace(/\b\w/g, (letter) => letter.toUpperCase());
   return name || clean(value);
 }
 
@@ -99,7 +101,8 @@ function buildBeverageRows(records) {
       else if (category === 'DRAFT 10OZ' && !row.draft_16oz_price) row.item_name = displayName(record.item_name);
 
       // Canonicalize display names for known cross-size aliases too.
-      if (BEER_ALIASES.has(keyName(record.item_name))) row.item_name = keyName(record.item_name)
+      const rawKey = strippedName(record.item_name).toLowerCase().replace(/[.'’]/g, '').replace(/\s+/g, ' ').trim();
+      if (BEER_ALIASES.has(rawKey)) row.item_name = keyName(record.item_name)
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
       if (category === 'BEER CAN') {
