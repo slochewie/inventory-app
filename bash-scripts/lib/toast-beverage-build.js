@@ -71,6 +71,12 @@ function displayName(value) {
   return name || clean(value);
 }
 
+function happyHourPrice(value) {
+  const amount = Number.parseFloat(clean(value));
+  if (!Number.isFinite(amount)) return '';
+  return Math.max(0, amount - 1).toFixed(2);
+}
+
 function price(value) {
   const text = clean(value);
   return /^ask$/i.test(text) ? '' : text;
@@ -93,6 +99,10 @@ function buildBeverageRows(records) {
           can_12oz_price: '',
           can_24oz_price: '',
           obsolete_20oz_price: '',
+          draft_10oz_happy_hour: '',
+          draft_16oz_happy_hour: '',
+          can_12oz_happy_hour: '',
+          can_24oz_happy_hour: '',
         });
       }
       const row = beer.get(name);
@@ -106,11 +116,22 @@ function buildBeverageRows(records) {
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
       if (category === 'BEER CAN') {
-        if (/\btall\b/i.test(clean(record.item_name))) row.can_24oz_price = price(record.price);
-        else row.can_12oz_price = price(record.price);
+        if (/\btall\b/i.test(clean(record.item_name))) {
+          row.can_24oz_price = price(record.price);
+          row.can_24oz_happy_hour = happyHourPrice(record.price);
+        } else {
+          row.can_12oz_price = price(record.price);
+          row.can_12oz_happy_hour = happyHourPrice(record.price);
+        }
       }
-      else if (category === 'DRAFT 10OZ') row.draft_10oz_price = price(record.price);
-      else if (category === 'DRAFT REG PINT') row.draft_16oz_price = price(record.price);
+      else if (category === 'DRAFT 10OZ') {
+        row.draft_10oz_price = price(record.price);
+        row.draft_10oz_happy_hour = happyHourPrice(record.price);
+      }
+      else if (category === 'DRAFT REG PINT') {
+        row.draft_16oz_price = price(record.price);
+        row.draft_16oz_happy_hour = happyHourPrice(record.price);
+      }
       else row.obsolete_20oz_price = price(record.price);
       continue;
     }
@@ -118,6 +139,7 @@ function buildBeverageRows(records) {
     liquor.push({
       item_name: clean(record.item_name),
       base_price: price(record.price),
+      happy_hour_price: '',
       liquor_type: category === 'BOURB WHISK' ? 'WHISKEY/BOURBON' : category,
     });
   }
@@ -131,4 +153,4 @@ function buildBeverageRows(records) {
   return { beer: keptBeer, liquor };
 }
 
-module.exports = { buildBeverageRows, displayName, keyName };
+module.exports = { buildBeverageRows, displayName, happyHourPrice, keyName };
