@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'toast-wine-')),input=path.join(dir,'mapped.csv'),output=path.join(dir,'wine.csv');
 fs.writeFileSync(input,[
- 'item_number,item_name,price,effective_time,category',
+ 'plu,item_name,price,effective_time,category',
  '1,Wine,6.50,00:00,WINE GLASS',
  '1,Wine,5.50,17:00,WINE GLASS',
  '1,Wine,6.50,19:00,WINE GLASS',
