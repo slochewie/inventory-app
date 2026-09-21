@@ -12,6 +12,7 @@ const {beer,liquor}=buildBeverageRows([
  {item_name:'Bourbon Well',price:'7.00',category:'BOURB WHISK'},
  {item_name:'Titos',price:'8.00',category:'TEQUILA'},
  {item_name:'Flor de Cana',price:'7.00',category:'TEQUILA'},
+ {item_name:'Flor de Cana',price:'8.00',category:'RUM'},
  {item_name:'Bombay East',price:'9.00',category:'SCOTCH'},
  {item_name:'Tangueray',price:'7.00',category:'LIQUEURS'},
 ]);
@@ -30,7 +31,9 @@ assert.equal(liquor[0].liquor_type,'WHISKEY/BOURBON');
 assert.equal(liquor.find(r=>r.item_name==='Jameson').happy_hour_price,'');
 assert.equal(liquor.find(r=>r.item_name==='Bourbon Well').happy_hour_price,'6.00');
 assert.equal(liquor.find(r=>r.item_name==='Titos').liquor_type,'VODKA');
+assert.equal(liquor.filter(r=>r.item_name==='Flor de Cana').length,1);
 assert.equal(liquor.find(r=>r.item_name==='Flor de Cana').liquor_type,'RUM');
+assert.equal(liquor.find(r=>r.item_name==='Flor de Cana').base_price,'8.00');
 assert.equal(liquor.find(r=>r.item_name==='Bombay East').liquor_type,'GIN');
 assert.equal(liquor.find(r=>r.item_name==='Tangueray').liquor_type,'GIN');
 assert.equal(guinness.draft_10oz_happy_hour,'5.00');
