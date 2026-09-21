@@ -17,6 +17,6 @@ const bad = validateRecords([
 assert.equal(bad.valid, false);
 assert.equal(bad.issues.some((issue) => issue.code === 'missing_item_name'), true);
 assert.equal(bad.issues.some((issue) => issue.code === 'invalid_price'), true);
-assert.equal(bad.issues.some((issue) => issue.code === 'duplicate_plu'), true);
+assert.equal(bad.issues.some((issue) => issue.code === 'plu_used_by_different_item_name'), false);
 
 console.log('intermediate validation tests passed');
