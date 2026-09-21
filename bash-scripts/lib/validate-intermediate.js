@@ -55,18 +55,23 @@ function duplicateIssues(records) {
 
   records.forEach((record, index) => {
     const plu = clean(record.plu);
+    const name = clean(record.item_name).toLowerCase();
     if (!plu) return;
     const row = clean(record.source_row_number) || String(index + 2);
+
     if (seenPlu.has(plu)) {
-      issues.push({
-        source_row_number: row,
-        severity: 'warning',
-        field: 'plu',
-        code: 'duplicate_plu',
-        message: `PLU ${plu} is also used by source row ${seenPlu.get(plu)}.`,
-      });
+      const first = seenPlu.get(plu);
+      if (first.name && name && first.name !== name) {
+        issues.push({
+          source_row_number: row,
+          severity: 'warning',
+          field: 'plu',
+          code: 'plu_used_by_different_item_name',
+          message: `PLU ${plu} is also used by "${first.displayName}" on source row ${first.row}.`,
+        });
+      }
     } else {
-      seenPlu.set(plu, row);
+      seenPlu.set(plu, { row, name, displayName: clean(record.item_name) });
     }
   });
 
