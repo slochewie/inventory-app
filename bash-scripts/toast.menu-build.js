@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { parseCsv, stringifyCsv } = require('./lib/csv');
 const { toMenuBuildRows } = require('./lib/toast-menu-build');
+const { collapseScheduledPrices } = require('./lib/collapse-scheduled-prices');
 
 function records(rows) {
   const headers = rows[0] || [];
@@ -27,12 +28,10 @@ function main() {
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   const source = records(inputRows);
 
-  // Happy Hour pricing is retained as review evidence but not emitted as a
-  // separate importable Menu Build item solely because it is a HH variant.
-  const regular = source.filter((record) =>
-    !['possible_happy_hour', 'explicit_happy_hour'].includes(record.pricing_program_classification)
-  );
-  const heldForReview = source.length - regular.length;
+  // Aloha may repeat a PLU for scheduled prices. Toast migration ignores
+  // those schedules and imports one base/normal-price menu item per PLU.
+  const regular = collapseScheduledPrices(source);
+  const scheduledRowsCollapsed = source.length - regular.length;
 
   const rows = toMenuBuildRows(regular, config);
   const headers = [
@@ -53,8 +52,7 @@ function main() {
     sheetName: config.menuBuild.sheetName,
     sourceRows: source.length,
     menuBuildRows: rows.length,
-    happyHourRowsHeldForReview: heldForReview,
-    happyHourImportsAutomatically: config.notes.happyHour.importsAutomatically
+    scheduledRowsCollapsed
   }, null, 2));
 }
 
