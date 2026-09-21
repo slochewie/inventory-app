@@ -28,6 +28,8 @@ toast_prep="${prefix}.toast-prep.csv"
 mapped="${prefix}.mapped.csv"
 validation="${prefix}.validation.csv"
 menu_build="${prefix}.toast-menu-build.csv"
+beer_build="${prefix}.toast-beer.csv"
+liquor_build="${prefix}.toast-liquor.csv"
 template_mapped="${prefix}.toast-template.csv"
 
 node "$SCRIPT_DIR/aloha.normalize.js" \
@@ -59,6 +61,9 @@ fi
 node "$SCRIPT_DIR/toast.menu-build.js" \
   "$mapped" "$menu_build"
 
+node "$SCRIPT_DIR/toast.beverage-build.js" \
+  "$mapped" "$beer_build" "$liquor_build"
+
 if [[ -n "$toast_template" ]]; then
   node "$SCRIPT_DIR/toast.map-template.js" \
     "$mapped" "$toast_template" "$template_mapped"
@@ -71,6 +76,8 @@ printf 'Toast candidates:        %s\n' "$toast_prep"
 printf 'Stable mapped records:   %s\n' "$mapped"
 printf 'Validation report:       %s\n' "$validation"
 printf 'Toast Menu Build:        %s\n' "$menu_build"
+printf 'Toast Beer reconciliation: %s\n' "$beer_build"
+printf 'Toast Liquor input:        %s\n' "$liquor_build"
 if [[ -n "$toast_template" ]]; then
   printf 'Exact-template mapping:  %s\n' "$template_mapped"
 fi
