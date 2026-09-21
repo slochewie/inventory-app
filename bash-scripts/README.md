@@ -1,27 +1,28 @@
-# Aloha → Toast CSV normalization
+# Aloha → Toast menu normalization
 
-This directory contains the first reusable normalization code for the inventory/menu-items project.
+This directory contains the reusable Aloha menu export → Toast Menu Build conversion pipeline.
 
 ## Run
 
 ```bash
-chmod +x bash-scripts/run-aloha-to-toast.sh
-./bash-scripts/run-aloha-to-toast.sh "McCarthy's Pub Menu Items.csv"
+bash ./bash-scripts/test-all.sh
+
+bash ./bash-scripts/normalize-aloha-for-review.sh \
+  "McCarthy's Pub Menu Items.csv" \
+  ./output
 ```
 
-That creates:
+The primary migration output is:
 
-- `McCarthy's Pub Menu Items.toast-prep.csv` — reviewable normalized rows.
-- `McCarthy's Pub Menu Items.skipped.csv` — rows removed from the main output with a reason.
-
-You can also call the Node script directly:
-
-```bash
-node bash-scripts/aloha.to.toast.menu.js input.csv output.csv --skipped skipped.csv --debug
-```
+- `<name>.toast-menu-build.csv` — Toast-facing Menu Build rows, one base/normal-price item per Aloha PLU.
+- `<name>.validation.csv` — errors and review warnings.
+- `<name>.mapped.csv` — stable source-to-Toast intermediate records for debugging/review.
+- `<name>.skipped.csv` — source rows excluded during normalization.
 
 ## Current normalization
 
-The Node script detects the Aloha header row, removes report noise and totals, normalizes CSV cells and prices, preserves the original source columns, and adds candidate Toast fields. It also flags explicit Happy Hour rows and matching item/price pairs where the lower price is exactly $1 below the regular price.
+The pipeline detects the Aloha header, removes report noise, legacy pre-menu food rows, blank item slots and structural/index rows, carries Aloha section labels into Toast Menu Group names, preserves PLU and effective-time data for reconciliation, and validates the stable intermediate records.
 
-The output is intentionally an intermediate review format rather than a final Toast bulk-import file. The next iterations can add mappings against the Toast template without throwing away the original Aloha data.
+Aloha scheduled pricing is intentionally not migrated. Repeated scheduled rows for the same PLU are collapsed to one Toast Menu Build item using the normal/base price. Happy Hour classification and review are not part of the normal migration workflow.
+
+Aloha `Ask` prices are retained as open-price review items and emitted with a blank Toast Base Price rather than an invalid text price.
