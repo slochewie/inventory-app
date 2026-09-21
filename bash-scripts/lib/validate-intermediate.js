@@ -4,6 +4,10 @@ function clean(value) {
   return String(value ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function isOpenPrice(value) {
+  return /^ask$/i.test(clean(value));
+}
+
 function numericPrice(value) {
   const text = clean(value).replace(/[,$]/g, '');
   if (!text) return null;
@@ -25,6 +29,8 @@ function validateRecord(record, index) {
 
   if (!priceText) {
     issues.push({ source_row_number: row, severity: 'warning', field: 'price', code: 'missing_price', message: 'Price is blank.' });
+  } else if (isOpenPrice(priceText)) {
+    issues.push({ source_row_number: row, severity: 'warning', field: 'price', code: 'open_price', message: 'Aloha price is Ask (open price); Toast Base Price will be left blank for review.' });
   } else if (price === null) {
     issues.push({ source_row_number: row, severity: 'error', field: 'price', code: 'invalid_price', message: `Price is not numeric: ${priceText}` });
   } else if (price < 0) {
@@ -90,4 +96,4 @@ function validateRecords(records) {
   return { issues, counts, valid: counts.error === 0 };
 }
 
-module.exports = { numericPrice, validateRecord, validateRecords };
+module.exports = { isOpenPrice, numericPrice, validateRecord, validateRecords };
