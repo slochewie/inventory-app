@@ -31,6 +31,7 @@ menu_build="${prefix}.toast-menu-build.csv"
 beer_build="${prefix}.toast-beer.csv"
 liquor_build="${prefix}.toast-liquor.csv"
 beer_tab="${prefix}.toast-beer-tab.csv"
+liquor_tab="${prefix}.toast-liquor-tab.csv"
 template_mapped="${prefix}.toast-template.csv"
 
 node "$SCRIPT_DIR/aloha.normalize.js" \
@@ -68,6 +69,9 @@ node "$SCRIPT_DIR/toast.beverage-build.js" \
 node "$SCRIPT_DIR/toast.beer-tab.js" \
   "$beer_build" "$beer_tab"
 
+node "$SCRIPT_DIR/toast.liquor-tab.js" \
+  "$liquor_build" "$liquor_tab"
+
 if [[ -n "$toast_template" ]]; then
   node "$SCRIPT_DIR/toast.map-template.js" \
     "$mapped" "$toast_template" "$template_mapped"
@@ -83,6 +87,7 @@ printf 'Toast Menu Build:        %s\n' "$menu_build"
 printf 'Toast Beer reconciliation: %s\n' "$beer_build"
 printf 'Toast Beer tab staging:     %s\n' "$beer_tab"
 printf 'Toast Liquor input:        %s\n' "$liquor_build"
+printf 'Toast Liquor tab staging:  %s\n' "$liquor_tab"
 if [[ -n "$toast_template" ]]; then
   printf 'Exact-template mapping:  %s\n' "$template_mapped"
 fi
