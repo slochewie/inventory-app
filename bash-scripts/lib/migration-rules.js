@@ -18,6 +18,7 @@ const DEFAULT_RULES = {
     'VODKA',
     'RUM',
     'GIN',
+    'WINE GLASS',
   ],
   renamedGroups: {
     'BOURB WHISK': 'WHISKEY/BOURBON',
