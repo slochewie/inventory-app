@@ -53,6 +53,7 @@ function mapRecord(record, config = {}) {
       'number',
       'sku',
     ]),
+    effective_time: clean(record.effective_time),
     pricing_program_classification: clean(record.pricing_program_classification),
     pricing_program_confidence: clean(record.pricing_program_confidence),
     pricing_program_reason: clean(record.pricing_program_reason),
