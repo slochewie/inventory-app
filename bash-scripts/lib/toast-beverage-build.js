@@ -153,6 +153,8 @@ function buildBeverageRows(records) {
       continue;
     }
 
+    if (category === 'WINE GLASS') continue;
+
     const liquorName = clean(record.item_name);
     const sourceLiquorType = category === 'BOURB WHISK' ? 'WHISKEY/BOURBON' : category;
     const liquorType = LIQUOR_TYPE_OVERRIDES.get(liquorName.toLowerCase()) || sourceLiquorType;
