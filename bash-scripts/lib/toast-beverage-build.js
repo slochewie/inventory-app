@@ -12,7 +12,7 @@ const OMIT_BEERS = new Set([
   'jameson can', 'draft', 'dba', 'weinstephan', 'stone', 'rogue',
   'liquid gravity', 'fig mtn davy brown', 'pizza port', 'alesmith',
   'maui brewing', 'voodoo ranger', 'lg dope melody', 'wandering don',
-  'weihenstephan', "killian's", 'tap it', 'weihensteph', 'new beer',
+  'weihenstephan', "killian's", 'tap it', 'weihensteph', 'new beer', 'tdne', 'silva',
 ]);
 
 const BEER_ALIASES = new Map(Object.entries({
@@ -35,6 +35,7 @@ const BEER_ALIASES = new Map(Object.entries({
   'cali squeeze': 'cali squeeze',
   'coors original': 'coors original',
   'coors og': 'coors original',
+  'sierra': 'sierra nevada hazy ipa',
   'weinstephan': 'weihenstephan',
   'weihensteph': 'weihenstephan',
 }));
