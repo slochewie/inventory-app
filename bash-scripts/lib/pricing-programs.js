@@ -41,14 +41,17 @@ function classifyPriceVariants(records, options = {}) {
     nameField = 'toast_candidate_name',
     priceField = 'toast_candidate_price',
     discount = 1,
+    identityField = 'item_number',
   } = options;
 
   const groups = new Map();
 
   records.forEach((record, index) => {
-    const key = comparableName(record[nameField]);
+    const nameKey = comparableName(record[nameField]);
+    const identity = normalizeName(record[identityField]);
+    const key = identity ? `${nameKey}::${identity}` : nameKey;
     const price = numericPrice(record[priceField]);
-    if (!key || price === null) return;
+    if (!nameKey || price === null) return;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push({ index, record, price });
   });
