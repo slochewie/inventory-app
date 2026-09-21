@@ -13,6 +13,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseCsv, stringifyCsv } = require('./lib/csv');
 
 const HELP = `Usage:
   aloha.normalize.js input.csv output.csv [options]
@@ -42,43 +43,6 @@ function parseArgs(argv) {
   }
 
   return { ...options, input: positional[0] || '', output: positional[1] || '' };
-}
-
-function parseCsv(text) {
-  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-  const rows = [];
-  let row = [];
-  let field = '';
-  let quoted = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    const next = text[i + 1];
-
-    if (quoted) {
-      if (ch === '"' && next === '"') {
-        field += '"';
-        i += 1;
-      } else if (ch === '"') quoted = false;
-      else field += ch;
-    } else if (ch === '"') quoted = true;
-    else if (ch === ',') {
-      row.push(field);
-      field = '';
-    } else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && next === '\n') i += 1;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-    } else field += ch;
-  }
-
-  if (field || row.length) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows;
 }
 
 function clean(value) {
