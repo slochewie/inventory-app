@@ -58,6 +58,7 @@ function main() {
   const outputRows = [];
   const skippedRows = [];
   let currentSection = '';
+  let sawFirstSection = false;
 
   for (let i = 0; i < dataRows.length; i += 1) {
     const sourceRowNumber = headerInfo.index + 2 + i;
@@ -66,7 +67,13 @@ function main() {
     const sectionName = sectionLabel(rawItemName);
     if (sectionName) {
       currentSection = sectionName;
+      sawFirstSection = true;
       skippedRows.push({ sourceRowNumber, reason: 'section/category label row', row });
+      continue;
+    }
+
+    if (!sawFirstSection) {
+      skippedRows.push({ sourceRowNumber, reason: 'pre-menu legacy row', row });
       continue;
     }
 
