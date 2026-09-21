@@ -10,7 +10,7 @@ const HELP = `Usage:
   aloha.map-fields.js input.csv output.csv [--config mapping.json]
 
 The output is a stable intermediate schema:
-  source_row_number,item_name,price,category,plu,
+  source_row_number,item_name,price,category,plu,effective_time,
   pricing_program_classification,pricing_program_confidence,
   pricing_program_reason,pricing_program_matching_rows
 
@@ -69,6 +69,7 @@ function main() {
     'price',
     'category',
     'plu',
+    'effective_time',
     'pricing_program_classification',
     'pricing_program_confidence',
     'pricing_program_reason',
