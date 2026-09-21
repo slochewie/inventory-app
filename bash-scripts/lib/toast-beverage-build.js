@@ -64,10 +64,16 @@ function keyName(value) {
   return BEER_ALIASES.get(normalized) || normalized;
 }
 
+function titleBeerName(value) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .replace(/\bIpa\b/g, 'IPA')
+    .replace(/\bNa\b/g, 'NA');
+}
+
 function displayName(value) {
   const name = strippedName(value);
-  const key = keyName(value);
-  if (BEER_ALIASES.has(key)) return key.replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const rawKey = name.toLowerCase().replace(/[.'’]/g, '').replace(/\s+/g, ' ').trim();
+  if (BEER_ALIASES.has(rawKey)) return titleBeerName(keyName(value));
   return name || clean(value);
 }
 
@@ -112,8 +118,7 @@ function buildBeverageRows(records) {
 
       // Canonicalize display names for known cross-size aliases too.
       const rawKey = strippedName(record.item_name).toLowerCase().replace(/[.'’]/g, '').replace(/\s+/g, ' ').trim();
-      if (BEER_ALIASES.has(rawKey)) row.item_name = keyName(record.item_name)
-        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+      if (BEER_ALIASES.has(rawKey)) row.item_name = titleBeerName(keyName(record.item_name));
 
       if (category === 'BEER CAN') {
         if (/\btall\b/i.test(clean(record.item_name))) {
@@ -153,4 +158,4 @@ function buildBeverageRows(records) {
   return { beer: keptBeer, liquor };
 }
 
-module.exports = { buildBeverageRows, displayName, happyHourPrice, keyName };
+module.exports = { buildBeverageRows, displayName, happyHourPrice, keyName, titleBeerName };
