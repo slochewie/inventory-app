@@ -57,10 +57,19 @@ function main() {
   const outputHeaders = buildOutputHeaders(headers);
   const outputRows = [];
   const skippedRows = [];
+  let currentSection = '';
 
   for (let i = 0; i < dataRows.length; i += 1) {
     const sourceRowNumber = headerInfo.index + 2 + i;
     const row = normalizeRowLength(dataRows[i], headers.length);
+    const rawItemName = valueAt(row, analysis.itemNameIndex);
+    const sectionName = sectionLabel(rawItemName);
+    if (sectionName) {
+      currentSection = sectionName;
+      skippedRows.push({ sourceRowNumber, reason: 'section/category label row', row });
+      continue;
+    }
+
     const skipReason = getSkipReason(row, headers, rawHeaders, analysis, args);
 
     if (skipReason) {
@@ -77,6 +86,7 @@ function main() {
       valueAt(row, analysis.menuGroupIndex),
       valueAt(row, analysis.categoryIndex),
       valueAt(row, analysis.departmentIndex),
+      currentSection,
     ]);
 
     record.toast_candidate_name = normalizeItemName(candidateName);
@@ -397,6 +407,8 @@ function getSkipReason(row, headers, rawHeaders, analysis, args) {
     return looksLikeMoney(valueAt(row, columnIndex));
   });
 
+  if (!itemName) return 'blank item slot';
+  if (isStructuralItemName(itemName)) return 'structural/index row';
   if (!itemName && !hasPrice) return 'no item name or price';
 
   if (!args.keepSectionRows && nonEmpty.length === 1 && !hasPrice) {
@@ -432,6 +444,23 @@ function isReportMetadataRow(row) {
 function isTotalRow(row) {
   const first = normalizeHeaderText(nonEmptyCells(row)[0] || '');
   return /^(total|subtotal|grand total|record count|count|number of records)\b/.test(first);
+}
+
+function sectionLabel(value) {
+  const raw = normalizeWhitespace(value);
+  const match = raw.match(/^<\s*(.*?)\s*>$/);
+  if (!match) return '';
+  return normalizeWhitespace(match[1]);
+}
+
+function isStructuralItemName(value) {
+  const raw = normalizeWhitespace(value);
+  if (!raw) return false;
+  if (/^[=\-_* ]+$/.test(raw)) return true;
+  if (/^=+\s*<.*>\s*=+$/.test(raw)) return true;
+  if (/^ITEM INDEX:?$/i.test(raw)) return true;
+  if (/^\d+\s+.*\s+#S$/i.test(raw)) return true;
+  return false;
 }
 
 function looksLikeSectionLabel(value) {
