@@ -88,6 +88,10 @@ function price(value) {
   return /^ask$/i.test(text) ? '' : text;
 }
 
+const WELL_LIQUOR_NAMES = new Set([
+  'bourbon well', 'gin well', 'rum well', 'scotch well', 'tequila well', 'vodka well',
+]);
+
 function buildBeverageRows(records) {
   const beer = new Map();
   const liquor = [];
@@ -144,7 +148,7 @@ function buildBeverageRows(records) {
     liquor.push({
       item_name: clean(record.item_name),
       base_price: price(record.price),
-      happy_hour_price: '',
+      happy_hour_price: WELL_LIQUOR_NAMES.has(clean(record.item_name).toLowerCase()) ? happyHourPrice(record.price) : '',
       liquor_type: category === 'BOURB WHISK' ? 'WHISKEY/BOURBON' : category,
     });
   }
@@ -158,4 +162,4 @@ function buildBeverageRows(records) {
   return { beer: keptBeer, liquor };
 }
 
-module.exports = { buildBeverageRows, displayName, happyHourPrice, keyName, titleBeerName };
+module.exports = { buildBeverageRows, displayName, happyHourPrice, keyName, titleBeerName, WELL_LIQUOR_NAMES };
