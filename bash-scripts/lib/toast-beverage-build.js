@@ -83,7 +83,8 @@ function buildBeverageRows(records) {
           item_name: displayName(record.item_name),
           draft_10oz_price: '',
           draft_16oz_price: '',
-          can_price: '',
+          can_12oz_price: '',
+          can_24oz_price: '',
           obsolete_20oz_price: '',
         });
       }
@@ -96,7 +97,10 @@ function buildBeverageRows(records) {
       if (BEER_ALIASES.has(keyName(record.item_name))) row.item_name = keyName(record.item_name)
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
-      if (category === 'BEER CAN') row.can_price = price(record.price);
+      if (category === 'BEER CAN') {
+        if (/\btall\b/i.test(clean(record.item_name))) row.can_24oz_price = price(record.price);
+        else row.can_12oz_price = price(record.price);
+      }
       else if (category === 'DRAFT 10OZ') row.draft_10oz_price = price(record.price);
       else if (category === 'DRAFT REG PINT') row.draft_16oz_price = price(record.price);
       else row.obsolete_20oz_price = price(record.price);
