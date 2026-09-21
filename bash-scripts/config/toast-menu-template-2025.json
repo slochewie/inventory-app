@@ -1,0 +1,23 @@
+{
+  "templateVersion": "Toast Menu Template updated 29 April 2025",
+  "menuBuild": {
+    "sheetName": "Menu Build",
+    "headerRow": 22,
+    "firstDataRow": 23,
+    "columns": {
+      "itemName": 1,
+      "basePrice": 2,
+      "description": 3,
+      "menuGroupName": 4,
+      "modifierGroups": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    }
+  },
+  "notes": {
+    "happyHour": {
+      "supportedByTemplate": true,
+      "importsAutomatically": false,
+      "manualToastWebBuildRequired": true,
+      "supportsTwoDailyTimeRanges": true
+    }
+  }
+}
