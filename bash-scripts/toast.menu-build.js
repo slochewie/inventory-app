@@ -6,6 +6,7 @@ const path = require('node:path');
 const { parseCsv, stringifyCsv } = require('./lib/csv');
 const { toMenuBuildRows } = require('./lib/toast-menu-build');
 const { collapseScheduledPrices } = require('./lib/collapse-scheduled-prices');
+const { applyMigrationRules } = require('./lib/migration-rules');
 
 function records(rows) {
   const headers = rows[0] || [];
@@ -33,7 +34,10 @@ function main() {
   const regular = collapseScheduledPrices(source);
   const scheduledRowsCollapsed = source.length - regular.length;
 
-  const rows = toMenuBuildRows(regular, config);
+  // Apply migration-scope rules after scheduled-price collapse so exclusions
+  // operate on actual Aloha items rather than their scheduled price rows.
+  const migration = applyMigrationRules(regular);
+  const rows = toMenuBuildRows(migration.kept, config);
   const headers = [
     'Item Name',
     'Base Price ($)',
@@ -52,7 +56,10 @@ function main() {
     sheetName: config.menuBuild.sheetName,
     sourceRows: source.length,
     menuBuildRows: rows.length,
-    scheduledRowsCollapsed
+    scheduledRowsCollapsed,
+    migrationRowsExcluded: migration.held.filter((row) => row.migration_action === 'excluded').length,
+    obsoleteRowsHeld: migration.held.filter((row) => row.migration_action === 'obsolete').length,
+    menuGroupsRenamed: migration.renamedCount
   }, null, 2));
 }
 
