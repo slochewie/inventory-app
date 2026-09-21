@@ -102,7 +102,7 @@ const WELL_LIQUOR_NAMES = new Set([
 
 function buildBeverageRows(records) {
   const beer = new Map();
-  const liquor = [];
+  const liquor = new Map();
 
   for (const record of records) {
     const category = clean(record.category).toUpperCase();
@@ -156,12 +156,20 @@ function buildBeverageRows(records) {
     const liquorName = clean(record.item_name);
     const sourceLiquorType = category === 'BOURB WHISK' ? 'WHISKEY/BOURBON' : category;
     const liquorType = LIQUOR_TYPE_OVERRIDES.get(liquorName.toLowerCase()) || sourceLiquorType;
-    liquor.push({
+    const liquorKey = `${liquorType}\u0000${liquorName.toLowerCase()}`;
+    const candidate = {
       item_name: liquorName,
       base_price: price(record.price),
-      happy_hour_price: WELL_LIQUOR_NAMES.has(clean(record.item_name).toLowerCase()) ? happyHourPrice(record.price) : '',
+      happy_hour_price: WELL_LIQUOR_NAMES.has(liquorName.toLowerCase()) ? happyHourPrice(record.price) : '',
       liquor_type: liquorType,
-    });
+    };
+    const existing = liquor.get(liquorKey);
+    // When the same reconciled liquor appears more than once, retain one Toast
+    // item. Prefer the higher regular price so an old discounted/source variant
+    // cannot become the imported base price.
+    if (!existing || Number.parseFloat(candidate.base_price) > Number.parseFloat(existing.base_price)) {
+      liquor.set(liquorKey, candidate);
+    }
   }
 
   const keptBeer = [...beer.values()].filter((row) => {
@@ -170,7 +178,7 @@ function buildBeverageRows(records) {
     return !OMIT_BEERS.has(raw) && !OMIT_BEERS.has(key);
   });
 
-  return { beer: keptBeer, liquor };
+  return { beer: keptBeer, liquor: [...liquor.values()] };
 }
 
 module.exports = { buildBeverageRows, displayName, happyHourPrice, keyName, titleBeerName, WELL_LIQUOR_NAMES, LIQUOR_TYPE_OVERRIDES };
