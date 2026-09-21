@@ -4,6 +4,17 @@ function clean(value) {
   return String(value ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+const OMIT_BEERS = new Set([
+  'domestic can', 'import can', 'tall', '$5 can', 'malibu boo', 'pb & j',
+  'the setup', 'cc 1.00', 'sierra pale', 'stiegl radler', 'fig. mtn. agua santa',
+  'sierra torpedo', 'blue moon', 'c-', 'banquet', 'bd', 'bd lite', 'm lite',
+  'h life', 'tec', 'bavic pilsner', 'ashland seltzer', 'ashland 16',
+  'jameson can', 'draft', 'dba', 'weinstephan', 'stone', 'rogue',
+  'liquid gravity', 'fig mtn davy brown', 'pizza port', 'alesmith',
+  'maui brewing', 'voodoo ranger', 'lg dope melody', 'wandering don',
+  'weihenstephan', "killian's", 'tap it', 'weihensteph', 'new beer',
+]);
+
 const BEER_ALIASES = new Map(Object.entries({
   'russ rv happy hops': 'russ rvr happy hops',
   'russ rvr happy hops': 'russ rvr happy hops',
@@ -99,7 +110,13 @@ function buildBeverageRows(records) {
     });
   }
 
-  return { beer: [...beer.values()], liquor };
+  const keptBeer = [...beer.values()].filter((row) => {
+    const raw = clean(row.item_name).toLowerCase();
+    const key = keyName(row.item_name);
+    return !OMIT_BEERS.has(raw) && !OMIT_BEERS.has(key);
+  });
+
+  return { beer: keptBeer, liquor };
 }
 
 module.exports = { buildBeverageRows, displayName, keyName };
