@@ -9,6 +9,7 @@ const {beer,liquor}=buildBeverageRows([
  {item_name:'Modelo',price:'7.00',category:'BEER CAN'},
  {item_name:'Modelo Tall',price:'9.00',category:'BEER CAN'},
  {item_name:'Jameson',price:'9.00',category:'BOURB WHISK'},
+ {item_name:'Bourbon Well',price:'7.00',category:'BOURB WHISK'},
 ]);
 assert.equal(beer.length,2);
 const guinness=beer.find(r=>r.item_name.toLowerCase().startsWith('guinness'));
@@ -20,6 +21,12 @@ const modelo=beer.find(r=>r.item_name.toLowerCase().startsWith('modelo'));
 assert.equal(modelo.can_12oz_price,'7.00');
 assert.equal(modelo.can_24oz_price,'9.00');
 assert.equal(modelo.item_name,'Modelo');
-assert.equal(liquor.length,1);
+assert.equal(liquor.length,2);
 assert.equal(liquor[0].liquor_type,'WHISKEY/BOURBON');
+assert.equal(liquor.find(r=>r.item_name==='Jameson').happy_hour_price,'');
+assert.equal(liquor.find(r=>r.item_name==='Bourbon Well').happy_hour_price,'6.00');
+assert.equal(guinness.draft_10oz_happy_hour,'5.00');
+assert.equal(guinness.draft_16oz_happy_hour,'7.00');
+assert.equal(modelo.can_12oz_happy_hour,'6.00');
+assert.equal(modelo.can_24oz_happy_hour,'8.00');
 console.log('Toast beverage build tests passed');
