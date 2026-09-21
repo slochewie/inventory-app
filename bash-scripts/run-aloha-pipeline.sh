@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [[ $# -lt 1 ]]; then
   cat >&2 <<'EOF'
 Usage:
-  run-aloha-pipeline.sh input.csv [output-prefix] [happy-hour-discount] [toast-template.csv]
+  run-aloha-pipeline.sh input.csv [output-prefix] [unused-discount] [toast-template.csv]
 
 Examples:
   ./bash-scripts/run-aloha-pipeline.sh aloha.csv
@@ -28,7 +28,6 @@ skipped="${prefix}.skipped.csv"
 toast_prep="${prefix}.toast-prep.csv"
 classified="${prefix}.classified.csv"
 mapped="${prefix}.mapped.csv"
-happy_hour_review="${prefix}.happy-hour-review.csv"
 validation="${prefix}.validation.csv"
 menu_build="${prefix}.toast-menu-build.csv"
 template_mapped="${prefix}.toast-template.csv"
@@ -49,9 +48,6 @@ node "$SCRIPT_DIR/aloha.classify-pricing.js" \
 
 node "$SCRIPT_DIR/aloha.map-fields.js" \
   "$classified" "$mapped"
-
-node "$SCRIPT_DIR/happy-hour.review.js" \
-  "$mapped" "$happy_hour_review"
 
 # Validation is a hard gate for malformed data. Warnings are written to the
 # report but do not stop the pipeline; errors stop before Toast output.
@@ -80,7 +76,6 @@ printf 'Skipped source rows:     %s\n' "$skipped"
 printf 'Toast candidates:        %s\n' "$toast_prep"
 printf 'Pricing classification:  %s\n' "$classified"
 printf 'Stable mapped records:   %s\n' "$mapped"
-printf 'Happy Hour review:       %s\n' "$happy_hour_review"
 printf 'Validation report:       %s\n' "$validation"
 printf 'Toast Menu Build:        %s\n' "$menu_build"
 if [[ -n "$toast_template" ]]; then
