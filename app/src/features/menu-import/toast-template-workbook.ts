@@ -233,9 +233,10 @@ function configurePackagedBeerSlots(sheetDoc: Document, mapping: BeerTemplateMap
 
 function writeBeerRowsToSheet(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]) {
   const draftRows = beerRows.filter(hasDraftBeerPrice)
-  const canRows = beerRows.filter(hasCanBeerPrice)
+  const canRows = beerRows.filter((row) => row.canPrice !== null)
+  const can24ozRows = beerRows.filter((row) => row.can24ozPrice !== null)
   const bottleRows = beerRows.filter((row) => row.bottlePrice !== null)
-  const writtenRowCount = Math.max(draftRows.length, canRows.length, bottleRows.length)
+  const writtenRowCount = Math.max(draftRows.length, canRows.length, can24ozRows.length, bottleRows.length)
   const clearToRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount + DATA_ROW_BUFFER)
   const targetColumns = getBeerTargetColumns(mapping)
 
@@ -247,6 +248,10 @@ function writeBeerRowsToSheet(sheetDoc: Document, mapping: BeerTemplateMapping, 
 
   canRows.forEach((beerRow, index) => {
     writeCanBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
+  })
+
+  can24ozRows.forEach((beerRow, index) => {
+    writeCan24ozBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
   })
 
   bottleRows.forEach((beerRow, index) => {
@@ -281,21 +286,20 @@ function writeDraftBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, row
 
 function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
   const canSlot = findPackagedSlot(mapping, 'can')
+  if (!canSlot || beerRow.canPrice === null) return
+
+  writeCellValue(sheetDoc, canSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
+  if (canSlot.priceCol) writeCellValue(sheetDoc, canSlot.priceCol, rowNumber, centsToDollars(beerRow.canPrice), mapping.dataStartRow)
+  if (canSlot.happyHourCol) writeCellValue(sheetDoc, canSlot.happyHourCol, rowNumber, centsToDollars(beerRow.canHappyHour), mapping.dataStartRow)
+}
+
+function writeCan24ozBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
   const can24ozSlot = findPackagedSlot(mapping, 'can24oz')
-  const nameCol = canSlot?.nameCol ?? can24ozSlot?.nameCol
-  if (!nameCol) return
+  if (!can24ozSlot || beerRow.can24ozPrice === null) return
 
-  writeCellValue(sheetDoc, nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
-
-  if (beerRow.canPrice !== null && canSlot) {
-    if (canSlot.priceCol) writeCellValue(sheetDoc, canSlot.priceCol, rowNumber, centsToDollars(beerRow.canPrice), mapping.dataStartRow)
-    if (canSlot.happyHourCol) writeCellValue(sheetDoc, canSlot.happyHourCol, rowNumber, centsToDollars(beerRow.canHappyHour), mapping.dataStartRow)
-  }
-
-  if (beerRow.can24ozPrice !== null && can24ozSlot) {
-    if (can24ozSlot.priceCol) writeCellValue(sheetDoc, can24ozSlot.priceCol, rowNumber, centsToDollars(beerRow.can24ozPrice), mapping.dataStartRow)
-    if (can24ozSlot.happyHourCol) writeCellValue(sheetDoc, can24ozSlot.happyHourCol, rowNumber, centsToDollars(beerRow.can24ozHappyHour), mapping.dataStartRow)
-  }
+  writeCellValue(sheetDoc, can24ozSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
+  if (can24ozSlot.priceCol) writeCellValue(sheetDoc, can24ozSlot.priceCol, rowNumber, centsToDollars(beerRow.can24ozPrice), mapping.dataStartRow)
+  if (can24ozSlot.happyHourCol) writeCellValue(sheetDoc, can24ozSlot.happyHourCol, rowNumber, centsToDollars(beerRow.can24ozHappyHour), mapping.dataStartRow)
 }
 
 function writeBottleBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
@@ -619,7 +623,7 @@ function getOrCreateCellWithStyleSource(sheetDoc: Document, column: number, rowN
   const cell = sheetDoc.createElementNS(SPREADSHEET_NS, 'c')
   cell.setAttribute('r', reference)
   copyStyleFromSource(sheetDoc, cell, styleSourceColumn, rowNumber)
-  insertCellSorted(row, cell, column)
+  insertCellSorted(row, cell)
   return cell
 }
 
@@ -643,9 +647,10 @@ function getOrCreateRow(sheetDoc: Document, rowNumber: number) {
   return row
 }
 
-function insertCellSorted(row: Element, cell: Element, column: number) {
+function insertCellSorted(row: Element, cell: Element, column?: number) {
+  const targetColumn = column ?? columnLettersToNumber(getCellReferenceColumn(cell.getAttribute('r') ?? ''))
   const cells = Array.from(row.getElementsByTagName('c'))
-  const nextCell = cells.find((candidate) => columnLettersToNumber(getCellReferenceColumn(candidate.getAttribute('r') ?? '')) > column)
+  const nextCell = cells.find((candidate) => columnLettersToNumber(getCellReferenceColumn(candidate.getAttribute('r') ?? '')) > targetColumn)
   row.insertBefore(cell, nextCell ?? null)
 }
 
@@ -790,10 +795,6 @@ function hasAnyBeerPrice(row: BeerTabPreviewRow) {
 
 function hasDraftBeerPrice(row: BeerTabPreviewRow) {
   return row.draft10ozPrice !== null || row.draft16ozPrice !== null
-}
-
-function hasCanBeerPrice(row: BeerTabPreviewRow) {
-  return row.canPrice !== null || row.can24ozPrice !== null
 }
 
 function centsToDollars(cents: number | null) {
