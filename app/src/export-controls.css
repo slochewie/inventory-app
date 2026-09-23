@@ -81,6 +81,7 @@
 
 .inventory-export-file-card {
   display: grid;
+  align-content: start;
   gap: 0.65rem;
   border: 1px solid #dbeafe;
   border-radius: 0.85rem;
@@ -128,6 +129,83 @@
   border-color: #cbd5e1;
   background: #e2e8f0;
   color: #64748b;
+}
+
+.inventory-export-preview {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.inventory-export-preview summary {
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.7rem;
+}
+
+.inventory-export-preview summary span {
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.inventory-export-preview summary strong {
+  color: #64748b;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.inventory-export-preview[open] summary {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.inventory-export-preview-empty,
+.inventory-export-preview-more {
+  color: #64748b !important;
+  font-size: 0.75rem !important;
+  padding: 0.65rem 0.7rem;
+}
+
+.inventory-export-preview-table-wrap {
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.inventory-export-preview-table {
+  width: 100%;
+  min-width: 42rem;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.inventory-export-preview-table th,
+.inventory-export-preview-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.inventory-export-preview-table th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.inventory-export-preview-table td {
+  background: #fff;
+  color: #0f172a;
 }
 
 .inventory-category-rule-panel {
