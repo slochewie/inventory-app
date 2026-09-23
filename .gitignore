@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# TanStack / Vite build output
+.output/
+dist/
+.vite/
+.tanstack/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Local secrets
+secrets/
+
+# Local CSV imports/exports in repository root
+/*.csv
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing / coverage
+coverage/
+playwright-report/
+test-results/
+
+# TanStack Router generated route tree
+app/src/routeTree.gen.ts
