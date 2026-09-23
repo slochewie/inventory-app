@@ -123,7 +123,7 @@ function populateBeerSheet(workbookPackage: WorkbookPackage, items: NormalizedMe
   const sheetXml = getTextFile(workbookPackage.files, initialMapping.sheetPath)
   const sheetDoc = parseXml(sheetXml)
   const beerRows = buildWorkbookBeerRows(items)
-  const mapping = ensureCan24ozColumns(sheetDoc, initialMapping, beerRows)
+  const mapping = configurePackagedBeerSlots(sheetDoc, initialMapping, beerRows)
   const writtenRowCount = writeBeerRowsToSheet(sheetDoc, mapping, beerRows)
 
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
@@ -204,49 +204,30 @@ function titleWorkbookBeerName(value: string) {
     .replace(/\bNa\b/g, 'NA')
 }
 
-function ensureCan24ozColumns(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]): BeerTemplateMapping {
+function configurePackagedBeerSlots(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]): BeerTemplateMapping {
   const needsCan24oz = beerRows.some((row) => row.can24ozPrice !== null)
   const hasCan24ozSlot = mapping.packagedGroups.some((slot) => slot.kind === 'can24oz')
+  const hasBottleRows = beerRows.some((row) => row.bottlePrice !== null)
 
-  if (!needsCan24oz || hasCan24ozSlot) return mapping
+  if (!needsCan24oz || hasCan24ozSlot || hasBottleRows) return mapping
 
-  const canSlot = mapping.packagedGroups.find((slot) => slot.kind === 'can')
-  if (!canSlot) return mapping
+  const bottleIndex = mapping.packagedGroups.findIndex((slot) => slot.kind === 'bottle')
+  if (bottleIndex < 0) return mapping
 
-  const insertAfterColumn = canSlot.happyHourCol ?? canSlot.priceCol ?? canSlot.nameCol
-  const insertAtColumn = insertAfterColumn + 1
+  const bottleSlot = mapping.packagedGroups[bottleIndex]
+  writeCellValueWithStyleSource(sheetDoc, bottleSlot.nameCol, mapping.headerRow, '24oz Can', bottleSlot.nameCol)
 
-  shiftWorksheetColumns(sheetDoc, insertAtColumn, 2)
-
-  const shiftedMapping = shiftMappingColumns(mapping, insertAtColumn, 2)
-  const shiftedCanSlot = shiftedMapping.packagedGroups.find((slot) => slot.kind === 'can') ?? canSlot
-  const priceStyleColumn = shiftedCanSlot.priceCol ?? shiftedCanSlot.nameCol
-  const happyHourStyleColumn = shiftedCanSlot.happyHourCol ?? priceStyleColumn
-
-  if (shiftedCanSlot.priceCol) {
-    writeCellValueWithStyleSource(sheetDoc, shiftedCanSlot.priceCol, mapping.headerRow, '12oz', priceStyleColumn)
-  }
-  writeCellValueWithStyleSource(sheetDoc, insertAtColumn, mapping.headerRow, '24oz', priceStyleColumn)
-  writeCellValueWithStyleSource(sheetDoc, insertAtColumn + 1, mapping.headerRow, 'Happy Hour', happyHourStyleColumn)
-  copyCellStyle(sheetDoc, priceStyleColumn, insertAtColumn, mapping.dataStartRow)
-  copyCellStyle(sheetDoc, happyHourStyleColumn, insertAtColumn + 1, mapping.dataStartRow)
-
-  const can24ozSlot: PackagedGroupSlot = {
-    label: '24oz',
+  const packagedGroups = [...mapping.packagedGroups]
+  packagedGroups[bottleIndex] = {
+    ...bottleSlot,
+    label: '24oz Can',
     kind: 'can24oz',
-    nameCol: shiftedCanSlot.nameCol,
-    priceCol: insertAtColumn,
-    happyHourCol: insertAtColumn + 1,
   }
-
-  const canIndex = shiftedMapping.packagedGroups.findIndex((slot) => slot.kind === 'can')
-  const packagedGroups = [...shiftedMapping.packagedGroups]
-  packagedGroups.splice(canIndex + 1, 0, can24ozSlot)
 
   return {
-    ...shiftedMapping,
+    ...mapping,
     packagedGroups,
-    warnings: shiftedMapping.warnings.filter((warning) => !/24oz Can column/i.test(warning)),
+    warnings: mapping.warnings.filter((warning) => !/24oz can/i.test(warning)),
   }
 }
 
@@ -383,7 +364,7 @@ function getBeerTemplateMapping(workbookPackage: WorkbookPackage): BeerTemplateM
   if (draftSizes.length === 0) warnings.push('Beer tab has no draft size columns')
   if (canColumn === null) warnings.push('Beer tab has no Can column')
   if (!packagedGroups.some((slot) => slot.kind === 'can24oz')) {
-    warnings.push('Beer tab has no 24oz can columns yet; they will be added when the uploaded Aloha export contains 24oz cans')
+    warnings.push('Beer tab has no 24oz can columns yet; Bottle will be renamed to 24oz Can when the uploaded Aloha export contains 24oz cans and no bottle beers')
   }
 
   return {
@@ -642,55 +623,10 @@ function getOrCreateCellWithStyleSource(sheetDoc: Document, column: number, rowN
   return cell
 }
 
-function copyCellStyle(sheetDoc: Document, sourceColumn: number, targetColumn: number, rowNumber: number) {
-  const cell = getOrCreateCellWithStyleSource(sheetDoc, targetColumn, rowNumber, sourceColumn)
-  removeChildren(cell, ['v', 'is'])
-  cell.removeAttribute('t')
-}
-
 function copyStyleFromSource(sheetDoc: Document, targetCell: Element, sourceColumn: number, rowNumber: number) {
   const sourceCell = findCell(sheetDoc, sourceColumn, rowNumber)
   const styleId = sourceCell?.getAttribute('s')
   if (styleId) targetCell.setAttribute('s', styleId)
-}
-
-function shiftWorksheetColumns(sheetDoc: Document, startColumn: number, offset: number) {
-  Array.from(sheetDoc.getElementsByTagName('row')).forEach((row) => {
-    const cells = Array.from(row.getElementsByTagName('c')).sort((left, right) => (
-      columnLettersToNumber(getCellReferenceColumn(right.getAttribute('r') ?? ''))
-      - columnLettersToNumber(getCellReferenceColumn(left.getAttribute('r') ?? ''))
-    ))
-
-    cells.forEach((cell) => {
-      const reference = cell.getAttribute('r') ?? ''
-      const column = columnLettersToNumber(getCellReferenceColumn(reference))
-      const rowNumber = getCellReferenceRow(reference)
-
-      if (column >= startColumn && rowNumber !== null) {
-        cell.setAttribute('r', `${numberToColumnLetters(column + offset)}${rowNumber}`)
-      }
-    })
-  })
-}
-
-function shiftMappingColumns(mapping: BeerTemplateMapping, startColumn: number, offset: number): BeerTemplateMapping {
-  const shift = (column: number | null) => (column !== null && column >= startColumn ? column + offset : column)
-
-  return {
-    ...mapping,
-    draftNameCol: shift(mapping.draftNameCol),
-    draftSizes: mapping.draftSizes.map((slot) => ({
-      ...slot,
-      priceCol: Number(shift(slot.priceCol)),
-      happyHourCol: shift(slot.happyHourCol),
-    })),
-    packagedGroups: mapping.packagedGroups.map((slot) => ({
-      ...slot,
-      nameCol: Number(shift(slot.nameCol)),
-      priceCol: shift(slot.priceCol),
-      happyHourCol: shift(slot.happyHourCol),
-    })),
-  }
 }
 
 function getOrCreateRow(sheetDoc: Document, rowNumber: number) {
