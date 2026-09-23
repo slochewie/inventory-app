@@ -58,7 +58,12 @@ function Home() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
-  const beerTabRows = useMemo(() => buildBeerTabPreviewRows(items), [items])
+  const beerPreviewItems = useMemo(() => (
+    categoryFilter === ALL_CATEGORIES
+      ? items
+      : items.filter((item) => getCategoryKey(item.category) === categoryFilter)
+  ), [categoryFilter, items])
+  const beerTabRows = useMemo(() => buildBeerTabPreviewRows(beerPreviewItems), [beerPreviewItems])
   const filterOptions = useMemo<FilterOption[]>(() => ([
     { id: 'included', label: 'Exporting', count: summary.exportItems },
     { id: 'excluded', label: 'Not exporting', count: summary.excludedItems },
