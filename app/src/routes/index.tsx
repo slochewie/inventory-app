@@ -10,6 +10,7 @@ import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from '#/features/menu-import/beer-preview'
 import { buildToastExportFiles, downloadCsv, type ToastExportFile } from '#/features/menu-import/toast-export'
+import { ToastExportPanelView } from '#/features/menu-import/toast-export-panel'
 import {
   formatCurrency,
   summarizeMenuItems,
@@ -329,7 +330,7 @@ function Home() {
               ) : null}
             </section>
 
-            <ToastExportPanel files={toastExportFiles} />
+            <ToastExportPanelView files={toastExportFiles} />
 
             <section className="inventory-card inventory-table-card">
               <div className="inventory-table-heading">
