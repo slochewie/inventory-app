@@ -16,6 +16,7 @@
     "@niteowl/ui": "file:./packages/niteowl-ui",
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
+    "fflate": "^0.8.2",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
