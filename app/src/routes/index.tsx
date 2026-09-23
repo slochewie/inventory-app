@@ -523,14 +523,14 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 
 function BeerTabPreview({ rows }: { rows: BeerTabPreviewRow[] }) {
   return (
-    <section className="inventory-card inventory-beer-preview-card">
-      <div className="inventory-table-heading">
-        <div>
-          <p className="inventory-kicker">Toast preview</p>
-          <h2>Beer tab staging</h2>
-        </div>
-        <p>{rows.length.toLocaleString()} beer rows grouped for the Toast Beer tab.</p>
-      </div>
+    <details className="inventory-card inventory-beer-preview-card">
+      <summary className="inventory-beer-preview-summary">
+        <span>
+          <span className="inventory-kicker">Toast preview</span>
+          <strong>Beer tab staging</strong>
+        </span>
+        <span>{rows.length.toLocaleString()} grouped rows</span>
+      </summary>
 
       <div className="inventory-table-wrap">
         <table className="inventory-table inventory-beer-preview-table">
@@ -574,7 +574,7 @@ function BeerTabPreview({ rows }: { rows: BeerTabPreviewRow[] }) {
           </tbody>
         </table>
       </div>
-    </section>
+    </details>
   )
 }
 
