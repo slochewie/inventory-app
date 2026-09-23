@@ -1,4 +1,5 @@
 import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from './beer-preview'
+import { saveReviewedItems } from './review-session'
 import type { NormalizedMenuItem } from './types'
 
 export type ToastExportFile = {
@@ -84,6 +85,8 @@ const WELL_LIQUOR_NAMES = new Set([
 ])
 
 export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportFile[] {
+  saveReviewedItems(items)
+
   const included = items.filter((item) => item.exportIncluded && item.status !== 'ignored')
   const beerItems = included.filter((item) => item.toastCategory.toLowerCase() === 'beer')
   const liquorItems = included.filter((item) => isLiquorItem(item))
