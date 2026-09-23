@@ -3,7 +3,8 @@ import { downloadCsv, type ToastExportFile } from './toast-export'
 const PREVIEW_ROW_LIMIT = 10
 
 export function ToastExportPanelView({ files }: { files: ToastExportFile[] }) {
-  const totalRows = files.reduce((total, file) => total + file.rowCount, 0)
+  const downloadRows = files.filter((file) => file.id !== 'review').reduce((total, file) => total + file.rowCount, 0)
+  const reviewFile = files.find((file) => file.id === 'review')
 
   return (
     <section className="inventory-card inventory-export-panel">
@@ -12,7 +13,10 @@ export function ToastExportPanelView({ files }: { files: ToastExportFile[] }) {
           <p className="inventory-kicker">Toast export</p>
           <h2>Generated CSVs</h2>
         </div>
-        <p>{totalRows.toLocaleString()} rows staged from currently export-included items.</p>
+        <p>
+          {downloadRows.toLocaleString()} Toast rows staged from export-included items
+          {reviewFile ? `, plus ${reviewFile.rowCount.toLocaleString()} review/audit rows.` : '.'}
+        </p>
       </div>
 
       <div className="inventory-export-file-grid">
@@ -55,25 +59,33 @@ function CsvPreview({ file }: { file: ToastExportFile }) {
         <p className="inventory-export-preview-empty">No rows are currently staged for this CSV.</p>
       ) : (
         <>
-          <div className="inventory-export-preview-table-wrap">
-            <table className="inventory-export-preview-table">
-              <thead>
-                <tr>
-                  {headers.map((header, index) => (
-                    <th key={`${file.id}-header-${index}`}>{header || `Column ${index + 1}`}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {previewRows.map((row, rowIndex) => (
-                  <tr key={`${file.id}-preview-${rowIndex}`}> 
-                    {headers.map((_, columnIndex) => (
-                      <td key={`${file.id}-preview-${rowIndex}-${columnIndex}`}>{row[columnIndex] || '—'}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="inventory-export-preview-list" role="table" aria-label={`${file.label} preview`}>
+            <div className="inventory-export-preview-header" role="row">
+              <span role="columnheader">Row</span>
+              <span role="columnheader">Populated CSV cells</span>
+            </div>
+
+            {previewRows.map((row, rowIndex) => {
+              const populatedCells = getPopulatedCells(headers, row)
+
+              return (
+                <div className="inventory-export-preview-row" role="row" key={`${file.id}-preview-${rowIndex}`}>
+                  <strong role="cell">{rowIndex + 1}</strong>
+                  <div role="cell">
+                    {populatedCells.length === 0 ? (
+                      <span className="inventory-export-preview-empty-cell">Empty row</span>
+                    ) : (
+                      populatedCells.map((cell) => (
+                        <span key={`${file.id}-${rowIndex}-${cell.index}`} className="inventory-export-preview-cell">
+                          <b>{cell.header}</b>
+                          <span>{cell.value}</span>
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           {hiddenRowCount > 0 ? (
@@ -85,4 +97,14 @@ function CsvPreview({ file }: { file: ToastExportFile }) {
       )}
     </details>
   )
+}
+
+function getPopulatedCells(headers: string[], row: string[]) {
+  return headers
+    .map((header, index) => ({
+      header: header || `Column ${index + 1}`,
+      value: row[index]?.trim() ?? '',
+      index,
+    }))
+    .filter((cell) => cell.value)
 }
