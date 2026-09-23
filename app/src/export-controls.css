@@ -68,6 +68,68 @@
   height: 1rem;
 }
 
+.inventory-export-panel {
+  border-color: #bfdbfe;
+  background: linear-gradient(180deg, #eff6ff 0%, #fff 100%);
+}
+
+.inventory-export-file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 0.85rem;
+}
+
+.inventory-export-file-card {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid #dbeafe;
+  border-radius: 0.85rem;
+  background: #fff;
+  padding: 0.85rem;
+}
+
+.inventory-export-file-card > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.inventory-export-file-card strong {
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.inventory-export-file-card span,
+.inventory-export-file-card p {
+  color: #475569;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.inventory-export-file-card p {
+  margin: 0;
+}
+
+.inventory-export-file-card button {
+  justify-self: start;
+  cursor: pointer;
+  border: 1px solid #0f172a;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #fff;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.inventory-export-file-card button:disabled {
+  cursor: not-allowed;
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #64748b;
+}
+
 .inventory-category-rule-panel {
   align-items: start;
   grid-template-columns: minmax(0, 1fr) !important;
@@ -286,5 +348,10 @@
 
   .inventory-category-rule-actions button {
     flex: 1;
+  }
+
+  .inventory-export-file-card > div {
+    align-items: start;
+    flex-direction: column;
   }
 }
