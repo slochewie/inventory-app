@@ -19,6 +19,7 @@ export type NormalizedMenuItem = {
   name: string
   category?: string
   toastCategory: string
+  toastDestination: string
   basePriceCents: number | null
   happyHourPriceCents: number | null
   happyHourWindow?: string
