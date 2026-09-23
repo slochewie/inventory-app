@@ -8,7 +8,12 @@ import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useMemo, useState } from 'react'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
-import { summarizeMenuItems, type NormalizedMenuItem, type ParsedMenuImport } from '#/features/menu-import/types'
+import {
+  formatCurrency,
+  summarizeMenuItems,
+  type NormalizedMenuItem,
+  type ParsedMenuImport,
+} from '#/features/menu-import/types'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -37,6 +42,7 @@ function Home() {
   const [filter, setFilter] = useState<ItemFilter>('active')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const filterOptions = useMemo<FilterOption[]>(() => ([
     { id: 'active', label: 'All active', count: summary.normalizedItems },
@@ -71,6 +77,10 @@ function Home() {
   const pageStart = (clampedPage - 1) * PAGE_SIZE
   const pageItems = filteredItems.slice(pageStart, pageStart + PAGE_SIZE)
   const pageEnd = pageStart + pageItems.length
+  const selectedItem = useMemo(
+    () => items.find((item) => item.id === selectedItemId) ?? null,
+    [items, selectedItemId],
+  )
 
   async function handleAlohaCsvChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -88,9 +98,11 @@ function Home() {
       setFilter('active')
       setQuery('')
       setPage(1)
+      setSelectedItemId(null)
     } catch (error) {
       setImportFile(null)
       setItems([])
+      setSelectedItemId(null)
       setImportError(error instanceof Error ? error.message : 'Unable to read the selected file')
     }
   }
@@ -249,6 +261,12 @@ function Home() {
                 </label>
               </div>
 
+              {selectedItem ? (
+                <EditItemPanel item={selectedItem} onChange={updateItem} onClose={() => setSelectedItemId(null)} />
+              ) : (
+                <p className="inventory-edit-hint">Select Edit on a row to adjust its normalized Toast-ready values.</p>
+              )}
+
               <div className="inventory-table-wrap">
                 <table className="inventory-table inventory-review-table">
                   <thead>
@@ -259,70 +277,37 @@ function Home() {
                       <th>Base price</th>
                       <th>Happy hour</th>
                       <th>Status</th>
+                      <th aria-label="Actions" />
                     </tr>
                   </thead>
                   <tbody>
                     {pageItems.map((item) => (
-                      <tr key={item.id}>
+                      <tr key={item.id} className={selectedItemId === item.id ? 'is-selected' : undefined}>
                         <td>{item.sourceItemNumber || '—'}</td>
                         <td>
-                          <input
-                            className="inventory-table-input inventory-name-input"
-                            value={item.name}
-                            onChange={(event) => updateItem(item.id, { name: event.target.value })}
-                            aria-label={`Name for ${item.sourceItemNumber || item.id}`}
-                          />
+                          <strong>{item.name}</strong>
                           {item.notes.length > 0 ? <span>{item.notes.join(' · ')}</span> : null}
                         </td>
+                        <td>{item.category || 'Uncategorized'}</td>
+                        <td>{formatCurrency(item.basePriceCents)}</td>
                         <td>
-                          <input
-                            className="inventory-table-input"
-                            value={item.category || ''}
-                            onChange={(event) => updateItem(item.id, { category: event.target.value || undefined })}
-                            placeholder="Uncategorized"
-                            aria-label={`Category for ${item.name}`}
-                          />
+                          {item.happyHourPriceCents === null
+                            ? '—'
+                            : `${formatCurrency(item.happyHourPriceCents)}${item.happyHourWindow ? ` · ${item.happyHourWindow}` : ''}`}
                         </td>
                         <td>
-                          <input
-                            className="inventory-table-input inventory-price-input"
-                            inputMode="decimal"
-                            value={formatCentsInput(item.basePriceCents)}
-                            onChange={(event) => updateItem(item.id, { basePriceCents: parseCurrencyInput(event.target.value) })}
-                            placeholder="Review"
-                            aria-label={`Base price for ${item.name}`}
-                          />
+                          <span className={`inventory-status inventory-status-${item.status}`}>
+                            {item.status}
+                          </span>
                         </td>
                         <td>
-                          <div className="inventory-happy-hour-cell">
-                            <input
-                              className="inventory-table-input inventory-price-input"
-                              inputMode="decimal"
-                              value={formatCentsInput(item.happyHourPriceCents)}
-                              onChange={(event) => updateItem(item.id, { happyHourPriceCents: parseCurrencyInput(event.target.value) })}
-                              placeholder="—"
-                              aria-label={`Happy hour price for ${item.name}`}
-                            />
-                            <input
-                              className="inventory-table-input inventory-window-input"
-                              value={item.happyHourWindow || ''}
-                              onChange={(event) => updateItem(item.id, { happyHourWindow: event.target.value || undefined })}
-                              placeholder="Window"
-                              aria-label={`Happy hour window for ${item.name}`}
-                            />
-                          </div>
-                        </td>
-                        <td>
-                          <select
-                            className={`inventory-status-select inventory-status-${item.status}`}
-                            value={item.status}
-                            onChange={(event) => updateItem(item.id, { status: event.target.value as NormalizedMenuItem['status'] })}
-                            aria-label={`Status for ${item.name}`}
+                          <button
+                            className="inventory-row-action"
+                            type="button"
+                            onClick={() => setSelectedItemId(item.id)}
                           >
-                            <option value="ready">Ready</option>
-                            <option value="review">Review</option>
-                            <option value="ignored">Ignored</option>
-                          </select>
+                            Edit
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -366,6 +351,88 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
       <span>{label}</span>
       <strong>{value.toLocaleString()}</strong>
     </article>
+  )
+}
+
+function EditItemPanel({
+  item,
+  onChange,
+  onClose,
+}: {
+  item: NormalizedMenuItem
+  onChange: (itemId: string, patch: Partial<NormalizedMenuItem>) => void
+  onClose: () => void
+}) {
+  return (
+    <section className="inventory-edit-panel" aria-label={`Edit ${item.name}`}>
+      <div className="inventory-edit-panel-heading">
+        <div>
+          <p className="inventory-kicker">Editing {item.sourceItemNumber ? `Aloha #${item.sourceItemNumber}` : 'item'}</p>
+          <h3>{item.name}</h3>
+        </div>
+        <button type="button" onClick={onClose}>Close</button>
+      </div>
+
+      <div className="inventory-edit-grid">
+        <label>
+          <span>Name</span>
+          <input
+            value={item.name}
+            onChange={(event) => onChange(item.id, { name: event.target.value })}
+          />
+        </label>
+
+        <label>
+          <span>Category</span>
+          <input
+            value={item.category || ''}
+            onChange={(event) => onChange(item.id, { category: event.target.value || undefined })}
+            placeholder="Uncategorized"
+          />
+        </label>
+
+        <label>
+          <span>Base price</span>
+          <input
+            inputMode="decimal"
+            value={formatCentsInput(item.basePriceCents)}
+            onChange={(event) => onChange(item.id, { basePriceCents: parseCurrencyInput(event.target.value) })}
+            placeholder="Review"
+          />
+        </label>
+
+        <label>
+          <span>Happy-hour price</span>
+          <input
+            inputMode="decimal"
+            value={formatCentsInput(item.happyHourPriceCents)}
+            onChange={(event) => onChange(item.id, { happyHourPriceCents: parseCurrencyInput(event.target.value) })}
+            placeholder="None"
+          />
+        </label>
+
+        <label>
+          <span>Happy-hour window</span>
+          <input
+            value={item.happyHourWindow || ''}
+            onChange={(event) => onChange(item.id, { happyHourWindow: event.target.value || undefined })}
+            placeholder="17:00–19:00"
+          />
+        </label>
+
+        <label>
+          <span>Status</span>
+          <select
+            value={item.status}
+            onChange={(event) => onChange(item.id, { status: event.target.value as NormalizedMenuItem['status'] })}
+          >
+            <option value="ready">Ready</option>
+            <option value="review">Review</option>
+            <option value="ignored">Ignored</option>
+          </select>
+        </label>
+      </div>
+    </section>
   )
 }
 
