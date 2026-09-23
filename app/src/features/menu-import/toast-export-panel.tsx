@@ -3,8 +3,11 @@ import { downloadCsv, type ToastExportFile } from './toast-export'
 const PREVIEW_ROW_LIMIT = 10
 
 export function ToastExportPanelView({ files }: { files: ToastExportFile[] }) {
-  const downloadRows = files.filter((file) => file.id !== 'review').reduce((total, file) => total + file.rowCount, 0)
-  const reviewFile = files.find((file) => file.id === 'review')
+  const toastRows = files
+    .filter((file) => file.id === 'beer-tab' || file.id === 'liquor')
+    .reduce((total, file) => total + file.rowCount, 0)
+  const exportReviewFile = files.find((file) => file.id === 'export-review')
+  const auditFile = files.find((file) => file.id === 'audit')
 
   return (
     <section className="inventory-card inventory-export-panel">
@@ -14,8 +17,9 @@ export function ToastExportPanelView({ files }: { files: ToastExportFile[] }) {
           <h2>Generated CSVs</h2>
         </div>
         <p>
-          {downloadRows.toLocaleString()} Toast rows staged from export-included items
-          {reviewFile ? `, plus ${reviewFile.rowCount.toLocaleString()} review/audit rows.` : '.'}
+          {toastRows.toLocaleString()} Toast tab rows staged
+          {exportReviewFile ? `, ${exportReviewFile.rowCount.toLocaleString()} export review rows` : ''}
+          {auditFile ? `, plus ${auditFile.rowCount.toLocaleString()} all-rows audit rows.` : '.'}
         </p>
       </div>
 
