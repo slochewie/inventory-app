@@ -49,19 +49,6 @@ type LiquorTemplateMapping = {
   slots: LiquorSlot[]
 }
 
-export function buildPopulatedToastTemplateWorkbookWithLiquor({
-  templateArrayBuffer,
-  items,
-}: {
-  templateArrayBuffer: ArrayBuffer
-  items: NormalizedMenuItem[]
-}) {
-  const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({ templateArrayBuffer, items })
-  const workbookPackagePromise = beerPopulatedWorkbook.arrayBuffer()
-
-  throw new Error('buildPopulatedToastTemplateWorkbookWithLiquorAsync must be used for Liquor workbook population')
-}
-
 export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   templateArrayBuffer,
   items,
@@ -353,14 +340,14 @@ function getOrCreateCell(sheetDoc: Document, column: number, rowNumber: number, 
   const row = getOrCreateRow(sheetDoc, rowNumber)
   const reference = `${numberToColumnLetters(column)}${rowNumber}`
   const existing = findCellInRow(row, reference)
-  if (existing) return existing
+  if (existing) {
+    copyStyleFromSource(sheetDoc, existing, column, templateRow)
+    return existing
+  }
 
   const cell = sheetDoc.createElementNS(SPREADSHEET_NS, 'c')
   cell.setAttribute('r', reference)
-
-  const templateCell = findCell(sheetDoc, column, templateRow)
-  const styleId = templateCell?.getAttribute('s')
-  if (styleId) cell.setAttribute('s', styleId)
+  copyStyleFromSource(sheetDoc, cell, column, templateRow)
 
   insertCellSorted(row, cell, column)
   return cell
@@ -382,10 +369,11 @@ function getOrCreateCellWithStyleSource(sheetDoc: Document, column: number, rowN
   return cell
 }
 
-function copyStyleFromSource(sheetDoc: Document, targetCell: Element, sourceColumn: number, rowNumber: number) {
-  const sourceCell = findCell(sheetDoc, sourceColumn, rowNumber)
+function copyStyleFromSource(sheetDoc: Document, targetCell: Element, sourceColumn: number, sourceRow: number) {
+  const sourceCell = findCell(sheetDoc, sourceColumn, sourceRow)
   const styleId = sourceCell?.getAttribute('s')
   if (styleId) targetCell.setAttribute('s', styleId)
+  else targetCell.removeAttribute('s')
 }
 
 function getOrCreateRow(sheetDoc: Document, rowNumber: number) {
