@@ -1,4 +1,4 @@
-import { buildBeerTabPreviewRows } from './beer-preview'
+import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from './beer-preview'
 import type { NormalizedMenuItem } from './types'
 
 export type ToastExportFile = {
@@ -110,7 +110,7 @@ export function downloadCsv(filename: string, rows: string[][]) {
 }
 
 function buildBeerExportRows(items: NormalizedMenuItem[]) {
-  const rows = buildBeerTabPreviewRows(items)
+  const rows = mergeBeerRows(buildBeerTabPreviewRows(items))
     .filter((row) => {
       const raw = clean(row.beerName).toLowerCase()
       const key = keyName(row.beerName)
@@ -147,6 +147,38 @@ function buildBeerExportRows(items: NormalizedMenuItem[]) {
   })
 
   return out
+}
+
+function mergeBeerRows(rows: BeerTabPreviewRow[]) {
+  const merged = new Map<string, BeerTabPreviewRow>()
+
+  rows.forEach((row) => {
+    const key = keyName(row.beerName)
+    const existing = merged.get(key)
+
+    if (!existing) {
+      merged.set(key, { ...row, beerName: displayBeerName(row.beerName), reviewNotes: [...row.reviewNotes] })
+      return
+    }
+
+    copyPriceFields(existing, row)
+    existing.reviewNotes.push(...row.reviewNotes)
+  })
+
+  return [...merged.values()].sort((left, right) => left.beerName.localeCompare(right.beerName))
+}
+
+function copyPriceFields(target: BeerTabPreviewRow, source: BeerTabPreviewRow) {
+  if (source.draft10ozPrice !== null) target.draft10ozPrice = source.draft10ozPrice
+  if (source.draft10ozHappyHour !== null) target.draft10ozHappyHour = source.draft10ozHappyHour
+  if (source.draft16ozPrice !== null) target.draft16ozPrice = source.draft16ozPrice
+  if (source.draft16ozHappyHour !== null) target.draft16ozHappyHour = source.draft16ozHappyHour
+  if (source.canPrice !== null) target.canPrice = source.canPrice
+  if (source.canHappyHour !== null) target.canHappyHour = source.canHappyHour
+  if (source.can24ozPrice !== null) target.can24ozPrice = source.can24ozPrice
+  if (source.can24ozHappyHour !== null) target.can24ozHappyHour = source.can24ozHappyHour
+  if (source.bottlePrice !== null) target.bottlePrice = source.bottlePrice
+  if (source.bottleHappyHour !== null) target.bottleHappyHour = source.bottleHappyHour
 }
 
 function buildLiquorExportRows(items: NormalizedMenuItem[]) {
