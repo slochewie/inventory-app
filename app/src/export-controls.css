@@ -1,0 +1,80 @@
+.inventory-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+}
+
+.inventory-bulk-actions span {
+  color: #4b5563;
+  font-size: 0.85rem;
+  font-weight: 800;
+  margin-right: auto;
+}
+
+.inventory-bulk-actions button,
+.inventory-export-pill {
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  color: #111827;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.inventory-bulk-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.inventory-export-pill {
+  width: max-content;
+  text-transform: uppercase;
+}
+
+.inventory-export-pill.is-included {
+  border-color: #bbf7d0;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.inventory-export-pill.is-excluded {
+  border-color: #fecaca;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.inventory-export-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  font-weight: 800;
+}
+
+.inventory-export-toggle input {
+  width: 1rem;
+  height: 1rem;
+}
+
+@media (max-width: 760px) {
+  .inventory-bulk-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inventory-bulk-actions span {
+    margin-right: 0;
+  }
+}
