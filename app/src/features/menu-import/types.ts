@@ -24,6 +24,7 @@ export type NormalizedMenuItem = {
   effectiveTimes: string[]
   sourceRowCount: number
   status: NormalizedMenuItemStatus
+  exportIncluded: boolean
   notes: string[]
   rawRows: RawMenuRow[]
 }
@@ -34,6 +35,8 @@ export type MenuImportSummary = {
   ignoredItems: number
   reviewItems: number
   happyHourItems: number
+  exportItems: number
+  excludedItems: number
 }
 
 export function summarizeMenuItems(items: NormalizedMenuItem[]): MenuImportSummary {
@@ -43,6 +46,8 @@ export function summarizeMenuItems(items: NormalizedMenuItem[]): MenuImportSumma
     ignoredItems: items.filter((item) => item.status === 'ignored').length,
     reviewItems: items.filter((item) => item.status === 'review').length,
     happyHourItems: items.filter((item) => item.happyHourPriceCents !== null).length,
+    exportItems: items.filter((item) => item.exportIncluded).length,
+    excludedItems: items.filter((item) => !item.exportIncluded).length,
   }
 }
 
