@@ -16,6 +16,7 @@ The current workflow imports an **Aloha menu-price CSV**, normalizes it into a r
 - Restore reviewed state from `toast-export-review.csv`.
 - Generate Toast-facing CSV exports.
 - Upload a Toast `.xlsx` Menu Template and populate the Beer and Liquor tabs.
+- Import an already populated Toast Menu Template `.xlsx` back into reviewed menu state.
 - Map draft beer sizes and packaged beer slots, including separate standard-can and 24oz-can items.
 
 See [docs/HOWTO.md](docs/HOWTO.md) for the operator and development workflow.
@@ -26,6 +27,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for the operator and development workflow.
 | --- | --- |
 | `/` | Import, normalize, review, edit, and export Aloha menu data |
 | `/toast-workbook` | Load reviewed menu state and populate a Toast Menu Template workbook |
+| `/toast-template-import` | Import a populated Toast Menu Template workbook into reviewed menu state |
 
 ## Repository layout
 
