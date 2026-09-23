@@ -8,6 +8,16 @@ const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
 const SPREADSHEET_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 const RELATIONSHIP_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 const DATA_ROW_BUFFER = 20
+const OMIT_WORKBOOK_BEERS = new Set([
+  '$5', '$5 can', 'domestic', 'domestic can', 'import', 'import can', 'tall',
+  'malibu boo', 'pb & j', 'the setup', 'cc 1.00', 'sierra pale', 'stiegl radler',
+  'fig. mtn. agua santa', 'sierra torpedo', 'blue moon', 'c-', 'banquet', 'bd',
+  'bd lite', 'm lite', 'h life', 'tec', 'bavic pilsner', 'ashland seltzer',
+  'ashland 16', 'jameson can', 'draft', 'dba', 'weinstephan', 'stone', 'rogue',
+  'liquid gravity', 'fig mtn davy brown', 'pizza port', 'alesmith', 'maui brewing',
+  'voodoo ranger', 'lg dope melody', 'wandering don', 'weihenstephan', "killian's",
+  'tap it', 'weihensteph', 'new beer', 'tdne', 'silva',
+])
 
 export type ToastTemplateWorkbookInfo = {
   fileName: string
@@ -110,12 +120,29 @@ function populateBeerSheet(workbookPackage: WorkbookPackage, items: NormalizedMe
   const initialMapping = getBeerTemplateMapping(workbookPackage)
   const sheetXml = getTextFile(workbookPackage.files, initialMapping.sheetPath)
   const sheetDoc = parseXml(sheetXml)
-  const beerRows = buildBeerTabPreviewRows(items)
+  const beerRows = buildWorkbookBeerRows(items)
   const mapping = ensureCan24ozColumns(sheetDoc, initialMapping, beerRows)
   const writtenRowCount = writeBeerRowsToSheet(sheetDoc, mapping, beerRows)
 
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
   workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
+}
+
+function buildWorkbookBeerRows(items: NormalizedMenuItem[]) {
+  return buildBeerTabPreviewRows(items).filter((row) => hasAnyBeerPrice(row) && !isOmittedWorkbookBeer(row.beerName))
+}
+
+function isOmittedWorkbookBeer(beerName: string) {
+  const key = normalizeWorkbookBeerName(beerName)
+  return OMIT_WORKBOOK_BEERS.has(key) || /^\$?\d+(?:\.\d{2})?$/.test(key)
+}
+
+function normalizeWorkbookBeerName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[.’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function ensureCan24ozColumns(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]): BeerTemplateMapping {
