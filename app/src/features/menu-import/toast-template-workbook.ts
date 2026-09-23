@@ -11,10 +11,10 @@ const DATA_ROW_BUFFER = 20
 
 const OMIT_WORKBOOK_BEERS = new Set([
   '$5', '$5 can', 'domestic', 'domestic can', 'import', 'import can', 'tall',
-  'malibu boo', 'pb & j', 'the setup', 'cc 1.00', 'cc 100', 'c', 'c-',
-  'sierra pale', 'stiegl radler', 'fig. mtn. agua santa', 'sierra torpedo',
-  'blue moon', 'banquet', 'bd', 'bd lite', 'm lite', 'h life', 'tec',
-  'bavic pilsner', 'ashland seltzer', 'ashland 16', 'jameson can', 'draft',
+  'malibu boo', 'pb & j', 'the setup', 'cc 1.00', 'cc 100', 'cc 1', 'c', 'c-',
+  'sierra pale', 'stiegl radler', 'fig. mtn. agua santa', 'fig mtn agua santa',
+  'sierra torpedo', 'blue moon', 'banquet', 'bd', 'bd lite', 'm lite', 'h life', 'tec',
+  'bavic pilsner', 'ashland seltzer', 'ashland 16', 'jameson can', 'jameson', 'draft',
   'dba', 'weinstephan', 'stone', 'rogue', 'liquid gravity', 'fig mtn davy brown',
   'pizza port', 'alesmith', 'maui brewing', 'voodoo ranger', 'lg dope melody',
   'wandering don', 'weihenstephan', "killian's", 'tap it', 'weihensteph',
@@ -131,12 +131,50 @@ function populateBeerSheet(workbookPackage: WorkbookPackage, items: NormalizedMe
 }
 
 function buildWorkbookBeerRows(items: NormalizedMenuItem[]) {
-  return buildBeerTabPreviewRows(items).filter((row) => hasAnyBeerPrice(row) && !isOmittedWorkbookBeer(row.beerName))
+  const merged = new Map<string, BeerTabPreviewRow>()
+
+  buildBeerTabPreviewRows(items)
+    .filter((row) => hasAnyBeerPrice(row) && !isOmittedWorkbookBeer(row.beerName))
+    .forEach((row) => {
+      const key = workbookBeerKey(row.beerName)
+      const existing = merged.get(key)
+
+      if (!existing) {
+        merged.set(key, {
+          ...row,
+          beerName: titleWorkbookBeerName(row.beerName),
+          reviewNotes: [...row.reviewNotes],
+        })
+        return
+      }
+
+      mergeWorkbookBeerRow(existing, row)
+    })
+
+  return [...merged.values()].sort((left, right) => left.beerName.localeCompare(right.beerName))
+}
+
+function mergeWorkbookBeerRow(target: BeerTabPreviewRow, source: BeerTabPreviewRow) {
+  if (source.draft10ozPrice !== null) target.draft10ozPrice = source.draft10ozPrice
+  if (source.draft10ozHappyHour !== null) target.draft10ozHappyHour = source.draft10ozHappyHour
+  if (source.draft16ozPrice !== null) target.draft16ozPrice = source.draft16ozPrice
+  if (source.draft16ozHappyHour !== null) target.draft16ozHappyHour = source.draft16ozHappyHour
+  if (source.canPrice !== null) target.canPrice = source.canPrice
+  if (source.canHappyHour !== null) target.canHappyHour = source.canHappyHour
+  if (source.can24ozPrice !== null) target.can24ozPrice = source.can24ozPrice
+  if (source.can24ozHappyHour !== null) target.can24ozHappyHour = source.can24ozHappyHour
+  if (source.bottlePrice !== null) target.bottlePrice = source.bottlePrice
+  if (source.bottleHappyHour !== null) target.bottleHappyHour = source.bottleHappyHour
+  target.reviewNotes.push(...source.reviewNotes)
 }
 
 function isOmittedWorkbookBeer(beerName: string) {
   const key = normalizeWorkbookBeerName(beerName)
-  return OMIT_WORKBOOK_BEERS.has(key) || /^\$?\d+(?:\.\d{2})?$/.test(key)
+  const compactKey = workbookBeerKey(beerName)
+  return OMIT_WORKBOOK_BEERS.has(key)
+    || OMIT_WORKBOOK_BEERS.has(compactKey)
+    || /^\$?\d+(?:\.\d{2})?$/.test(key)
+    || /^\$?\d+(?:\.\d{2})?$/.test(compactKey)
 }
 
 function normalizeWorkbookBeerName(value: string) {
@@ -145,6 +183,25 @@ function normalizeWorkbookBeerName(value: string) {
     .replace(/[.’]/g, "'")
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function workbookBeerKey(value: string) {
+  return normalizeWorkbookBeerName(value)
+    .replace(/\b(10\s*oz|10oz|16\s*oz|16oz|20\s*oz|20oz|24\s*oz|24oz)\b/gi, '')
+    .replace(/\b(draft|pint|imperial|imp|reg|regular|can|bottle|btl|tall)\b/gi, '')
+    .replace(/[.'’]/g, '')
+    .replace(/[^a-z0-9$]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function titleWorkbookBeerName(value: string) {
+  return value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .replace(/\bIpa\b/g, 'IPA')
+    .replace(/\bNa\b/g, 'NA')
 }
 
 function ensureCan24ozColumns(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]): BeerTemplateMapping {
