@@ -106,7 +106,30 @@ Treat this as the portable save file for the review session. It is preferable to
 
 The export panel may also provide other Toast-facing CSV files and previews.
 
-## 6. Open Toast Workbook
+## 6. Import an existing populated Toast workbook
+
+If you are starting from a Toast Menu Template workbook that already contains menu data, navigate to:
+
+```text
+/toast-template-import
+```
+
+Choose the populated Toast `.xlsx` file. The importer reads supported Toast tabs into the same normalized reviewed-item model used by the Aloha workflow and saves that reviewed state in the browser.
+
+The current template importer reads:
+
+- Beer
+- Liquor
+- Wine
+- Cocktails
+- NA Bev
+- Retail
+
+Beer headers may represent draft sizes, standard cans, bottles, or 24oz cans. Retail rows can also be recovered from the NA Bev tab when the row Group is Retail.
+
+After import, the saved reviewed state is available on both **Menu Items** and **Toast Workbook**. Download `toast-export-review.csv` from the Template Import page when you want a durable portable copy.
+
+## 7. Open Toast Workbook
 
 Navigate to:
 
@@ -122,13 +145,13 @@ The page can obtain reviewed menu state in three ways, in this preference order:
 
 The raw Aloha option starts from unedited normalized data, so use the review CSV when you want to preserve prior edits.
 
-## 7. Download a Toast Menu Template
+## 8. Download a Toast Menu Template
 
 In Toast's Menu Bulk Import workflow, make/download a local `.xlsx` copy of the Toast Menu Template that you want this app to populate.
 
 Do not upload a Google Sheets URL to the Inventory app. The current workbook page accepts an actual `.xlsx` file.
 
-## 8. Upload the Toast template
+## 9. Upload the Toast template
 
 On `/toast-workbook`, choose the Toast `.xlsx` file.
 
@@ -141,7 +164,7 @@ Current workbook population covers:
 
 The UI reports counts for staged Beer and Liquor export items.
 
-## 9. Generate the populated workbook
+## 10. Generate the populated workbook
 
 Choose **Download populated workbook**.
 
