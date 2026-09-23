@@ -170,42 +170,89 @@
   padding: 0.65rem 0.7rem;
 }
 
-.inventory-export-preview-table-wrap {
-  max-height: 18rem;
+.inventory-export-preview-list {
+  display: grid;
+  max-height: 24rem;
   overflow: auto;
+  background: #fff;
 }
 
-.inventory-export-preview-table {
-  width: 100%;
-  min-width: 42rem;
-  border-collapse: collapse;
-  font-size: 0.72rem;
-}
-
-.inventory-export-preview-table th,
-.inventory-export-preview-table td {
+.inventory-export-preview-header,
+.inventory-export-preview-row {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  gap: 0.6rem;
   border-bottom: 1px solid #e2e8f0;
-  padding: 0.45rem 0.55rem;
-  text-align: left;
-  vertical-align: top;
-  white-space: nowrap;
+  padding: 0.55rem 0.7rem;
 }
 
-.inventory-export-preview-table th {
+.inventory-export-preview-header {
   position: sticky;
   top: 0;
   background: #f8fafc;
+  z-index: 1;
+}
+
+.inventory-export-preview-header span {
   color: #334155;
   font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  z-index: 1;
 }
 
-.inventory-export-preview-table td {
-  background: #fff;
+.inventory-export-preview-row > strong {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.inventory-export-preview-row > div {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.inventory-export-preview-cell {
+  display: inline-grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+}
+
+.inventory-export-preview-cell b,
+.inventory-export-preview-cell span,
+.inventory-export-preview-empty-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventory-export-preview-cell b {
+  border-right: 1px solid #e2e8f0;
+  color: #334155;
+  padding: 0.18rem 0.4rem;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.inventory-export-preview-cell span {
   color: #0f172a;
+  padding: 0.18rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.inventory-export-preview-empty-cell {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-style: italic;
 }
 
 .inventory-category-rule-panel {
@@ -431,5 +478,10 @@
   .inventory-export-file-card > div {
     align-items: start;
     flex-direction: column;
+  }
+
+  .inventory-export-preview-header,
+  .inventory-export-preview-row {
+    grid-template-columns: 1.75rem minmax(0, 1fr);
   }
 }
