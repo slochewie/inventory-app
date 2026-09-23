@@ -1,12 +1,6 @@
-import {
-  appDefinitionsById,
-  buildNavigation,
-  getDefaultAppUrls,
-  getDeploymentBrand,
-} from '@niteowl/app-config'
-import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useMemo, useState } from 'react'
+import { InventorySidebar } from '#/inventory-sidebar'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
 import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
@@ -32,14 +26,6 @@ type WorkbookState = {
 
 function ToastWorkbook() {
   const savedReviewSession = useMemo(() => loadReviewSession(), [])
-  const app = appDefinitionsById.inventory
-  const hostname = getHostname()
-  const brand = getDeploymentBrand(hostname)
-  const navigation = buildNavigation({
-    currentApp: 'inventory',
-    currentPath: '/toast-workbook',
-    urls: getDefaultAppUrls(hostname),
-  })
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(savedReviewSession?.importFile ?? null)
   const [items, setItems] = useState<NormalizedMenuItem[]>(savedReviewSession?.items ?? [])
   const [reviewSource, setReviewSource] = useState<'saved' | 'review-csv' | 'uploaded' | null>(savedReviewSession?.items.length ? 'saved' : null)
@@ -139,41 +125,7 @@ function ToastWorkbook() {
 
   return (
     <main className="inventory-shell">
-      <aside className="inventory-sidebar" aria-label="Application navigation">
-        <a className="inventory-brand" href="/">
-          <span className="inventory-brand-icon" aria-hidden="true">
-            <NiteOwlNavigationIcon icon={app.icon} />
-          </span>
-          <span>
-            <span className="inventory-brand-eyebrow">{brand}</span>
-            <span className="inventory-brand-title">{app.label}</span>
-          </span>
-        </a>
-
-        <nav className="inventory-nav">
-          {[...navigation.primary, ...navigation.apps].map((section) => (
-            <section key={section.id} className="inventory-nav-section">
-              {section.label ? <h2>{section.label}</h2> : null}
-              <ul>
-                {section.items.map((item) => (
-                  <li key={item.id}>
-                    <a
-                      className={item.active ? 'inventory-nav-link is-active' : 'inventory-nav-link'}
-                      href={item.href}
-                    >
-                      <span className="inventory-nav-icon" aria-hidden="true">
-                        <NiteOwlNavigationIcon icon={item.icon} />
-                      </span>
-                      <span>{item.label}</span>
-                      {item.external ? <span className="inventory-nav-external">↗</span> : null}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </nav>
-      </aside>
+      <InventorySidebar currentPath="/toast-workbook" />
 
       <section className="inventory-content">
         <header className="inventory-hero">
@@ -376,8 +328,4 @@ function isLiquorItem(item: NormalizedMenuItem) {
 
 function clean(value?: string) {
   return String(value ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
-function getHostname() {
-  return typeof window === 'undefined' ? 'inventory.niteowl.dev' : window.location.hostname
 }
