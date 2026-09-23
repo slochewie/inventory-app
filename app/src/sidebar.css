@@ -1,0 +1,45 @@
+.inventory-shell.is-sidebar-collapsed {
+  grid-template-columns: 5rem minmax(0, 1fr);
+}
+
+.inventory-shell.is-sidebar-collapsed .inventory-sidebar {
+  align-items: center;
+  padding-inline: 0.75rem;
+}
+
+.inventory-brand-icon {
+  cursor: pointer;
+}
+
+.inventory-brand-icon:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+.inventory-shell.is-sidebar-collapsed .inventory-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.inventory-shell.is-sidebar-collapsed .inventory-brand > span:not(.inventory-brand-icon),
+.inventory-shell.is-sidebar-collapsed .inventory-nav-section h2,
+.inventory-shell.is-sidebar-collapsed .inventory-nav-link span:not(.inventory-nav-icon),
+.inventory-shell.is-sidebar-collapsed .inventory-nav-external {
+  display: none;
+}
+
+.inventory-shell.is-sidebar-collapsed .inventory-nav,
+.inventory-shell.is-sidebar-collapsed .inventory-nav-section,
+.inventory-shell.is-sidebar-collapsed .inventory-nav-section ul {
+  width: 100%;
+}
+
+.inventory-shell.is-sidebar-collapsed .inventory-nav-link {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.inventory-shell.is-sidebar-collapsed .inventory-nav-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
