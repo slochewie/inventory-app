@@ -68,6 +68,38 @@
   height: 1rem;
 }
 
+.inventory-category-rule-panel {
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.inventory-category-rule-panel > div:first-child {
+  min-width: 0;
+}
+
+.inventory-category-rule-panel p {
+  max-width: none;
+  margin: 0;
+}
+
+.inventory-category-rule-panel label {
+  max-width: 24rem;
+}
+
+.inventory-category-rule-actions {
+  justify-content: flex-start;
+}
+
+@media (min-width: 1100px) {
+  .inventory-category-rule-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem) !important;
+  }
+
+  .inventory-category-rule-actions {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 760px) {
   .inventory-bulk-actions {
     align-items: stretch;
@@ -76,5 +108,13 @@
 
   .inventory-bulk-actions span {
     margin-right: 0;
+  }
+
+  .inventory-category-rule-panel label {
+    max-width: none;
+  }
+
+  .inventory-category-rule-actions button {
+    flex: 1;
   }
 }
