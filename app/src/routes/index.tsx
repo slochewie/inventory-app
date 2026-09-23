@@ -60,7 +60,7 @@ function Home() {
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const beerPreviewItems = useMemo(() => (
     categoryFilter === ALL_CATEGORIES
-      ? items
+      ? []
       : items.filter((item) => getCategoryKey(item.category) === categoryFilter)
   ), [categoryFilter, items])
   const beerTabRows = useMemo(() => buildBeerTabPreviewRows(beerPreviewItems), [beerPreviewItems])
