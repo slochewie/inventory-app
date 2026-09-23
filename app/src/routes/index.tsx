@@ -9,6 +9,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from '#/features/menu-import/beer-preview'
+import { loadReviewSession } from '#/features/menu-import/review-session'
 import { buildToastExportFiles, downloadCsv, type ToastExportFile } from '#/features/menu-import/toast-export'
 import { ToastExportPanelView } from '#/features/menu-import/toast-export-panel'
 import {
@@ -98,6 +99,20 @@ function Home() {
   ), [categoryFilter, items])
 
   const selectedCategoryToastCategory = selectedCategoryItems[0]?.toastCategory ?? ''
+
+  useEffect(() => {
+    const savedSession = loadReviewSession()
+    if (!savedSession || savedSession.items.length === 0) return
+
+    setImportFile(savedSession.importFile ?? createSavedImportFile(savedSession.items, savedSession.savedAt))
+    setItems(savedSession.items)
+    setFilter('included')
+    setCategoryFilter(ALL_CATEGORIES)
+    setToastCategoryDraft('')
+    setQuery('')
+    setPage(1)
+    setSelectedItemId(null)
+  }, [])
 
   useEffect(() => {
     if (categoryFilter === ALL_CATEGORIES) {
@@ -281,8 +296,8 @@ function Home() {
             <h2>Aloha CSV import</h2>
             <p>
               This first importer reads Aloha menu-price CSV exports and converts them into
-              a normalized menu-item model. The next source can be each bar&apos;s Toast Menu
-              Template Google Sheet using this same normalized shape.
+              a normalized menu-item model. Use Template Import for already-populated Toast
+              workbooks; those saved reviewed items also load here.
             </p>
           </div>
 
@@ -310,7 +325,7 @@ function Home() {
               <dl>
                 <div>
                   <dt>Source type</dt>
-                  <dd>Aloha CSV</dd>
+                  <dd>{getSourceTypeLabel(importFile.sourceKind)}</dd>
                 </div>
                 <div>
                   <dt>Store</dt>
@@ -504,11 +519,11 @@ function Home() {
           </>
         ) : (
           <section className="inventory-card">
-            <h2>Next phase ready</h2>
+            <h2>Load or import menu data</h2>
             <p>
-              Each location can bring its own Toast Menu Template Google Sheet later. The
-              importer should treat those sheets as another source adapter, normalize each
-              location&apos;s sheet rows, and then compare them against Aloha-normalized items.
+              Upload an Aloha CSV here, or use Template Import to read an already populated
+              Toast workbook. Template Import saves the reviewed data so it appears on this
+              page for review, editing, and export.
             </p>
           </section>
         )}
@@ -716,6 +731,26 @@ function EditItemPanel({
       </div>
     </section>
   )
+}
+
+function createSavedImportFile(items: NormalizedMenuItem[], savedAt: string): ParsedMenuImport {
+  const firstItem = items[0]
+
+  return {
+    sourceKind: firstItem?.sourceKind ?? 'toast-template-sheet',
+    sourceName: 'Saved reviewed menu items',
+    rows: [],
+    warnings: [`Loaded reviewed state saved ${new Date(savedAt).toLocaleString()}`],
+    meta: {
+      store: firstItem?.rawRows?.[0]?.Store || firstItem?.rawRows?.[0]?.store || 'Saved review session',
+      savedAt,
+    },
+  }
+}
+
+function getSourceTypeLabel(sourceKind: ParsedMenuImport['sourceKind']) {
+  if (sourceKind === 'aloha-csv') return 'Aloha CSV'
+  return 'Toast template workbook'
 }
 
 function formatCentsInput(cents: number | null) {
