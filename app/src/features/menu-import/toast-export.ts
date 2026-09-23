@@ -2,7 +2,7 @@ import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from './beer-preview'
 import type { NormalizedMenuItem } from './types'
 
 export type ToastExportFile = {
-  id: 'review' | 'beer-tab' | 'liquor'
+  id: 'export-review' | 'beer-tab' | 'liquor' | 'audit'
   label: string
   filename: string
   rows: string[][]
@@ -87,18 +87,19 @@ export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportF
   const included = items.filter((item) => item.exportIncluded && item.status !== 'ignored')
   const beerItems = included.filter((item) => item.toastCategory.toLowerCase() === 'beer')
   const liquorItems = included.filter((item) => isLiquorItem(item))
-  const reviewRows = buildReviewExportRows(items)
+  const exportReviewRows = buildReviewRows(included)
+  const auditRows = buildReviewRows(items)
   const beerRows = buildBeerExportRows(beerItems)
   const liquorRows = buildLiquorExportRows(liquorItems)
 
   return [
     {
-      id: 'review',
-      label: 'Normalized review CSV',
-      filename: 'toast-normalized-review.csv',
-      rows: [REVIEW_EXPORT_HEADERS, ...reviewRows],
-      rowCount: reviewRows.length,
-      note: 'Complete reviewed state from the app: edited names, categories, prices, status, export inclusion, notes, and source metadata for audit/reconciliation.',
+      id: 'export-review',
+      label: 'Export review CSV',
+      filename: 'toast-export-review.csv',
+      rows: [REVIEW_EXPORT_HEADERS, ...exportReviewRows],
+      rowCount: exportReviewRows.length,
+      note: 'Only rows currently included for Toast export. This should change immediately when you edit, include, or exclude menu items.',
     },
     {
       id: 'beer-tab',
@@ -115,6 +116,14 @@ export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportF
       rows: [LIQUOR_EXPORT_HEADERS, ...liquorRows],
       rowCount: liquorRows.length,
       note: 'Liquor staging uses Aloha source groups as Toast liquor types, maps BOURB WHISK to WHISKEY/BOURBON, and only gives happy hour to well liquors by default.',
+    },
+    {
+      id: 'audit',
+      label: 'All rows audit CSV',
+      filename: 'toast-all-rows-audit.csv',
+      rows: [REVIEW_EXPORT_HEADERS, ...auditRows],
+      rowCount: auditRows.length,
+      note: 'Full audit/reconciliation file. This intentionally includes ignored and not-exporting rows so you can inspect everything imported from Aloha.',
     },
   ]
 }
@@ -135,9 +144,12 @@ export function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
-function buildReviewExportRows(items: NormalizedMenuItem[]) {
+function buildReviewRows(items: NormalizedMenuItem[]) {
   return [...items]
     .sort((left, right) => {
+      const exportCompare = Number(right.exportIncluded) - Number(left.exportIncluded)
+      if (exportCompare !== 0) return exportCompare
+
       const leftCategory = clean(left.category || 'Uncategorized')
       const rightCategory = clean(right.category || 'Uncategorized')
       const categoryCompare = leftCategory.localeCompare(rightCategory)
