@@ -1,5 +1,6 @@
 import { getDefaultToastCategory, shouldExportByDefault } from './category-rules'
 import { normalizeHeader, parseCsv } from './csv'
+import { getToastDestination } from './toast-destination'
 import type { NormalizedMenuItem, ParsedMenuImport, RawMenuRow } from './types'
 
 const ALOHA_REQUIRED_HEADERS = ['item number', 'item name', 'price', 'effective time']
@@ -111,6 +112,16 @@ function normalizeAlohaGroup(rows: RawMenuRow[]): NormalizedMenuItem {
   }
 
   const toastCategory = getDefaultToastCategory(sourceCategory)
+  const toastDestination = getToastDestination({
+    sourceCategory,
+    itemName: name,
+    toastCategory,
+  })
+
+  if (status !== 'ignored' && toastDestination.note) {
+    notes.push(toastDestination.note)
+  }
+
   const exportIncluded = shouldExportByDefault({
     sourceCategory,
     itemName: name,
@@ -124,6 +135,7 @@ function normalizeAlohaGroup(rows: RawMenuRow[]): NormalizedMenuItem {
     name,
     category: sourceCategory,
     toastCategory,
+    toastDestination: toastDestination.label,
     basePriceCents,
     happyHourPriceCents,
     happyHourWindow,
