@@ -120,6 +120,7 @@ function normalizeAlohaGroup(rows: RawMenuRow[]): NormalizedMenuItem {
     effectiveTimes: [...new Set(rows.map((row) => row['Effective Time']?.trim()).filter(isNonEmptyString))],
     sourceRowCount: rows.length,
     status,
+    exportIncluded: status !== 'ignored',
     notes,
     rawRows: rows,
   }
