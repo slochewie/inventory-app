@@ -8,15 +8,17 @@ const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
 const SPREADSHEET_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 const RELATIONSHIP_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 const DATA_ROW_BUFFER = 20
+
 const OMIT_WORKBOOK_BEERS = new Set([
   '$5', '$5 can', 'domestic', 'domestic can', 'import', 'import can', 'tall',
-  'malibu boo', 'pb & j', 'the setup', 'cc 1.00', 'sierra pale', 'stiegl radler',
-  'fig. mtn. agua santa', 'sierra torpedo', 'blue moon', 'c-', 'banquet', 'bd',
-  'bd lite', 'm lite', 'h life', 'tec', 'bavic pilsner', 'ashland seltzer',
-  'ashland 16', 'jameson can', 'draft', 'dba', 'weinstephan', 'stone', 'rogue',
-  'liquid gravity', 'fig mtn davy brown', 'pizza port', 'alesmith', 'maui brewing',
-  'voodoo ranger', 'lg dope melody', 'wandering don', 'weihenstephan', "killian's",
-  'tap it', 'weihensteph', 'new beer', 'tdne', 'silva',
+  'malibu boo', 'pb & j', 'the setup', 'cc 1.00', 'cc 100', 'c', 'c-',
+  'sierra pale', 'stiegl radler', 'fig. mtn. agua santa', 'sierra torpedo',
+  'blue moon', 'banquet', 'bd', 'bd lite', 'm lite', 'h life', 'tec',
+  'bavic pilsner', 'ashland seltzer', 'ashland 16', 'jameson can', 'draft',
+  'dba', 'weinstephan', 'stone', 'rogue', 'liquid gravity', 'fig mtn davy brown',
+  'pizza port', 'alesmith', 'maui brewing', 'voodoo ranger', 'lg dope melody',
+  'wandering don', 'weihenstephan', "killian's", 'tap it', 'weihensteph',
+  'new beer', 'tdne', 'silva',
 ])
 
 export type ToastTemplateWorkbookInfo = {
@@ -164,6 +166,9 @@ function ensureCan24ozColumns(sheetDoc: Document, mapping: BeerTemplateMapping, 
   const priceStyleColumn = shiftedCanSlot.priceCol ?? shiftedCanSlot.nameCol
   const happyHourStyleColumn = shiftedCanSlot.happyHourCol ?? priceStyleColumn
 
+  if (shiftedCanSlot.priceCol) {
+    writeCellValueWithStyleSource(sheetDoc, shiftedCanSlot.priceCol, mapping.headerRow, '12oz', priceStyleColumn)
+  }
   writeCellValueWithStyleSource(sheetDoc, insertAtColumn, mapping.headerRow, '24oz', priceStyleColumn)
   writeCellValueWithStyleSource(sheetDoc, insertAtColumn + 1, mapping.headerRow, 'Happy Hour', happyHourStyleColumn)
   copyCellStyle(sheetDoc, priceStyleColumn, insertAtColumn, mapping.dataStartRow)
@@ -189,21 +194,28 @@ function ensureCan24ozColumns(sheetDoc: Document, mapping: BeerTemplateMapping, 
 }
 
 function writeBeerRowsToSheet(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]) {
-  const rowsToWrite = beerRows.filter(hasAnyBeerPrice)
-  const clearToRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + rowsToWrite.length + DATA_ROW_BUFFER)
+  const draftRows = beerRows.filter(hasDraftBeerPrice)
+  const canRows = beerRows.filter(hasCanBeerPrice)
+  const bottleRows = beerRows.filter((row) => row.bottlePrice !== null)
+  const writtenRowCount = Math.max(draftRows.length, canRows.length, bottleRows.length)
+  const clearToRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount + DATA_ROW_BUFFER)
   const targetColumns = getBeerTargetColumns(mapping)
 
   clearCells(sheetDoc, targetColumns, mapping.dataStartRow, clearToRow)
 
-  rowsToWrite.forEach((beerRow, index) => {
-    const rowNumber = mapping.dataStartRow + index
-    writeDraftBeerRow(sheetDoc, mapping, rowNumber, beerRow)
-    writePackagedBeerRow(sheetDoc, mapping, rowNumber, beerRow, 'can')
-    writePackagedBeerRow(sheetDoc, mapping, rowNumber, beerRow, 'can24oz')
-    writePackagedBeerRow(sheetDoc, mapping, rowNumber, beerRow, 'bottle')
+  draftRows.forEach((beerRow, index) => {
+    writeDraftBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
   })
 
-  return rowsToWrite.length
+  canRows.forEach((beerRow, index) => {
+    writeCanBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
+  })
+
+  bottleRows.forEach((beerRow, index) => {
+    writeBottleBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
+  })
+
+  return writtenRowCount
 }
 
 function writeDraftBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
@@ -211,9 +223,6 @@ function writeDraftBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, row
 
   const draft10Slot = findDraftSlot(mapping, 10)
   const draft16Slot = findDraftSlot(mapping, 16)
-  const hasDraft = beerRow.draft10ozPrice !== null || beerRow.draft16ozPrice !== null
-
-  if (!hasDraft) return
 
   writeCellValue(sheetDoc, mapping.draftNameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
 
@@ -232,32 +241,32 @@ function writeDraftBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, row
   }
 }
 
-function writePackagedBeerRow(
-  sheetDoc: Document,
-  mapping: BeerTemplateMapping,
-  rowNumber: number,
-  beerRow: BeerTabPreviewRow,
-  kind: 'can' | 'can24oz' | 'bottle',
-) {
-  const slot = findPackagedSlot(mapping, kind)
-  if (!slot) return
+function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
+  const canSlot = findPackagedSlot(mapping, 'can')
+  const can24ozSlot = findPackagedSlot(mapping, 'can24oz')
+  const nameCol = canSlot?.nameCol ?? can24ozSlot?.nameCol
+  if (!nameCol) return
 
-  const price = kind === 'can'
-    ? beerRow.canPrice
-    : kind === 'can24oz'
-      ? beerRow.can24ozPrice
-      : beerRow.bottlePrice
-  const happyHour = kind === 'can'
-    ? beerRow.canHappyHour
-    : kind === 'can24oz'
-      ? beerRow.can24ozHappyHour
-      : beerRow.bottleHappyHour
+  writeCellValue(sheetDoc, nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
 
-  if (price === null) return
+  if (beerRow.canPrice !== null && canSlot) {
+    if (canSlot.priceCol) writeCellValue(sheetDoc, canSlot.priceCol, rowNumber, centsToDollars(beerRow.canPrice), mapping.dataStartRow)
+    if (canSlot.happyHourCol) writeCellValue(sheetDoc, canSlot.happyHourCol, rowNumber, centsToDollars(beerRow.canHappyHour), mapping.dataStartRow)
+  }
 
-  writeCellValue(sheetDoc, slot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
-  if (slot.priceCol) writeCellValue(sheetDoc, slot.priceCol, rowNumber, centsToDollars(price), mapping.dataStartRow)
-  if (slot.happyHourCol) writeCellValue(sheetDoc, slot.happyHourCol, rowNumber, centsToDollars(happyHour), mapping.dataStartRow)
+  if (beerRow.can24ozPrice !== null && can24ozSlot) {
+    if (can24ozSlot.priceCol) writeCellValue(sheetDoc, can24ozSlot.priceCol, rowNumber, centsToDollars(beerRow.can24ozPrice), mapping.dataStartRow)
+    if (can24ozSlot.happyHourCol) writeCellValue(sheetDoc, can24ozSlot.happyHourCol, rowNumber, centsToDollars(beerRow.can24ozHappyHour), mapping.dataStartRow)
+  }
+}
+
+function writeBottleBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
+  const bottleSlot = findPackagedSlot(mapping, 'bottle')
+  if (!bottleSlot || beerRow.bottlePrice === null) return
+
+  writeCellValue(sheetDoc, bottleSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
+  if (bottleSlot.priceCol) writeCellValue(sheetDoc, bottleSlot.priceCol, rowNumber, centsToDollars(beerRow.bottlePrice), mapping.dataStartRow)
+  if (bottleSlot.happyHourCol) writeCellValue(sheetDoc, bottleSlot.happyHourCol, rowNumber, centsToDollars(beerRow.bottleHappyHour), mapping.dataStartRow)
 }
 
 function findDraftSlot(mapping: BeerTemplateMapping, sourceSizeOz: 10 | 16) {
@@ -784,6 +793,14 @@ function hasAnyBeerPrice(row: BeerTabPreviewRow) {
     row.can24ozPrice,
     row.bottlePrice,
   ].some((value) => value !== null)
+}
+
+function hasDraftBeerPrice(row: BeerTabPreviewRow) {
+  return row.draft10ozPrice !== null || row.draft16ozPrice !== null
+}
+
+function hasCanBeerPrice(row: BeerTabPreviewRow) {
+  return row.canPrice !== null || row.can24ozPrice !== null
 }
 
 function centsToDollars(cents: number | null) {
