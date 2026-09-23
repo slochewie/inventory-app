@@ -107,14 +107,58 @@ export function downloadPopulatedToastWorkbook(filename: string, blob: Blob) {
 }
 
 function populateBeerSheet(workbookPackage: WorkbookPackage, items: NormalizedMenuItem[]) {
-  const mapping = getBeerTemplateMapping(workbookPackage)
-  const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
+  const initialMapping = getBeerTemplateMapping(workbookPackage)
+  const sheetXml = getTextFile(workbookPackage.files, initialMapping.sheetPath)
   const sheetDoc = parseXml(sheetXml)
   const beerRows = buildBeerTabPreviewRows(items)
+  const mapping = ensureCan24ozColumns(sheetDoc, initialMapping, beerRows)
   const writtenRowCount = writeBeerRowsToSheet(sheetDoc, mapping, beerRows)
 
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
   workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
+}
+
+function ensureCan24ozColumns(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]): BeerTemplateMapping {
+  const needsCan24oz = beerRows.some((row) => row.can24ozPrice !== null)
+  const hasCan24ozSlot = mapping.packagedGroups.some((slot) => slot.kind === 'can24oz')
+
+  if (!needsCan24oz || hasCan24ozSlot) return mapping
+
+  const canSlot = mapping.packagedGroups.find((slot) => slot.kind === 'can')
+  if (!canSlot) return mapping
+
+  const insertAfterColumn = canSlot.happyHourCol ?? canSlot.priceCol ?? canSlot.nameCol
+  const insertAtColumn = insertAfterColumn + 1
+
+  shiftWorksheetColumns(sheetDoc, insertAtColumn, 2)
+
+  const shiftedMapping = shiftMappingColumns(mapping, insertAtColumn, 2)
+  const shiftedCanSlot = shiftedMapping.packagedGroups.find((slot) => slot.kind === 'can') ?? canSlot
+  const priceStyleColumn = shiftedCanSlot.priceCol ?? shiftedCanSlot.nameCol
+  const happyHourStyleColumn = shiftedCanSlot.happyHourCol ?? priceStyleColumn
+
+  writeCellValueWithStyleSource(sheetDoc, insertAtColumn, mapping.headerRow, '24oz', priceStyleColumn)
+  writeCellValueWithStyleSource(sheetDoc, insertAtColumn + 1, mapping.headerRow, 'Happy Hour', happyHourStyleColumn)
+  copyCellStyle(sheetDoc, priceStyleColumn, insertAtColumn, mapping.dataStartRow)
+  copyCellStyle(sheetDoc, happyHourStyleColumn, insertAtColumn + 1, mapping.dataStartRow)
+
+  const can24ozSlot: PackagedGroupSlot = {
+    label: '24oz',
+    kind: 'can24oz',
+    nameCol: shiftedCanSlot.nameCol,
+    priceCol: insertAtColumn,
+    happyHourCol: insertAtColumn + 1,
+  }
+
+  const canIndex = shiftedMapping.packagedGroups.findIndex((slot) => slot.kind === 'can')
+  const packagedGroups = [...shiftedMapping.packagedGroups]
+  packagedGroups.splice(canIndex + 1, 0, can24ozSlot)
+
+  return {
+    ...shiftedMapping,
+    packagedGroups,
+    warnings: shiftedMapping.warnings.filter((warning) => !/24oz Can column/i.test(warning)),
+  }
 }
 
 function writeBeerRowsToSheet(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]) {
@@ -209,12 +253,6 @@ function findDraftSlot(mapping: BeerTemplateMapping, sourceSizeOz: 10 | 16) {
 }
 
 function findPackagedSlot(mapping: BeerTemplateMapping, kind: 'can' | 'can24oz' | 'bottle') {
-  if (kind === 'can24oz') {
-    return mapping.packagedGroups.find((slot) => slot.kind === 'can24oz')
-      ?? mapping.packagedGroups.find((slot) => slot.kind === 'bottle')
-      ?? null
-  }
-
   return mapping.packagedGroups.find((slot) => slot.kind === kind) ?? null
 }
 
@@ -252,7 +290,7 @@ function getBeerTemplateMapping(workbookPackage: WorkbookPackage): BeerTemplateM
   if (draftSizes.length === 0) warnings.push('Beer tab has no draft size columns')
   if (canColumn === null) warnings.push('Beer tab has no Can column')
   if (!packagedGroups.some((slot) => slot.kind === 'can24oz')) {
-    warnings.push('Beer tab has no 24oz Can column; 24oz cans will fall back to the Bottle slot')
+    warnings.push('Beer tab has no 24oz can columns yet; they will be added when the uploaded Aloha export contains 24oz cans')
   }
 
   return {
@@ -348,12 +386,59 @@ function getPackagedGroupSlots(rowValues: { col: number, value: string }[]): Pac
     const kind = getPackagedKind(label)
     if (!kind) return []
 
+    if (kind === 'can') return getCanGroupSlots(rowValues, cell)
+
     const nextCells = rowValues.filter((candidate) => candidate.col > cell.col && candidate.col <= cell.col + 3)
     const priceCol = nextCells.find((candidate) => /price/i.test(candidate.value))?.col ?? cell.col + 1
     const happyHourCol = nextCells.find((candidate) => /happy\s*hour/i.test(candidate.value))?.col ?? null
 
     return [{ label, kind, nameCol: cell.col, priceCol, happyHourCol }]
   })
+}
+
+function getCanGroupSlots(rowValues: { col: number, value: string }[], canCell: { col: number, value: string }): PackagedGroupSlot[] {
+  const nextPackagedHeader = rowValues
+    .filter((candidate) => candidate.col > canCell.col && getPackagedKind(candidate.value) !== null)
+    .map((candidate) => candidate.col)
+    .sort((left, right) => left - right)[0] ?? Number.POSITIVE_INFINITY
+  const canGroupCells = rowValues.filter((candidate) => candidate.col > canCell.col && candidate.col < nextPackagedHeader)
+  const regularPriceCell = canGroupCells.find((candidate) => (
+    !/happy\s*hour/i.test(candidate.value)
+    && !/^24\s*oz(?:\s*can)?$/i.test(candidate.value)
+  ))
+  const regularPriceCol = regularPriceCell?.col ?? canCell.col + 1
+  const regularHappyHourCol = canGroupCells.find((candidate) => (
+    candidate.col > regularPriceCol
+    && candidate.col <= regularPriceCol + 1
+    && /happy\s*hour/i.test(candidate.value)
+  ))?.col ?? null
+  const can24ozCell = canGroupCells.find((candidate) => /^24\s*oz(?:\s*can)?$/i.test(candidate.value))
+  const can24ozHappyHourCol = can24ozCell
+    ? canGroupCells.find((candidate) => (
+      candidate.col > can24ozCell.col
+      && candidate.col <= can24ozCell.col + 1
+      && /happy\s*hour/i.test(candidate.value)
+    ))?.col ?? null
+    : null
+  const slots: PackagedGroupSlot[] = [{
+    label: regularPriceCell?.value ? `${canCell.value} ${regularPriceCell.value}` : canCell.value,
+    kind: 'can',
+    nameCol: canCell.col,
+    priceCol: regularPriceCol,
+    happyHourCol: regularHappyHourCol,
+  }]
+
+  if (can24ozCell) {
+    slots.push({
+      label: can24ozCell.value,
+      kind: 'can24oz',
+      nameCol: canCell.col,
+      priceCol: can24ozCell.col,
+      happyHourCol: can24ozHappyHourCol,
+    })
+  }
+
+  return slots
 }
 
 function getPackagedKind(label: string): PackagedGroupSlot['kind'] | null {
@@ -396,6 +481,15 @@ function writeCellValue(sheetDoc: Document, column: number, rowNumber: number, v
   if (value === null || value === '') return
 
   const cell = getOrCreateCell(sheetDoc, column, rowNumber, templateRow)
+  setCellValue(sheetDoc, cell, value)
+}
+
+function writeCellValueWithStyleSource(sheetDoc: Document, column: number, rowNumber: number, value: string | number, styleSourceColumn: number) {
+  const cell = getOrCreateCellWithStyleSource(sheetDoc, column, rowNumber, styleSourceColumn)
+  setCellValue(sheetDoc, cell, value)
+}
+
+function setCellValue(sheetDoc: Document, cell: Element, value: string | number) {
   removeChildren(cell, ['v', 'is'])
 
   if (typeof value === 'number') {
@@ -437,6 +531,73 @@ function getOrCreateCell(sheetDoc: Document, column: number, rowNumber: number, 
 
   insertCellSorted(row, cell, column)
   return cell
+}
+
+function getOrCreateCellWithStyleSource(sheetDoc: Document, column: number, rowNumber: number, styleSourceColumn: number) {
+  const row = getOrCreateRow(sheetDoc, rowNumber)
+  const reference = `${numberToColumnLetters(column)}${rowNumber}`
+  const existing = findCellInRow(row, reference)
+  if (existing) {
+    copyStyleFromSource(sheetDoc, existing, styleSourceColumn, rowNumber)
+    return existing
+  }
+
+  const cell = sheetDoc.createElementNS(SPREADSHEET_NS, 'c')
+  cell.setAttribute('r', reference)
+  copyStyleFromSource(sheetDoc, cell, styleSourceColumn, rowNumber)
+  insertCellSorted(row, cell, column)
+  return cell
+}
+
+function copyCellStyle(sheetDoc: Document, sourceColumn: number, targetColumn: number, rowNumber: number) {
+  const cell = getOrCreateCellWithStyleSource(sheetDoc, targetColumn, rowNumber, sourceColumn)
+  removeChildren(cell, ['v', 'is'])
+  cell.removeAttribute('t')
+}
+
+function copyStyleFromSource(sheetDoc: Document, targetCell: Element, sourceColumn: number, rowNumber: number) {
+  const sourceCell = findCell(sheetDoc, sourceColumn, rowNumber)
+  const styleId = sourceCell?.getAttribute('s')
+  if (styleId) targetCell.setAttribute('s', styleId)
+}
+
+function shiftWorksheetColumns(sheetDoc: Document, startColumn: number, offset: number) {
+  Array.from(sheetDoc.getElementsByTagName('row')).forEach((row) => {
+    const cells = Array.from(row.getElementsByTagName('c')).sort((left, right) => (
+      columnLettersToNumber(getCellReferenceColumn(right.getAttribute('r') ?? ''))
+      - columnLettersToNumber(getCellReferenceColumn(left.getAttribute('r') ?? ''))
+    ))
+
+    cells.forEach((cell) => {
+      const reference = cell.getAttribute('r') ?? ''
+      const column = columnLettersToNumber(getCellReferenceColumn(reference))
+      const rowNumber = getCellReferenceRow(reference)
+
+      if (column >= startColumn && rowNumber !== null) {
+        cell.setAttribute('r', `${numberToColumnLetters(column + offset)}${rowNumber}`)
+      }
+    })
+  })
+}
+
+function shiftMappingColumns(mapping: BeerTemplateMapping, startColumn: number, offset: number): BeerTemplateMapping {
+  const shift = (column: number | null) => (column !== null && column >= startColumn ? column + offset : column)
+
+  return {
+    ...mapping,
+    draftNameCol: shift(mapping.draftNameCol),
+    draftSizes: mapping.draftSizes.map((slot) => ({
+      ...slot,
+      priceCol: Number(shift(slot.priceCol)),
+      happyHourCol: shift(slot.happyHourCol),
+    })),
+    packagedGroups: mapping.packagedGroups.map((slot) => ({
+      ...slot,
+      nameCol: Number(shift(slot.nameCol)),
+      priceCol: shift(slot.priceCol),
+      happyHourCol: shift(slot.happyHourCol),
+    })),
+  }
 }
 
 function getOrCreateRow(sheetDoc: Document, rowNumber: number) {
@@ -487,7 +648,14 @@ function updateWorksheetDimension(sheetDoc: Document, mapping: BeerTemplateMappi
   if (!dimension) return
 
   const endRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount - 1)
-  dimension.setAttribute('ref', `A1:AE${endRow}`)
+  const maxColumn = Math.max(
+    1,
+    ...Array.from(sheetDoc.getElementsByTagName('c')).map((cell) => (
+      columnLettersToNumber(getCellReferenceColumn(cell.getAttribute('r') ?? ''))
+    )),
+  )
+
+  dimension.setAttribute('ref', `A1:${numberToColumnLetters(maxColumn)}${endRow}`)
 }
 
 function getLastWorksheetRow(sheetDoc: Document) {
@@ -557,6 +725,11 @@ function findColumn(rowValues: { col: number, value: string }[], matcher: RegExp
 
 function getCellReferenceColumn(reference: string) {
   return reference.match(/^[A-Z]+/i)?.[0] ?? ''
+}
+
+function getCellReferenceRow(reference: string) {
+  const match = reference.match(/\d+$/)
+  return match ? Number(match[0]) : null
 }
 
 function columnLettersToNumber(letters: string) {
