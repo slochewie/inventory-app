@@ -1,18 +1,24 @@
-# inventory-app
+# inventory-app web app
 
-A minimal TanStack Start app with one route and plain CSS.
+TanStack Start browser application for the Inventory project.
+
+Current routes:
+
+- `/` — import/review normalized menu items.
+- `/toast-workbook` — load reviewed state and populate a Toast Menu Template workbook.
+- `/toast-template-import` — import a populated Toast Menu Template workbook back into reviewed state.
+
+The app uses the shared NiteOwl application configuration for Inventory navigation and the shared NiteOwl UI navigation icons.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Edit `src/routes/index.tsx` to get started. Add route files under
-`src/routes`; TanStack Router updates `src/routeTree.gen.ts` for you.
+Add route files under `src/routes`; TanStack Router generates `src/routeTree.gen.ts`.
 
 Build the production app with:
 
 ```bash
 npm run build
 ```
-
