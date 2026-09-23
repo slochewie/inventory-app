@@ -77,7 +77,7 @@ function normalizeAlohaGroup(rows: RawMenuRow[]): NormalizedMenuItem {
   const firstRow = rows[0] ?? {}
   const itemNumber = firstRow['Item Number']?.trim() ?? ''
   const name = firstRow['Item Name']?.trim() ?? ''
-  const prices = rows.map((row) => parsePriceCents(row.Price)).filter((price) => price !== null)
+  const prices = rows.map((row) => parsePriceCents(row.Price)).filter(isPriceCents)
   const basePriceCents = getBasePriceCents(rows)
   const happyHourPriceCents = getHappyHourPriceCents(rows, basePriceCents)
   const happyHourWindow = happyHourPriceCents === null ? undefined : getHappyHourWindow(rows, happyHourPriceCents)
@@ -109,7 +109,7 @@ function normalizeAlohaGroup(rows: RawMenuRow[]): NormalizedMenuItem {
   }
 
   return {
-    id: itemNumber ? `aloha-${itemNumber}` : `aloha-row-${firstRow['Source Row'] ?? cryptoSafeId(name)}`,
+    id: itemNumber ? `aloha-${itemNumber}-${cryptoSafeId(name)}` : `aloha-row-${firstRow['Source Row'] ?? cryptoSafeId(name)}`,
     sourceKind: 'aloha-csv',
     sourceItemNumber: itemNumber || undefined,
     name,
@@ -117,7 +117,7 @@ function normalizeAlohaGroup(rows: RawMenuRow[]): NormalizedMenuItem {
     basePriceCents,
     happyHourPriceCents,
     happyHourWindow,
-    effectiveTimes: [...new Set(rows.map((row) => row['Effective Time']?.trim()).filter(Boolean) as string[])],
+    effectiveTimes: [...new Set(rows.map((row) => row['Effective Time']?.trim()).filter(isNonEmptyString))],
     sourceRowCount: rows.length,
     status,
     notes,
@@ -130,7 +130,7 @@ function getBasePriceCents(rows: RawMenuRow[]) {
   const midnightPrice = parsePriceCents(midnightRow?.Price)
   if (midnightPrice !== null) return midnightPrice
 
-  const parsedPrices = rows.map((row) => parsePriceCents(row.Price)).filter((price) => price !== null)
+  const parsedPrices = rows.map((row) => parsePriceCents(row.Price)).filter(isPriceCents)
   if (parsedPrices.length === 0) return null
 
   return Math.max(...parsedPrices)
@@ -141,7 +141,7 @@ function getHappyHourPriceCents(rows: RawMenuRow[], basePriceCents: number | nul
 
   const lowerPrices = rows
     .map((row) => parsePriceCents(row.Price))
-    .filter((price) => price !== null && price < basePriceCents)
+    .filter((price): price is number => isPriceCents(price) && price < basePriceCents)
 
   if (lowerPrices.length === 0) return null
 
@@ -190,6 +190,14 @@ function isIgnoredAlohaName(name: string) {
 
 function isAlohaSectionHeader(name: string) {
   return /^<[^>]+>$/.test(name.trim())
+}
+
+function isPriceCents(value: number | null): value is number {
+  return value !== null
+}
+
+function isNonEmptyString(value: string | undefined): value is string {
+  return Boolean(value)
 }
 
 function cryptoSafeId(value: string) {
