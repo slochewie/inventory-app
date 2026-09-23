@@ -1,4 +1,9 @@
-
+:root {
+  color: #111827;
+  background: #f8fafc;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
 
 * {
   box-sizing: border-box;
@@ -6,11 +11,196 @@
 
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  min-width: 320px;
 }
 
-main {
-  width: min(42rem, calc(100% - 2rem));
-  margin: 4rem auto;
+a {
+  color: inherit;
+  text-decoration: none;
 }
 
+.inventory-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 18rem minmax(0, 1fr);
+}
+
+.inventory-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  border-right: 1px solid #e5e7eb;
+  background: #fff;
+  padding: 1rem;
+}
+
+.inventory-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+}
+
+.inventory-brand:hover,
+.inventory-nav-link:hover {
+  background: #f3f4f6;
+}
+
+.inventory-brand-icon,
+.inventory-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.inventory-brand-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  background: #111827;
+  color: #fff;
+}
+
+.inventory-brand-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.inventory-brand-eyebrow,
+.inventory-brand-title {
+  display: block;
+  line-height: 1.2;
+}
+
+.inventory-brand-eyebrow {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.inventory-brand-title {
+  font-weight: 700;
+}
+
+.inventory-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.inventory-nav-section h2 {
+  margin: 0 0 0.5rem;
+  padding: 0 0.75rem;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inventory-nav-section ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inventory-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  color: #374151;
+  font-size: 0.925rem;
+  font-weight: 500;
+}
+
+.inventory-nav-link.is-active {
+  background: #111827;
+  color: #fff;
+}
+
+.inventory-nav-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.inventory-nav-external {
+  margin-left: auto;
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.inventory-content {
+  padding: clamp(1rem, 4vw, 3rem);
+}
+
+.inventory-hero,
+.inventory-card {
+  max-width: 56rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+}
+
+.inventory-hero {
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.inventory-kicker {
+  margin: 0 0 0.75rem;
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inventory-hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.inventory-hero p,
+.inventory-card p {
+  color: #4b5563;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.inventory-hero p {
+  max-width: 40rem;
+  margin: 1rem 0 0;
+}
+
+.inventory-card {
+  margin-top: 1rem;
+  padding: 1.25rem;
+}
+
+.inventory-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.inventory-card p {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .inventory-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+}
