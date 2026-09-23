@@ -6,7 +6,7 @@ import {
 } from '@niteowl/app-config'
 import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 import { createFileRoute } from '@tanstack/react-router'
-import { type ChangeEvent, useMemo, useState } from 'react'
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import {
   formatCurrency,
@@ -51,6 +51,7 @@ function Home() {
   const [importError, setImportError] = useState<string | null>(null)
   const [filter, setFilter] = useState<ItemFilter>('included')
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES)
+  const [toastCategoryDraft, setToastCategoryDraft] = useState('')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
@@ -79,6 +80,23 @@ function Home() {
       .sort(([left], [right]) => getCategoryLabel(left).localeCompare(getCategoryLabel(right)))
       .map(([value, count]) => ({ value, label: getCategoryLabel(value), count }))
   }, [items])
+
+  const selectedCategoryItems = useMemo(() => (
+    categoryFilter === ALL_CATEGORIES
+      ? []
+      : items.filter((item) => getCategoryKey(item.category) === categoryFilter)
+  ), [categoryFilter, items])
+
+  const selectedCategoryToastCategory = selectedCategoryItems[0]?.toastCategory ?? ''
+
+  useEffect(() => {
+    if (categoryFilter === ALL_CATEGORIES) {
+      setToastCategoryDraft('')
+      return
+    }
+
+    setToastCategoryDraft(selectedCategoryToastCategory || getCategoryLabel(categoryFilter))
+  }, [categoryFilter, selectedCategoryToastCategory])
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -133,6 +151,7 @@ function Home() {
       setItems(normalizedItems)
       setFilter('included')
       setCategoryFilter(ALL_CATEGORIES)
+      setToastCategoryDraft('')
       setQuery('')
       setPage(1)
       setSelectedItemId(null)
@@ -163,6 +182,22 @@ function Home() {
       pageItemIds.has(item.id) ? { ...item, ...patch } : item
     )))
     setSelectedItemId(null)
+  }
+
+  function updateSelectedCategoryItems(patch: Partial<NormalizedMenuItem>) {
+    if (categoryFilter === ALL_CATEGORIES) return
+
+    setItems((currentItems) => currentItems.map((item) => (
+      getCategoryKey(item.category) === categoryFilter ? { ...item, ...patch } : item
+    )))
+    setSelectedItemId(null)
+  }
+
+  function handleApplyToastCategory() {
+    const nextToastCategory = toastCategoryDraft.trim()
+    if (!nextToastCategory) return
+
+    updateSelectedCategoryItems({ toastCategory: nextToastCategory })
   }
 
   function handleFilterChange(nextFilter: ItemFilter) {
@@ -312,7 +347,7 @@ function Home() {
 
                 <div className="inventory-filter-panel">
                   <label className="inventory-search-control">
-                    <span>Category</span>
+                    <span>Aloha category</span>
                     <select value={categoryFilter} onChange={handleCategoryChange}>
                       <option value={ALL_CATEGORIES}>All categories ({items.length.toLocaleString()})</option>
                       {categoryOptions.map((option) => (
@@ -335,6 +370,35 @@ function Home() {
                 </div>
               </div>
 
+              {categoryFilter !== ALL_CATEGORIES ? (
+                <section className="inventory-category-rule-panel">
+                  <div>
+                    <p className="inventory-kicker">Toast category rule</p>
+                    <h3>{getCategoryLabel(categoryFilter)}</h3>
+                    <p>
+                      Rename this Aloha category for Toast export. Beer source groups can all
+                      become <strong>Beer</strong>, matching the existing script behavior where
+                      cans, bottles/tall cans, 10 oz, and pint sizes are reconciled under Beer.
+                    </p>
+                  </div>
+
+                  <label>
+                    <span>Toast category</span>
+                    <input
+                      value={toastCategoryDraft}
+                      onChange={(event) => setToastCategoryDraft(event.target.value)}
+                      placeholder="Toast category"
+                    />
+                  </label>
+
+                  <div className="inventory-category-rule-actions">
+                    <button type="button" onClick={handleApplyToastCategory}>Apply Toast category</button>
+                    <button type="button" onClick={() => updateSelectedCategoryItems({ exportIncluded: true })}>Include category</button>
+                    <button type="button" onClick={() => updateSelectedCategoryItems({ exportIncluded: false })}>Exclude category</button>
+                  </div>
+                </section>
+              ) : null}
+
               <div className="inventory-bulk-bar">
                 <strong>{filteredItems.length.toLocaleString()} matching items</strong>
                 <button type="button" onClick={() => updateFilteredItems({ exportIncluded: false })}>Exclude filtered from export</button>
@@ -354,7 +418,8 @@ function Home() {
                     <tr>
                       <th>Aloha #</th>
                       <th>Name</th>
-                      <th>Category</th>
+                      <th>Aloha category</th>
+                      <th>Toast category</th>
                       <th>Base price</th>
                       <th>Happy hour</th>
                       <th>Export</th>
@@ -371,6 +436,7 @@ function Home() {
                           {item.notes.length > 0 ? <span>{item.notes.join(' · ')}</span> : null}
                         </td>
                         <td>{item.category || 'Uncategorized'}</td>
+                        <td>{item.toastCategory}</td>
                         <td>{formatCurrency(item.basePriceCents)}</td>
                         <td>
                           {item.happyHourPriceCents === null
@@ -474,11 +540,20 @@ function EditItemPanel({
         </label>
 
         <label>
-          <span>Category</span>
+          <span>Aloha category</span>
           <input
             value={item.category || ''}
             onChange={(event) => onChange(item.id, { category: event.target.value || undefined })}
             placeholder="Uncategorized"
+          />
+        </label>
+
+        <label>
+          <span>Toast category</span>
+          <input
+            value={item.toastCategory}
+            onChange={(event) => onChange(item.id, { toastCategory: event.target.value })}
+            placeholder="Toast category"
           />
         </label>
 
