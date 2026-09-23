@@ -8,6 +8,7 @@ import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useMemo, useState } from 'react'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
+import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
 import {
   buildPopulatedToastTemplateWorkbook,
   downloadPopulatedToastWorkbook,
@@ -29,6 +30,7 @@ type WorkbookState = {
 }
 
 function ToastWorkbook() {
+  const savedReviewSession = useMemo(() => loadReviewSession(), [])
   const app = appDefinitionsById.inventory
   const hostname = getHostname()
   const brand = getDeploymentBrand(hostname)
@@ -37,8 +39,10 @@ function ToastWorkbook() {
     currentPath: '/toast-workbook',
     urls: getDefaultAppUrls(hostname),
   })
-  const [importFile, setImportFile] = useState<ParsedMenuImport | null>(null)
-  const [items, setItems] = useState<NormalizedMenuItem[]>([])
+  const [importFile, setImportFile] = useState<ParsedMenuImport | null>(savedReviewSession?.importFile ?? null)
+  const [items, setItems] = useState<NormalizedMenuItem[]>(savedReviewSession?.items ?? [])
+  const [reviewSource, setReviewSource] = useState<'saved' | 'uploaded' | null>(savedReviewSession?.items.length ? 'saved' : null)
+  const [reviewSavedAt, setReviewSavedAt] = useState(savedReviewSession?.savedAt ?? null)
   const [alohaError, setAlohaError] = useState<string | null>(null)
   const [workbook, setWorkbook] = useState<WorkbookState | null>(null)
   const [workbookError, setWorkbookError] = useState<string | null>(null)
@@ -61,9 +65,14 @@ function ToastWorkbook() {
 
       setImportFile(parsed)
       setItems(normalizedItems)
+      setReviewSource('uploaded')
+      setReviewSavedAt(null)
+      saveReviewSession(parsed, normalizedItems)
     } catch (error) {
       setImportFile(null)
       setItems([])
+      setReviewSource(null)
+      setReviewSavedAt(null)
       setAlohaError(error instanceof Error ? error.message : 'Unable to read the selected Aloha CSV')
     }
   }
@@ -144,16 +153,30 @@ function ToastWorkbook() {
           <p className="inventory-kicker">Toast workbook</p>
           <h1>Populate Toast template</h1>
           <p>
-            Upload an Aloha CSV and a downloaded Toast Menu Template workbook. This first
-            workbook pass fills the Beer tab from the normalized export-included beer rows.
+            Upload a downloaded Toast Menu Template workbook. This page uses the reviewed
+            menu state from the main Inventory page, including edits, category changes, and
+            export include/exclude decisions.
           </p>
         </header>
 
         <section className="inventory-card inventory-import-card">
           <div>
             <p className="inventory-kicker">Step 1</p>
-            <h2>Aloha CSV</h2>
-            <p>Use the same Aloha menu export that drives the review/export page.</p>
+            <h2>Reviewed menu state</h2>
+            <p>
+              Preferred: review/edit the Aloha import on the main Menu Items page, then come
+              here. This page will use that saved reviewed state. Uploading a CSV here is only
+              a fallback and starts from raw normalized Aloha data.
+            </p>
+            {reviewSource === 'saved' ? (
+              <p>
+                Using saved reviewed state{reviewSavedAt ? ` from ${new Date(reviewSavedAt).toLocaleString()}` : ''}.
+              </p>
+            ) : reviewSource === 'uploaded' ? (
+              <p>Using the raw Aloha CSV uploaded on this workbook page.</p>
+            ) : (
+              <p>No reviewed state found yet. Go to Menu Items, upload/review the Aloha CSV, then return here.</p>
+            )}
           </div>
           <label className="inventory-upload-control">
             <span>Choose Aloha CSV</span>
@@ -162,13 +185,33 @@ function ToastWorkbook() {
           {alohaError ? <p className="inventory-error">{alohaError}</p> : null}
         </section>
 
-        {importFile ? (
-          <section className="inventory-summary-grid" aria-label="Aloha import summary">
-            <SummaryCard label="Source rows" value={summary.rawRows} />
-            <SummaryCard label="Normalized items" value={summary.normalizedItems} />
-            <SummaryCard label="Exporting" value={summary.exportItems} />
-            <SummaryCard label="Beer export items" value={beerExportItemCount} />
-          </section>
+        {items.length > 0 ? (
+          <>
+            <section className="inventory-summary-grid" aria-label="Aloha import summary">
+              <SummaryCard label="Source rows" value={summary.rawRows} />
+              <SummaryCard label="Normalized items" value={summary.normalizedItems} />
+              <SummaryCard label="Exporting" value={summary.exportItems} />
+              <SummaryCard label="Beer export items" value={beerExportItemCount} />
+            </section>
+
+            <section className="inventory-card inventory-source-card">
+              <h2>{importFile?.sourceName ?? 'Saved reviewed menu state'}</h2>
+              <dl>
+                <div>
+                  <dt>Source type</dt>
+                  <dd>{reviewSource === 'saved' ? 'Reviewed Inventory state' : 'Aloha CSV'}</dd>
+                </div>
+                <div>
+                  <dt>Store</dt>
+                  <dd>{importFile?.meta?.store || 'Unknown'}</dd>
+                </div>
+                <div>
+                  <dt>Ignored rows</dt>
+                  <dd>{summary.ignoredItems}</dd>
+                </div>
+              </dl>
+            </section>
+          </>
         ) : null}
 
         <section className="inventory-card inventory-import-card">
@@ -200,7 +243,7 @@ function ToastWorkbook() {
           </div>
 
           <p>
-            The populated workbook is generated from the current normalized Aloha rows and the
+            The populated workbook is generated from the current reviewed menu rows and the
             uploaded Toast template workbook. Later passes can add Liquor, Wine, Cocktails,
             NA Bev, Menu Build, and Modifier Build tabs.
           </p>
