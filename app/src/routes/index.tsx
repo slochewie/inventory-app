@@ -12,6 +12,16 @@ import { formatCurrency, summarizeMenuItems, type NormalizedMenuItem, type Parse
 
 export const Route = createFileRoute('/')({ component: Home })
 
+type ItemFilter = 'active' | 'ready' | 'review' | 'happy-hour' | 'ignored' | 'all'
+
+type FilterOption = {
+  id: ItemFilter
+  label: string
+  count: number
+}
+
+const PAGE_SIZE = 50
+
 function Home() {
   const app = appDefinitionsById.inventory
   const hostname = getHostname()
@@ -24,8 +34,43 @@ function Home() {
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(null)
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
   const [importError, setImportError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<ItemFilter>('active')
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
   const summary = useMemo(() => summarizeMenuItems(items), [items])
-  const previewItems = useMemo(() => items.filter((item) => item.status !== 'ignored').slice(0, 75), [items])
+  const filterOptions = useMemo<FilterOption[]>(() => ([
+    { id: 'active', label: 'All active', count: summary.normalizedItems },
+    { id: 'ready', label: 'Ready', count: items.filter((item) => item.status === 'ready').length },
+    { id: 'review', label: 'Review', count: summary.reviewItems },
+    { id: 'happy-hour', label: 'Happy hour', count: summary.happyHourItems },
+    { id: 'ignored', label: 'Ignored', count: summary.ignoredItems },
+    { id: 'all', label: 'Everything', count: items.length },
+  ]), [items, summary])
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+
+    return items.filter((item) => {
+      if (filter === 'active' && item.status === 'ignored') return false
+      if (filter === 'ready' && item.status !== 'ready') return false
+      if (filter === 'review' && item.status !== 'review') return false
+      if (filter === 'happy-hour' && item.happyHourPriceCents === null) return false
+      if (filter === 'ignored' && item.status !== 'ignored') return false
+
+      if (!normalizedQuery) return true
+
+      return [
+        item.sourceItemNumber,
+        item.name,
+        item.category,
+        item.notes.join(' '),
+      ].some((value) => value?.toLowerCase().includes(normalizedQuery))
+    })
+  }, [filter, items, query])
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const clampedPage = Math.min(page, pageCount)
+  const pageStart = (clampedPage - 1) * PAGE_SIZE
+  const pageItems = filteredItems.slice(pageStart, pageStart + PAGE_SIZE)
+  const pageEnd = pageStart + pageItems.length
 
   async function handleAlohaCsvChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -40,11 +85,30 @@ function Home() {
 
       setImportFile(parsed)
       setItems(normalizedItems)
+      setFilter('active')
+      setQuery('')
+      setPage(1)
     } catch (error) {
       setImportFile(null)
       setItems([])
       setImportError(error instanceof Error ? error.message : 'Unable to read the selected file')
     }
+  }
+
+  function updateItem(itemId: string, patch: Partial<NormalizedMenuItem>) {
+    setItems((currentItems) => currentItems.map((item) => (
+      item.id === itemId ? { ...item, ...patch } : item
+    )))
+  }
+
+  function handleFilterChange(nextFilter: ItemFilter) {
+    setFilter(nextFilter)
+    setPage(1)
+  }
+
+  function handleQueryChange(event: ChangeEvent<HTMLInputElement>) {
+    setQuery(event.target.value)
+    setPage(1)
   }
 
   return (
@@ -152,13 +216,41 @@ function Home() {
               <div className="inventory-table-heading">
                 <div>
                   <p className="inventory-kicker">Review</p>
-                  <h2>Normalized menu preview</h2>
+                  <h2>Normalized menu items</h2>
                 </div>
-                <p>Showing {previewItems.length} of {summary.normalizedItems} non-ignored items.</p>
+                <p>
+                  Showing {filteredItems.length === 0 ? 0 : pageStart + 1}–{pageEnd} of {filteredItems.length} filtered items.
+                </p>
+              </div>
+
+              <div className="inventory-review-controls">
+                <div className="inventory-filter-group" aria-label="Filter menu items">
+                  {filterOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={filter === option.id ? 'inventory-filter is-active' : 'inventory-filter'}
+                      onClick={() => handleFilterChange(option.id)}
+                    >
+                      <span>{option.label}</span>
+                      <strong>{option.count.toLocaleString()}</strong>
+                    </button>
+                  ))}
+                </div>
+
+                <label className="inventory-search-control">
+                  <span>Search</span>
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={handleQueryChange}
+                    placeholder="Name, Aloha #, category, note…"
+                  />
+                </label>
               </div>
 
               <div className="inventory-table-wrap">
-                <table className="inventory-table">
+                <table className="inventory-table inventory-review-table">
                   <thead>
                     <tr>
                       <th>Aloha #</th>
@@ -170,29 +262,86 @@ function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {previewItems.map((item) => (
+                    {pageItems.map((item) => (
                       <tr key={item.id}>
-                        <td>{item.sourceItemNumber}</td>
+                        <td>{item.sourceItemNumber || '—'}</td>
                         <td>
-                          <strong>{item.name}</strong>
+                          <input
+                            className="inventory-table-input inventory-name-input"
+                            value={item.name}
+                            onChange={(event) => updateItem(item.id, { name: event.target.value })}
+                            aria-label={`Name for ${item.sourceItemNumber || item.id}`}
+                          />
                           {item.notes.length > 0 ? <span>{item.notes.join(' · ')}</span> : null}
                         </td>
-                        <td>{item.category || 'Uncategorized'}</td>
-                        <td>{formatCurrency(item.basePriceCents)}</td>
                         <td>
-                          {item.happyHourPriceCents === null
-                            ? '—'
-                            : `${formatCurrency(item.happyHourPriceCents)}${item.happyHourWindow ? ` · ${item.happyHourWindow}` : ''}`}
+                          <input
+                            className="inventory-table-input"
+                            value={item.category || ''}
+                            onChange={(event) => updateItem(item.id, { category: event.target.value || undefined })}
+                            placeholder="Uncategorized"
+                            aria-label={`Category for ${item.name}`}
+                          />
                         </td>
                         <td>
-                          <span className={`inventory-status inventory-status-${item.status}`}>
-                            {item.status}
-                          </span>
+                          <input
+                            className="inventory-table-input inventory-price-input"
+                            inputMode="decimal"
+                            value={formatCentsInput(item.basePriceCents)}
+                            onChange={(event) => updateItem(item.id, { basePriceCents: parseCurrencyInput(event.target.value) })}
+                            placeholder="Review"
+                            aria-label={`Base price for ${item.name}`}
+                          />
+                        </td>
+                        <td>
+                          <div className="inventory-happy-hour-cell">
+                            <input
+                              className="inventory-table-input inventory-price-input"
+                              inputMode="decimal"
+                              value={formatCentsInput(item.happyHourPriceCents)}
+                              onChange={(event) => updateItem(item.id, { happyHourPriceCents: parseCurrencyInput(event.target.value) })}
+                              placeholder="—"
+                              aria-label={`Happy hour price for ${item.name}`}
+                            />
+                            <input
+                              className="inventory-table-input inventory-window-input"
+                              value={item.happyHourWindow || ''}
+                              onChange={(event) => updateItem(item.id, { happyHourWindow: event.target.value || undefined })}
+                              placeholder="Window"
+                              aria-label={`Happy hour window for ${item.name}`}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <select
+                            className={`inventory-status-select inventory-status-${item.status}`}
+                            value={item.status}
+                            onChange={(event) => updateItem(item.id, { status: event.target.value as NormalizedMenuItem['status'] })}
+                            aria-label={`Status for ${item.name}`}
+                          >
+                            <option value="ready">Ready</option>
+                            <option value="review">Review</option>
+                            <option value="ignored">Ignored</option>
+                          </select>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {filteredItems.length === 0 ? (
+                <p className="inventory-empty-state">No menu items match the current filter.</p>
+              ) : null}
+
+              <div className="inventory-pagination" aria-label="Pagination">
+                <button type="button" onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))} disabled={clampedPage <= 1}>
+                  Previous
+                </button>
+                <span>Page {clampedPage.toLocaleString()} of {pageCount.toLocaleString()}</span>
+                <button type="button" onClick={() => setPage((currentPage) => Math.min(pageCount, currentPage + 1))} disabled={clampedPage >= pageCount}>
+                  Next
+                </button>
               </div>
             </section>
           </>
@@ -218,6 +367,22 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
       <strong>{value.toLocaleString()}</strong>
     </article>
   )
+}
+
+function formatCentsInput(cents: number | null) {
+  if (cents === null) return ''
+
+  return (cents / 100).toFixed(2)
+}
+
+function parseCurrencyInput(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const parsed = Number(trimmed.replace(/[$,]/g, ''))
+  if (!Number.isFinite(parsed)) return null
+
+  return Math.round(parsed * 100)
 }
 
 function getHostname() {
