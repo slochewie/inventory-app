@@ -2,13 +2,30 @@ import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from './beer-preview'
 import type { NormalizedMenuItem } from './types'
 
 export type ToastExportFile = {
-  id: 'beer-tab' | 'liquor'
+  id: 'review' | 'beer-tab' | 'liquor'
   label: string
   filename: string
   rows: string[][]
   rowCount: number
   note: string
 }
+
+const REVIEW_EXPORT_HEADERS = [
+  'Source Kind',
+  'Source Item #',
+  'Item Name',
+  'Aloha Category',
+  'Toast Category',
+  'Toast Destination',
+  'Base Price ($)',
+  'Happy Hour $',
+  'Happy Hour Window',
+  'Status',
+  'Export Included',
+  'Effective Times',
+  'Source Row Count',
+  'Notes',
+]
 
 const BEER_EXPORT_HEADERS = [
   'Draft Beer', '10oz', 'Happy Hour $', '16oz', 'Happy Hour $',
@@ -70,10 +87,19 @@ export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportF
   const included = items.filter((item) => item.exportIncluded && item.status !== 'ignored')
   const beerItems = included.filter((item) => item.toastCategory.toLowerCase() === 'beer')
   const liquorItems = included.filter((item) => isLiquorItem(item))
+  const reviewRows = buildReviewExportRows(items)
   const beerRows = buildBeerExportRows(beerItems)
   const liquorRows = buildLiquorExportRows(liquorItems)
 
   return [
+    {
+      id: 'review',
+      label: 'Normalized review CSV',
+      filename: 'toast-normalized-review.csv',
+      rows: [REVIEW_EXPORT_HEADERS, ...reviewRows],
+      rowCount: reviewRows.length,
+      note: 'Complete reviewed state from the app: edited names, categories, prices, status, export inclusion, notes, and source metadata for audit/reconciliation.',
+    },
     {
       id: 'beer-tab',
       label: 'Beer tab CSV',
@@ -94,7 +120,7 @@ export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportF
 }
 
 export function toCsv(rows: string[][]) {
-  return rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n')
+  return `${rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n')}\n`
 }
 
 export function downloadCsv(filename: string, rows: string[][]) {
@@ -107,6 +133,34 @@ export function downloadCsv(filename: string, rows: string[][]) {
   link.click()
   link.remove()
   URL.revokeObjectURL(url)
+}
+
+function buildReviewExportRows(items: NormalizedMenuItem[]) {
+  return [...items]
+    .sort((left, right) => {
+      const leftCategory = clean(left.category || 'Uncategorized')
+      const rightCategory = clean(right.category || 'Uncategorized')
+      const categoryCompare = leftCategory.localeCompare(rightCategory)
+      if (categoryCompare !== 0) return categoryCompare
+
+      return clean(left.name).localeCompare(clean(right.name))
+    })
+    .map((item) => [
+      item.sourceKind,
+      item.sourceItemNumber ?? '',
+      item.name,
+      item.category || 'Uncategorized',
+      item.toastCategory,
+      item.toastDestination,
+      moneyBlank(item.basePriceCents),
+      moneyBlank(item.happyHourPriceCents),
+      item.happyHourWindow ?? '',
+      item.status,
+      item.exportIncluded ? 'yes' : 'no',
+      item.effectiveTimes.join(' | '),
+      String(item.sourceRowCount),
+      item.notes.join(' | '),
+    ])
 }
 
 function buildBeerExportRows(items: NormalizedMenuItem[]) {
@@ -274,7 +328,7 @@ function getOneDollarOff(cents: number) {
 }
 
 function escapeCsvCell(value: string) {
-  if (!/[",\n\r]/.test(value)) return value
+  if (!/^[\s]|[\s]$|[",\n\r]/.test(value)) return value
 
   return `"${value.replace(/"/g, '""')}"`
 }
