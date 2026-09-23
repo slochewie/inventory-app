@@ -76,8 +76,9 @@ export function shouldExportByDefault({
   const category = normalizeCategoryKey(sourceCategory)
   const normalizedCategory = normalizeHeader(category).toUpperCase()
 
+  if (normalizedCategory === 'UNCATEGORIZED') return false
   if (DEFAULT_EXCLUDED_SOURCE_CATEGORIES.has(category)) return false
-  if (!INCLUDED_SOURCE_CATEGORIES.has(category) && normalizedCategory !== 'UNCATEGORIZED') return false
+  if (!INCLUDED_SOURCE_CATEGORIES.has(category)) return false
   if (EXCLUDED_NAME_PATTERNS.some((pattern) => pattern.test(itemName))) return false
 
   return true
