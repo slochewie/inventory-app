@@ -8,6 +8,7 @@ import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
+import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from '#/features/menu-import/beer-preview'
 import {
   formatCurrency,
   summarizeMenuItems,
@@ -57,6 +58,7 @@ function Home() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
+  const beerTabRows = useMemo(() => buildBeerTabPreviewRows(items), [items])
   const filterOptions = useMemo<FilterOption[]>(() => ([
     { id: 'included', label: 'Exporting', count: summary.exportItems },
     { id: 'excluded', label: 'Not exporting', count: summary.excludedItems },
@@ -319,6 +321,8 @@ function Home() {
               ) : null}
             </section>
 
+            {beerTabRows.length > 0 ? <BeerTabPreview rows={beerTabRows} /> : null}
+
             <section className="inventory-card inventory-table-card">
               <div className="inventory-table-heading">
                 <div>
@@ -511,6 +515,63 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
   )
 }
 
+function BeerTabPreview({ rows }: { rows: BeerTabPreviewRow[] }) {
+  return (
+    <section className="inventory-card inventory-beer-preview-card">
+      <div className="inventory-table-heading">
+        <div>
+          <p className="inventory-kicker">Toast preview</p>
+          <h2>Beer tab staging</h2>
+        </div>
+        <p>{rows.length.toLocaleString()} beer rows grouped for the Toast Beer tab.</p>
+      </div>
+
+      <div className="inventory-table-wrap">
+        <table className="inventory-table inventory-beer-preview-table">
+          <thead>
+            <tr>
+              <th>Draft Beer</th>
+              <th>10oz</th>
+              <th>Happy Hour $</th>
+              <th>16oz</th>
+              <th>Happy Hour $</th>
+              <th>Can</th>
+              <th>Price $</th>
+              <th>Happy Hour $</th>
+              <th>24oz Can</th>
+              <th>Price $</th>
+              <th>Happy Hour $</th>
+              <th>Bottle</th>
+              <th>Price $</th>
+              <th>Happy Hour $</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.beerName}>
+                <td>{row.draft10ozPrice !== null || row.draft16ozPrice !== null ? row.beerName : ''}</td>
+                <td>{formatCurrencyBlank(row.draft10ozPrice)}</td>
+                <td>{formatCurrencyBlank(row.draft10ozHappyHour)}</td>
+                <td>{formatCurrencyBlank(row.draft16ozPrice)}</td>
+                <td>{formatCurrencyBlank(row.draft16ozHappyHour)}</td>
+                <td>{row.canPrice !== null ? row.beerName : ''}</td>
+                <td>{formatCurrencyBlank(row.canPrice)}</td>
+                <td>{formatCurrencyBlank(row.canHappyHour)}</td>
+                <td>{row.can24ozPrice !== null ? row.beerName : ''}</td>
+                <td>{formatCurrencyBlank(row.can24ozPrice)}</td>
+                <td>{formatCurrencyBlank(row.can24ozHappyHour)}</td>
+                <td>{row.bottlePrice !== null ? row.beerName : ''}</td>
+                <td>{formatCurrencyBlank(row.bottlePrice)}</td>
+                <td>{formatCurrencyBlank(row.bottleHappyHour)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 function EditItemPanel({
   item,
   onChange,
@@ -615,6 +676,10 @@ function formatCentsInput(cents: number | null) {
   if (cents === null) return ''
 
   return (cents / 100).toFixed(2)
+}
+
+function formatCurrencyBlank(cents: number | null) {
+  return cents === null ? '' : formatCurrency(cents)
 }
 
 function parseCurrencyInput(value: string) {
