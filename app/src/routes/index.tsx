@@ -34,6 +34,8 @@ type FilterOption = {
 }
 
 const PAGE_SIZE = 50
+const ALL_CATEGORIES = '__all__'
+const UNCATEGORIZED = '__uncategorized__'
 
 function Home() {
   const app = appDefinitionsById.inventory
@@ -48,9 +50,11 @@ function Home() {
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
   const [importError, setImportError] = useState<string | null>(null)
   const [filter, setFilter] = useState<ItemFilter>('included')
+  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const filterOptions = useMemo<FilterOption[]>(() => ([
     { id: 'included', label: 'Exporting', count: summary.exportItems },
@@ -62,6 +66,20 @@ function Home() {
     { id: 'ignored', label: 'Ignored', count: summary.ignoredItems },
     { id: 'all', label: 'Everything', count: items.length },
   ]), [items, summary])
+
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    items.forEach((item) => {
+      const category = getCategoryKey(item.category)
+      counts.set(category, (counts.get(category) ?? 0) + 1)
+    })
+
+    return [...counts.entries()]
+      .sort(([left], [right]) => getCategoryLabel(left).localeCompare(getCategoryLabel(right)))
+      .map(([value, count]) => ({ value, label: getCategoryLabel(value), count }))
+  }, [items])
+
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
 
@@ -74,17 +92,21 @@ function Home() {
       if (filter === 'happy-hour' && item.happyHourPriceCents === null) return false
       if (filter === 'ignored' && item.status !== 'ignored') return false
 
+      if (categoryFilter !== ALL_CATEGORIES && getCategoryKey(item.category) !== categoryFilter) {
+        return false
+      }
+
       if (!normalizedQuery) return true
 
       return [
         item.sourceItemNumber,
         item.name,
-        item.category,
         item.exportIncluded ? 'exporting include included' : 'excluded not exporting exclude',
         item.notes.join(' '),
       ].some((value) => value?.toLowerCase().includes(normalizedQuery))
     })
-  }, [filter, items, query])
+  }, [categoryFilter, filter, items, query])
+
   const filteredItemIds = useMemo(() => new Set(filteredItems.map((item) => item.id)), [filteredItems])
   const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
   const clampedPage = Math.min(page, pageCount)
@@ -110,6 +132,7 @@ function Home() {
       setImportFile(parsed)
       setItems(normalizedItems)
       setFilter('included')
+      setCategoryFilter(ALL_CATEGORIES)
       setQuery('')
       setPage(1)
       setSelectedItemId(null)
@@ -122,34 +145,33 @@ function Home() {
   }
 
   function updateItem(itemId: string, patch: Partial<NormalizedMenuItem>) {
-    setItems((currentItems) => currentItems.map((item) => {
-      if (item.id !== itemId) return item
-
-      const normalizedPatch = { ...patch }
-      if (normalizedPatch.status === 'ignored' && normalizedPatch.exportIncluded === undefined) {
-        normalizedPatch.exportIncluded = false
-      }
-
-      return { ...item, ...normalizedPatch }
-    }))
-  }
-
-  function setExportForFiltered(exportIncluded: boolean) {
     setItems((currentItems) => currentItems.map((item) => (
-      filteredItemIds.has(item.id) ? { ...item, exportIncluded } : item
+      item.id === itemId ? { ...item, ...patch } : item
     )))
   }
 
-  function setExportForPage(exportIncluded: boolean) {
+  function updateFilteredItems(patch: Partial<NormalizedMenuItem>) {
+    setItems((currentItems) => currentItems.map((item) => (
+      filteredItemIds.has(item.id) ? { ...item, ...patch } : item
+    )))
+    setSelectedItemId(null)
+  }
+
+  function updatePageItems(patch: Partial<NormalizedMenuItem>) {
     const pageItemIds = new Set(pageItems.map((item) => item.id))
-
     setItems((currentItems) => currentItems.map((item) => (
-      pageItemIds.has(item.id) ? { ...item, exportIncluded } : item
+      pageItemIds.has(item.id) ? { ...item, ...patch } : item
     )))
+    setSelectedItemId(null)
   }
 
   function handleFilterChange(nextFilter: ItemFilter) {
     setFilter(nextFilter)
+    setPage(1)
+  }
+
+  function handleCategoryChange(event: ChangeEvent<HTMLSelectElement>) {
+    setCategoryFilter(event.target.value)
     setPage(1)
     setSelectedItemId(null)
   }
@@ -157,7 +179,6 @@ function Home() {
   function handleQueryChange(event: ChangeEvent<HTMLInputElement>) {
     setQuery(event.target.value)
     setPage(1)
-    setSelectedItemId(null)
   }
 
   return (
@@ -203,8 +224,8 @@ function Home() {
           <p className="inventory-kicker">Menu items</p>
           <h1>{app.label}</h1>
           <p>
-            Import Aloha menu exports, normalize the data, review items, decide what should export,
-            and generate the Toast bulk-import format from one place.
+            Import Aloha menu exports, normalize the data, review items, decide what should
+            export, and generate the Toast bulk-import format from one place.
           </p>
         </header>
 
@@ -289,28 +310,36 @@ function Home() {
                   ))}
                 </div>
 
-                <label className="inventory-search-control">
-                  <span>Search</span>
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={handleQueryChange}
-                    placeholder="Name, Aloha #, category, note…"
-                  />
-                </label>
+                <div className="inventory-filter-panel">
+                  <label className="inventory-search-control">
+                    <span>Category</span>
+                    <select value={categoryFilter} onChange={handleCategoryChange}>
+                      <option value={ALL_CATEGORIES}>All categories ({items.length.toLocaleString()})</option>
+                      {categoryOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label} ({option.count.toLocaleString()})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="inventory-search-control">
+                    <span>Search items</span>
+                    <input
+                      type="search"
+                      value={query}
+                      onChange={handleQueryChange}
+                      placeholder="Name, Aloha #, note…"
+                    />
+                  </label>
+                </div>
               </div>
 
-              <div className="inventory-bulk-actions" aria-label="Bulk export actions">
-                <span>{filteredItems.length.toLocaleString()} matching item{filteredItems.length === 1 ? '' : 's'}</span>
-                <button type="button" onClick={() => setExportForFiltered(false)} disabled={filteredItems.length === 0}>
-                  Exclude filtered from export
-                </button>
-                <button type="button" onClick={() => setExportForFiltered(true)} disabled={filteredItems.length === 0}>
-                  Include filtered in export
-                </button>
-                <button type="button" onClick={() => setExportForPage(false)} disabled={pageItems.length === 0}>
-                  Exclude this page
-                </button>
+              <div className="inventory-bulk-bar">
+                <strong>{filteredItems.length.toLocaleString()} matching items</strong>
+                <button type="button" onClick={() => updateFilteredItems({ exportIncluded: false })}>Exclude filtered from export</button>
+                <button type="button" onClick={() => updateFilteredItems({ exportIncluded: true })}>Include filtered in export</button>
+                <button type="button" onClick={() => updatePageItems({ exportIncluded: false })}>Exclude this page</button>
               </div>
 
               {selectedItem ? (
@@ -350,8 +379,8 @@ function Home() {
                         </td>
                         <td>
                           <button
+                            className={item.exportIncluded ? 'inventory-export-toggle is-included' : 'inventory-export-toggle'}
                             type="button"
-                            className={item.exportIncluded ? 'inventory-export-pill is-included' : 'inventory-export-pill is-excluded'}
                             onClick={() => updateItem(item.id, { exportIncluded: !item.exportIncluded })}
                           >
                             {item.exportIncluded ? 'Export' : 'No export'}
@@ -435,15 +464,6 @@ function EditItemPanel({
         <button type="button" onClick={onClose}>Close</button>
       </div>
 
-      <label className="inventory-export-toggle">
-        <input
-          type="checkbox"
-          checked={item.exportIncluded}
-          onChange={(event) => onChange(item.id, { exportIncluded: event.target.checked })}
-        />
-        <span>Include this item in Toast export</span>
-      </label>
-
       <div className="inventory-edit-grid">
         <label>
           <span>Name</span>
@@ -502,6 +522,15 @@ function EditItemPanel({
             <option value="ignored">Ignored</option>
           </select>
         </label>
+
+        <label className="inventory-checkbox-label">
+          <input
+            type="checkbox"
+            checked={item.exportIncluded}
+            onChange={(event) => onChange(item.id, { exportIncluded: event.target.checked })}
+          />
+          <span>Include this item in Toast export</span>
+        </label>
       </div>
     </section>
   )
@@ -521,6 +550,15 @@ function parseCurrencyInput(value: string) {
   if (!Number.isFinite(parsed)) return null
 
   return Math.round(parsed * 100)
+}
+
+function getCategoryKey(category?: string) {
+  const normalized = category?.trim()
+  return normalized ? normalized : UNCATEGORIZED
+}
+
+function getCategoryLabel(categoryKey: string) {
+  return categoryKey === UNCATEGORIZED ? 'Uncategorized' : categoryKey
 }
 
 function getHostname() {
