@@ -8,7 +8,7 @@ import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useMemo, useState } from 'react'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
-import { formatCurrency, summarizeMenuItems, type NormalizedMenuItem, type ParsedMenuImport } from '#/features/menu-import/types'
+import { summarizeMenuItems, type NormalizedMenuItem, type ParsedMenuImport } from '#/features/menu-import/types'
 
 export const Route = createFileRoute('/')({ component: Home })
 
