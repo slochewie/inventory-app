@@ -112,7 +112,8 @@
   margin: 0;
 }
 
-.inventory-export-file-card button {
+.inventory-export-file-card button,
+.inventory-template-download {
   justify-self: start;
   cursor: pointer;
   border: 1px solid #0f172a;
@@ -124,7 +125,8 @@
   font-weight: 900;
 }
 
-.inventory-export-file-card button:disabled {
+.inventory-export-file-card button:disabled,
+.inventory-template-download:disabled {
   cursor: not-allowed;
   border-color: #cbd5e1;
   background: #e2e8f0;
@@ -253,6 +255,57 @@
   color: #64748b;
   font-size: 0.72rem;
   font-style: italic;
+}
+
+.inventory-template-inspection {
+  border-color: #dbeafe;
+}
+
+.inventory-template-detected-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.inventory-template-detected-grid div {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  background: #fff;
+  padding: 0.75rem;
+}
+
+.inventory-template-detected-grid dt {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.inventory-template-detected-grid dd {
+  margin: 0.25rem 0 0;
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.inventory-template-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  background: #fff;
+}
+
+.inventory-template-tab-list span {
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .inventory-category-rule-panel {
