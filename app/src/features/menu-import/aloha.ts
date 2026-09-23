@@ -1,30 +1,8 @@
+import { getDefaultToastCategory, shouldExportByDefault } from './category-rules'
 import { normalizeHeader, parseCsv } from './csv'
 import type { NormalizedMenuItem, ParsedMenuImport, RawMenuRow } from './types'
 
 const ALOHA_REQUIRED_HEADERS = ['item number', 'item name', 'price', 'effective time']
-const DEFAULT_EXCLUDED_CATEGORY_KEYWORDS = [
-  'gift card',
-  'gift cards',
-  'open item',
-  'open items',
-  'deposit',
-  'deposits',
-  'retail',
-]
-const DEFAULT_EXCLUDED_NAME_KEYWORDS = [
-  'gift card',
-  'gift certificate',
-  'refund gift card',
-  'open beer',
-  'open wine',
-  'open liquor',
-  'open bev',
-  'open retail',
-  'open item',
-  'sales tax',
-  'deposit',
-  'unavailable',
-]
 
 export function parseAlohaMenuCsv(text: string, sourceName: string): ParsedMenuImport {
   const csvRows = parseCsv(text)
@@ -100,7 +78,7 @@ function normalizeAlohaGroup(rows: RawMenuRow[]): NormalizedMenuItem {
   const firstRow = rows[0] ?? {}
   const itemNumber = firstRow['Item Number']?.trim() ?? ''
   const name = firstRow['Item Name']?.trim() ?? ''
-  const category = firstRow['Aloha Section'] || undefined
+  const sourceCategory = firstRow['Aloha Section'] || undefined
   const prices = rows.map((row) => parsePriceCents(row.Price)).filter(isPriceCents)
   const basePriceCents = getBasePriceCents(rows)
   const happyHourPriceCents = getHappyHourPriceCents(rows, basePriceCents)
@@ -132,17 +110,20 @@ function normalizeAlohaGroup(rows: RawMenuRow[]): NormalizedMenuItem {
     notes.push('Detected lower timed price')
   }
 
-  const exportIncluded = getDefaultExportIncluded({ name, category, status })
-  if (!exportIncluded && status !== 'ignored') {
-    notes.push('Excluded from export by default')
-  }
+  const toastCategory = getDefaultToastCategory(sourceCategory)
+  const exportIncluded = shouldExportByDefault({
+    sourceCategory,
+    itemName: name,
+    status,
+  })
 
   return {
     id: itemNumber ? `aloha-${itemNumber}-${cryptoSafeId(name)}` : `aloha-row-${firstRow['Source Row'] ?? cryptoSafeId(name)}`,
     sourceKind: 'aloha-csv',
     sourceItemNumber: itemNumber || undefined,
     name,
-    category,
+    category: sourceCategory,
+    toastCategory,
     basePriceCents,
     happyHourPriceCents,
     happyHourWindow,
@@ -204,35 +185,6 @@ function parsePriceCents(value?: string) {
   if (!Number.isFinite(numeric)) return null
 
   return Math.round(numeric * 100)
-}
-
-function getDefaultExportIncluded({
-  name,
-  category,
-  status,
-}: {
-  name: string
-  category?: string
-  status: NormalizedMenuItem['status']
-}) {
-  if (status === 'ignored') return false
-
-  const categoryLabel = normalizeLabel(category ?? '')
-  const itemLabel = normalizeLabel(name)
-
-  if (DEFAULT_EXCLUDED_CATEGORY_KEYWORDS.some((keyword) => categoryLabel.includes(keyword))) {
-    return false
-  }
-
-  if (DEFAULT_EXCLUDED_NAME_KEYWORDS.some((keyword) => itemLabel.includes(keyword))) {
-    return false
-  }
-
-  return true
-}
-
-function normalizeLabel(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
 function isIgnoredAlohaName(name: string) {
