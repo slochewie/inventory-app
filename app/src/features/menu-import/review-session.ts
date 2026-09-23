@@ -6,22 +6,27 @@ const STORAGE_VERSION = 1
 export type SavedReviewSession = {
   version: number
   savedAt: string
-  importFile: ParsedMenuImport
+  importFile: ParsedMenuImport | null
   items: NormalizedMenuItem[]
 }
 
 export function saveReviewSession(importFile: ParsedMenuImport | null, items: NormalizedMenuItem[]) {
+  saveReviewedItems(items, importFile)
+}
+
+export function saveReviewedItems(items: NormalizedMenuItem[], importFile: ParsedMenuImport | null = null) {
   if (typeof window === 'undefined') return
 
-  if (!importFile || items.length === 0) {
+  if (items.length === 0) {
     window.localStorage.removeItem(STORAGE_KEY)
     return
   }
 
+  const existing = loadReviewSession()
   const payload: SavedReviewSession = {
     version: STORAGE_VERSION,
     savedAt: new Date().toISOString(),
-    importFile,
+    importFile: importFile ?? existing?.importFile ?? null,
     items,
   }
 
@@ -38,9 +43,14 @@ export function loadReviewSession(): SavedReviewSession | null {
     const parsed = JSON.parse(raw) as Partial<SavedReviewSession>
 
     if (parsed.version !== STORAGE_VERSION) return null
-    if (!parsed.importFile || !Array.isArray(parsed.items)) return null
+    if (!Array.isArray(parsed.items)) return null
 
-    return parsed as SavedReviewSession
+    return {
+      version: STORAGE_VERSION,
+      savedAt: parsed.savedAt ?? new Date().toISOString(),
+      importFile: parsed.importFile ?? null,
+      items: parsed.items,
+    }
   } catch {
     return null
   }
