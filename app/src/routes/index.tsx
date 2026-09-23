@@ -214,6 +214,7 @@ function Home() {
 
   function handleCategoryChange(event: ChangeEvent<HTMLSelectElement>) {
     setCategoryFilter(event.target.value)
+    setFilter('included')
     setPage(1)
     setSelectedItemId(null)
   }
@@ -326,8 +327,6 @@ function Home() {
               ) : null}
             </section>
 
-            {beerTabRows.length > 0 ? <BeerTabPreview rows={beerTabRows} /> : null}
-
             <section className="inventory-card inventory-table-card">
               <div className="inventory-table-heading">
                 <div>
@@ -407,6 +406,8 @@ function Home() {
                   </div>
                 </section>
               ) : null}
+
+              {beerTabRows.length > 0 ? <BeerTabPreview rows={beerTabRows} /> : null}
 
               <div className="inventory-bulk-bar">
                 <strong>{filteredItems.length.toLocaleString()} matching items</strong>
