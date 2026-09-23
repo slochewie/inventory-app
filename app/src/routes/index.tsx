@@ -9,6 +9,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from '#/features/menu-import/beer-preview'
+import { buildToastExportFiles, downloadCsv, type ToastExportFile } from '#/features/menu-import/toast-export'
 import {
   formatCurrency,
   summarizeMenuItems,
@@ -58,6 +59,7 @@ function Home() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
+  const toastExportFiles = useMemo(() => buildToastExportFiles(items), [items])
   const beerPreviewItems = useMemo(() => (
     categoryFilter === ALL_CATEGORIES
       ? []
@@ -327,6 +329,8 @@ function Home() {
               ) : null}
             </section>
 
+            <ToastExportPanel files={toastExportFiles} />
+
             <section className="inventory-card inventory-table-card">
               <div className="inventory-table-heading">
                 <div>
@@ -518,6 +522,41 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
       <span>{label}</span>
       <strong>{value.toLocaleString()}</strong>
     </article>
+  )
+}
+
+function ToastExportPanel({ files }: { files: ToastExportFile[] }) {
+  const totalRows = files.reduce((total, file) => total + file.rowCount, 0)
+
+  return (
+    <section className="inventory-card inventory-export-panel">
+      <div className="inventory-table-heading">
+        <div>
+          <p className="inventory-kicker">Toast export</p>
+          <h2>Generated CSVs</h2>
+        </div>
+        <p>{totalRows.toLocaleString()} rows staged from currently export-included items.</p>
+      </div>
+
+      <div className="inventory-export-file-grid">
+        {files.map((file) => (
+          <article key={file.id} className="inventory-export-file-card">
+            <div>
+              <strong>{file.label}</strong>
+              <span>{file.rowCount.toLocaleString()} rows</span>
+            </div>
+            <p>{file.note}</p>
+            <button
+              type="button"
+              onClick={() => downloadCsv(file.filename, file.rows)}
+              disabled={file.rowCount === 0}
+            >
+              Download {file.filename}
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
   )
 }
 
