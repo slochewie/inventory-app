@@ -9,9 +9,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useMemo, useState } from 'react'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
-import { isToastExportReviewCsv, parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
+import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
+import { buildPopulatedToastTemplateWorkbookWithLiquorAsync } from '#/features/menu-import/toast-template-liquor-workbook'
 import {
-  buildPopulatedToastTemplateWorkbook,
   downloadPopulatedToastWorkbook,
   inspectToastTemplateWorkbook,
   type ToastTemplateWorkbookInfo,
@@ -30,8 +30,6 @@ type WorkbookState = {
   info: ToastTemplateWorkbookInfo
 }
 
-type ReviewSource = 'saved' | 'review-csv' | 'uploaded-aloha' | null
-
 function ToastWorkbook() {
   const savedReviewSession = useMemo(() => loadReviewSession(), [])
   const app = appDefinitionsById.inventory
@@ -44,42 +42,65 @@ function ToastWorkbook() {
   })
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(savedReviewSession?.importFile ?? null)
   const [items, setItems] = useState<NormalizedMenuItem[]>(savedReviewSession?.items ?? [])
-  const [reviewSource, setReviewSource] = useState<ReviewSource>(savedReviewSession?.items.length ? 'saved' : null)
+  const [reviewSource, setReviewSource] = useState<'saved' | 'review-csv' | 'uploaded' | null>(savedReviewSession?.items.length ? 'saved' : null)
   const [reviewSavedAt, setReviewSavedAt] = useState(savedReviewSession?.savedAt ?? null)
-  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [alohaError, setAlohaError] = useState<string | null>(null)
   const [workbook, setWorkbook] = useState<WorkbookState | null>(null)
   const [workbookError, setWorkbookError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
-  const beerExportItemCount = items.filter((item) => item.exportIncluded && item.toastCategory.toLowerCase() === 'beer').length
+  const beerExportItemCount = items.filter((item) => item.exportIncluded && item.toastCategory === 'Beer').length
+  const liquorExportItemCount = items.filter((item) => item.exportIncluded && isLiquorItem(item)).length
 
-  async function handleReviewCsvChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleAlohaCsvChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
 
-    setReviewError(null)
+    setAlohaError(null)
     setDownloadError(null)
 
     try {
       const text = await file.text()
-      const restored = isToastExportReviewCsv(text)
-        ? parseToastExportReviewCsv(text, file.name)
-        : parseRawAlohaCsv(text, file.name)
+      const parsed = parseAlohaMenuCsv(text, file.name)
+      const normalizedItems = normalizeAlohaMenuItems(parsed)
 
-      setImportFile(restored.importFile)
-      setItems(restored.items)
-      setReviewSource(isToastExportReviewCsv(text) ? 'review-csv' : 'uploaded-aloha')
+      setImportFile(parsed)
+      setItems(normalizedItems)
+      setReviewSource('uploaded')
       setReviewSavedAt(null)
-      saveReviewSession(restored.importFile, restored.items)
+      saveReviewSession(parsed, normalizedItems)
     } catch (error) {
       setImportFile(null)
       setItems([])
       setReviewSource(null)
       setReviewSavedAt(null)
-      setReviewError(error instanceof Error ? error.message : 'Unable to read the selected CSV')
-    } finally {
-      event.target.value = ''
+      setAlohaError(error instanceof Error ? error.message : 'Unable to read the selected Aloha CSV')
+    }
+  }
+
+  async function handleReviewCsvChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setAlohaError(null)
+    setDownloadError(null)
+
+    try {
+      const text = await file.text()
+      const parsed = parseToastExportReviewCsv(text, file.name)
+
+      setImportFile(parsed.importFile)
+      setItems(parsed.items)
+      setReviewSource('review-csv')
+      setReviewSavedAt(null)
+      saveReviewSession(parsed.importFile, parsed.items)
+    } catch (error) {
+      setImportFile(null)
+      setItems([])
+      setReviewSource(null)
+      setReviewSavedAt(null)
+      setAlohaError(error instanceof Error ? error.message : 'Unable to restore the selected Toast export review CSV')
     }
   }
 
@@ -100,13 +121,13 @@ function ToastWorkbook() {
     }
   }
 
-  function handleDownloadWorkbook() {
+  async function handleDownloadWorkbook() {
     if (!workbook) return
 
     setDownloadError(null)
 
     try {
-      const populatedWorkbook = buildPopulatedToastTemplateWorkbook({
+      const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
         templateArrayBuffer: workbook.arrayBuffer,
         items,
       })
@@ -159,8 +180,8 @@ function ToastWorkbook() {
           <p className="inventory-kicker">Toast workbook</p>
           <h1>Populate Toast template</h1>
           <p>
-            Upload a downloaded Toast Menu Template workbook. This page uses reviewed menu
-            state from the main Inventory page or from a downloaded toast-export-review.csv save file.
+            Upload a downloaded Toast Menu Template workbook. This page uses reviewed menu rows
+            from the main Inventory page or a saved toast-export-review.csv file.
           </p>
         </header>
 
@@ -169,26 +190,33 @@ function ToastWorkbook() {
             <p className="inventory-kicker">Step 1</p>
             <h2>Reviewed menu state</h2>
             <p>
-              Preferred durable save: upload <strong>toast-export-review.csv</strong>. Browser
-              session state is used when available, and raw Aloha CSV upload remains a fallback.
+              Preferred: upload <strong>toast-export-review.csv</strong>, your durable save file.
+              A saved browser review state is used automatically when present. Raw Aloha CSV is
+              still available as a fallback, but it starts from unedited normalized data.
             </p>
             {reviewSource === 'saved' ? (
               <p>
-                Using saved browser reviewed state{reviewSavedAt ? ` from ${new Date(reviewSavedAt).toLocaleString()}` : ''}.
+                Using saved reviewed state{reviewSavedAt ? ` from ${new Date(reviewSavedAt).toLocaleString()}` : ''}.
               </p>
             ) : reviewSource === 'review-csv' ? (
-              <p>Using reviewed rows restored from toast-export-review.csv.</p>
-            ) : reviewSource === 'uploaded-aloha' ? (
-              <p>Using raw normalized Aloha CSV rows from this page.</p>
+              <p>Using restored reviewed rows from toast-export-review.csv.</p>
+            ) : reviewSource === 'uploaded' ? (
+              <p>Using the raw Aloha CSV uploaded on this workbook page.</p>
             ) : (
-              <p>No reviewed state loaded yet. Upload toast-export-review.csv or review an Aloha CSV on the Menu Items page.</p>
+              <p>No reviewed state found yet. Upload toast-export-review.csv or go to Menu Items to review the Aloha CSV.</p>
             )}
           </div>
-          <label className="inventory-upload-control">
-            <span>Choose review CSV</span>
-            <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
-          </label>
-          {reviewError ? <p className="inventory-error">{reviewError}</p> : null}
+          <div className="inventory-upload-stack">
+            <label className="inventory-upload-control">
+              <span>Choose toast-export-review.csv</span>
+              <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
+            </label>
+            <label className="inventory-upload-control">
+              <span>Choose raw Aloha CSV</span>
+              <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
+            </label>
+          </div>
+          {alohaError ? <p className="inventory-error">{alohaError}</p> : null}
         </section>
 
         {items.length > 0 ? (
@@ -198,14 +226,15 @@ function ToastWorkbook() {
               <SummaryCard label="Normalized items" value={summary.normalizedItems} />
               <SummaryCard label="Exporting" value={summary.exportItems} />
               <SummaryCard label="Beer export items" value={beerExportItemCount} />
+              <SummaryCard label="Liquor export items" value={liquorExportItemCount} />
             </section>
 
             <section className="inventory-card inventory-source-card">
-              <h2>{importFile?.sourceName ?? 'Reviewed menu state'}</h2>
+              <h2>{importFile?.sourceName ?? 'Saved reviewed menu state'}</h2>
               <dl>
                 <div>
                   <dt>Source type</dt>
-                  <dd>{getReviewSourceLabel(reviewSource)}</dd>
+                  <dd>{reviewSource === 'review-csv' ? 'Toast export review CSV' : reviewSource === 'saved' ? 'Reviewed Inventory state' : 'Aloha CSV'}</dd>
                 </div>
                 <div>
                   <dt>Store</dt>
@@ -225,9 +254,8 @@ function ToastWorkbook() {
             <p className="inventory-kicker">Step 2</p>
             <h2>Toast template workbook</h2>
             <p>
-              Use a downloaded .xlsx copy of the Toast Menu Template. The first implementation
-              inspects the Beer tab headers so bars can have different draft sizes and packaged
-              beer groups.
+              Use a downloaded .xlsx copy of the Toast Menu Template. The workbook writer now
+              fills the Beer and Liquor tabs from reviewed export-included rows.
             </p>
           </div>
           <label className="inventory-upload-control">
@@ -245,13 +273,13 @@ function ToastWorkbook() {
               <p className="inventory-kicker">Step 3</p>
               <h2>Download populated workbook</h2>
             </div>
-            <p>First pass writes Beer tab values only.</p>
+            <p>Writes Beer and Liquor tab values.</p>
           </div>
 
           <p>
             The populated workbook is generated from the current reviewed menu rows and the
-            uploaded Toast template workbook. Later passes can add Liquor, Wine, Cocktails,
-            NA Bev, Menu Build, and Modifier Build tabs.
+            uploaded Toast template workbook. Later passes can add Wine, Cocktails, NA Bev,
+            Menu Build, Modifier Build, and Liquor Mods tabs.
           </p>
 
           <button
@@ -268,21 +296,6 @@ function ToastWorkbook() {
       </section>
     </main>
   )
-}
-
-function parseRawAlohaCsv(text: string, fileName: string) {
-  const importFile = parseAlohaMenuCsv(text, fileName)
-  return {
-    importFile,
-    items: normalizeAlohaMenuItems(importFile),
-  }
-}
-
-function getReviewSourceLabel(source: ReviewSource) {
-  if (source === 'saved') return 'Saved browser reviewed state'
-  if (source === 'review-csv') return 'toast-export-review.csv'
-  if (source === 'uploaded-aloha') return 'Raw Aloha CSV fallback'
-  return 'None'
 }
 
 function WorkbookInspectionCard({ workbook }: { workbook: WorkbookState }) {
@@ -349,6 +362,20 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
       <strong>{value.toLocaleString()}</strong>
     </article>
   )
+}
+
+function isLiquorItem(item: NormalizedMenuItem) {
+  const category = clean(item.category).toUpperCase()
+  const toastCategory = clean(item.toastCategory).toUpperCase()
+
+  if (category === 'WINE GLASS') return false
+
+  return ['BOURB WHISK', 'BRANDY/COGNAC', 'GIN', 'LIQUEURS', 'RUM', 'SCOTCH', 'TEQUILA', 'VODKA', 'WHISKEY/BOURBON']
+    .includes(category || toastCategory)
+}
+
+function clean(value?: string) {
+  return String(value ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function getHostname() {
