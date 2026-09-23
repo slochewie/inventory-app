@@ -85,7 +85,7 @@ const WELL_LIQUOR_NAMES = new Set([
 ])
 
 export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportFile[] {
-  saveReviewedItems(items)
+  if (items.length > 0) saveReviewedItems(items)
 
   const included = items.filter((item) => item.exportIncluded && item.status !== 'ignored')
   const beerItems = included.filter((item) => item.toastCategory.toLowerCase() === 'beer')
