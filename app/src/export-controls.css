@@ -94,15 +94,34 @@
   border-color: #d1d5db;
 }
 
+.inventory-beer-preview-card .inventory-table-heading {
+  margin-bottom: 0.75rem;
+}
+
+.inventory-beer-preview-card .inventory-table-wrap {
+  max-height: 26rem;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
 .inventory-beer-preview-table {
   min-width: 82rem;
   font-size: 0.82rem;
 }
 
 .inventory-beer-preview-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: #f3f4f6;
   color: #111827;
   font-weight: 900;
+  white-space: nowrap;
+}
+
+.inventory-beer-preview-table td {
+  background: #fff;
 }
 
 .inventory-beer-preview-table th:nth-child(1),
