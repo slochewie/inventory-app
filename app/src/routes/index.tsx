@@ -126,6 +126,12 @@ function CatalogPage() {
       variantId: item.id,
     }
 
+    if (Object.hasOwn(patch, 'name')) {
+      const nextName = patch.name?.trim() ?? ''
+      payload.toastNameOverride =
+        nextName && nextName !== item.masterName ? nextName : null
+    }
+
     if (Object.hasOwn(patch, 'organizationEnabled')) {
       payload.enabled = patch.organizationEnabled
     }
@@ -451,6 +457,13 @@ function CatalogDrawer({
                   </div>
                 </div>
 
+                <NameField
+                  value={item.name}
+                  masterName={item.masterName ?? item.name}
+                  disabled={!canEdit || saving}
+                  onCommit={(value) => void onUpdate(item, { name: value })}
+                />
+
                 <div className="inventory-catalog-price-grid">
                   <MoneyField
                     label="Price"
@@ -486,6 +499,46 @@ function CatalogDrawer({
         </p>
       </section>
     </dialog>
+  )
+}
+
+function NameField({
+  value,
+  masterName,
+  disabled,
+  onCommit,
+}: {
+  value: string
+  masterName: string
+  disabled: boolean
+  onCommit: (value: string) => void
+}) {
+  const [draft, setDraft] = useState(value)
+
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
+
+  return (
+    <label className="inventory-search-control inventory-catalog-name-field">
+      <span>Name</span>
+      <input
+        value={draft}
+        disabled={disabled}
+        placeholder={masterName}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          const nextValue = draft.trim() || masterName
+          if (nextValue !== value) {
+            setDraft(nextValue)
+            onCommit(nextValue)
+          }
+        }}
+      />
+      {value !== masterName ? (
+        <small>Master name: {masterName}</small>
+      ) : null}
+    </label>
   )
 }
 
