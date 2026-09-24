@@ -1,7 +1,7 @@
 import { appDefinitionsById } from '@niteowl/app-config'
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { InventorySidebar } from '#/inventory-sidebar'
+import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from '#/features/menu-import/beer-preview'
 import { loadReviewSession } from '#/features/menu-import/review-session'
@@ -231,9 +231,7 @@ function Home() {
   }
 
   return (
-    <main className="inventory-shell">
-      <InventorySidebar currentPath="/" />
-
+    <AuthenticatedInventoryShell currentPath="/">
       <section className="inventory-content">
         <header className="inventory-hero">
           <p className="inventory-kicker">Menu items</p>
@@ -478,7 +476,7 @@ function Home() {
           </section>
         )}
       </section>
-    </main>
+    </AuthenticatedInventoryShell>
   )
 }
 
