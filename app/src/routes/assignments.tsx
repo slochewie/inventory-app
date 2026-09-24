@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
+import {
+  AuthenticatedInventoryShell,
+  useInventoryAccessRole,
+} from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import {
   listInventoryAssignments,
@@ -9,9 +12,22 @@ import {
   type InventoryRole,
 } from '#/lib/inventory-access'
 
-export const Route = createFileRoute('/assignments')({ component: InventoryAssignments })
+export const Route = createFileRoute('/assignments')({ component: InventoryAssignmentsRoute })
 
 const ROLE_OPTIONS: InventoryRole[] = ['viewer', 'staff', 'manager', 'admin']
+
+function InventoryAssignmentsRoute() {
+  const { canManageAssignments } = useInventoryAccessRole()
+
+  return (
+    <AuthenticatedInventoryShell
+      currentPath="/assignments"
+      requiredCapability="manage-assignments"
+    >
+      {canManageAssignments ? <InventoryAssignments /> : null}
+    </AuthenticatedInventoryShell>
+  )
+}
 
 function InventoryAssignments() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
@@ -74,7 +90,6 @@ function InventoryAssignments() {
   }
 
   return (
-    <AuthenticatedInventoryShell currentPath="/assignments">
       <section className="inventory-content">
         <header className="inventory-hero">
           <p className="inventory-kicker">Assignments</p>
@@ -157,6 +172,5 @@ function InventoryAssignments() {
           ) : null}
         </section>
       </section>
-    </AuthenticatedInventoryShell>
   )
 }
