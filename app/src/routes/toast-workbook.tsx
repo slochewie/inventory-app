@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
-import { InventorySidebar } from '#/inventory-sidebar'
+import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
 import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
@@ -172,9 +172,7 @@ function ToastWorkbook() {
   }
 
   return (
-    <main className="inventory-shell">
-      <InventorySidebar currentPath="/toast-workbook" />
-
+    <AuthenticatedInventoryShell currentPath="/toast-workbook">
       <section className="inventory-content">
         <header className="inventory-hero">
           <p className="inventory-kicker">Toast workbook</p>
@@ -303,7 +301,7 @@ function ToastWorkbook() {
           {downloadError ? <p className="inventory-error">{downloadError}</p> : null}
         </section>
       </section>
-    </main>
+    </AuthenticatedInventoryShell>
   )
 }
 
