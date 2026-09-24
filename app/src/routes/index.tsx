@@ -218,11 +218,14 @@ function Home() {
   }, [categoryFilter, filter, items, query])
 
   const filteredItemIds = useMemo(() => new Set(filteredItems.map((item) => item.id)), [filteredItems])
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const filteredItemGroups = useMemo(() => groupMenuItems(filteredItems), [filteredItems])
+  const allItemGroups = useMemo(() => groupMenuItems(items), [items])
+  const pageCount = Math.max(1, Math.ceil(filteredItemGroups.length / PAGE_SIZE))
   const clampedPage = Math.min(page, pageCount)
   const pageStart = (clampedPage - 1) * PAGE_SIZE
-  const pageItems = filteredItems.slice(pageStart, pageStart + PAGE_SIZE)
-  const pageEnd = pageStart + pageItems.length
+  const pageGroups = filteredItemGroups.slice(pageStart, pageStart + PAGE_SIZE)
+  const pageItems = pageGroups.flatMap((group) => group.items)
+  const pageEnd = pageStart + pageGroups.length
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? null,
     [items, selectedItemId],
@@ -554,9 +557,18 @@ function Home() {
           <>
             <section className="inventory-summary-grid" aria-label="Import summary">
               <SummaryCard label="Source rows" value={summary.rawRows} />
-              <SummaryCard label="Normalized items" value={summary.normalizedItems} />
-              <SummaryCard label="Exporting" value={summary.exportItems} />
-              <SummaryCard label="Not exporting" value={summary.excludedItems} />
+              <SummaryCard
+                label={importFile.meta?.source === 'inventory-catalog' ? 'Master items' : 'Normalized items'}
+                value={importFile.meta?.source === 'inventory-catalog' ? allItemGroups.length : summary.normalizedItems}
+              />
+              <SummaryCard
+                label={importFile.meta?.source === 'inventory-catalog' ? 'Exporting variants' : 'Exporting'}
+                value={summary.exportItems}
+              />
+              <SummaryCard
+                label={importFile.meta?.source === 'inventory-catalog' ? 'Not exporting variants' : 'Not exporting'}
+                value={summary.excludedItems}
+              />
               <SummaryCard label="Needs review" value={summary.reviewItems} />
               <SummaryCard label="Happy-hour prices" value={summary.happyHourItems} />
             </section>
@@ -622,7 +634,7 @@ function Home() {
                   <h2>Normalized menu items</h2>
                 </div>
                 <p>
-                  Showing {filteredItems.length === 0 ? 0 : pageStart + 1}–{pageEnd} of {filteredItems.length} filtered items.
+                  Showing {filteredItemGroups.length === 0 ? 0 : pageStart + 1}–{pageEnd} of {filteredItemGroups.length} filtered items.
                 </p>
               </div>
 
@@ -700,7 +712,7 @@ function Home() {
               {canEdit ? (
                 <>
                   <div className="inventory-bulk-bar">
-                    <strong>{filteredItems.length.toLocaleString()} matching items</strong>
+                    <strong>{filteredItemGroups.length.toLocaleString()} matching items</strong>
                     <button type="button" onClick={() => updateFilteredItems({ exportIncluded: false })}>Exclude filtered from export</button>
                     <button type="button" onClick={() => updateFilteredItems({ exportIncluded: true })}>Include filtered in export</button>
                     <button type="button" onClick={() => updatePageItems({ exportIncluded: false })}>Exclude this page</button>
@@ -729,54 +741,94 @@ function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {pageItems.map((item) => (
-                      <tr key={item.id} className={selectedItemId === item.id ? 'is-selected' : undefined}>
-                        <td>
-                          <div className="inventory-item-name-line">
-                            <strong>{item.name}</strong>
-                            <span className={`inventory-status inventory-status-${item.status}`}>
-                              {item.status}
-                            </span>
-                          </div>
-                          {item.notes.length > 0 ? <span>{item.notes.join(' · ')}</span> : null}
-                        </td>
-                        <td>{item.category || 'Uncategorized'}</td>
-                        <td>{item.toastCategory}</td>
-                        <td>{formatCurrency(item.basePriceCents)}</td>
-                        <td>
-                          {item.happyHourPriceCents === null
-                            ? '—'
-                            : `${formatCurrency(item.happyHourPriceCents)}${item.happyHourWindow ? ` · ${item.happyHourWindow}` : ''}`}
-                        </td>
-                        <td className="inventory-review-actions">
-                          {canEdit ? (
-                            <div className="inventory-review-action-buttons">
-                              <button
-                                className={item.exportIncluded ? 'inventory-export-toggle is-included' : 'inventory-export-toggle'}
-                                type="button"
-                                onClick={() => updateItem(item.id, { exportIncluded: !item.exportIncluded })}
-                              >
-                                {item.exportIncluded ? 'Export' : 'No export'}
-                              </button>
-                              <button
-                                className="inventory-row-action"
-                                type="button"
-                                onClick={() => setSelectedItemId(item.id)}
-                              >
-                                Edit
-                              </button>
+                    {pageGroups.map((group) => {
+                      const item = group.items[0]
+                      const groupSelected = group.items.some((variant) => selectedItemId === variant.id)
+                      const status = getGroupStatus(group.items)
+
+                      return (
+                        <tr key={group.key} className={groupSelected ? 'is-selected' : undefined}>
+                          <td>
+                            <div className="inventory-item-name-line">
+                              <strong>{item.name}</strong>
+                              <span className={`inventory-status inventory-status-${status}`}>
+                                {status}
+                              </span>
                             </div>
-                          ) : (
-                            <span>{item.exportIncluded ? 'Exporting' : 'Not exporting'}</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                            {group.items.length === 1 && item.notes.length > 0 ? (
+                              <span>{item.notes.join(' · ')}</span>
+                            ) : (
+                              <span>{group.items.length} variants</span>
+                            )}
+                          </td>
+                          <td>{item.category || 'Uncategorized'}</td>
+                          <td>{item.toastCategory}</td>
+                          <td>
+                            <div className="inventory-variant-stack">
+                              {group.items.map((variant) => (
+                                <span key={variant.id}>
+                                  <strong>{getVariantDisplayLabel(variant)}</strong>
+                                  {formatCurrency(variant.basePriceCents)}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="inventory-variant-stack">
+                              {group.items.map((variant) => (
+                                <span key={variant.id}>
+                                  <strong>{getVariantDisplayLabel(variant)}</strong>
+                                  {variant.happyHourPriceCents === null
+                                    ? '—'
+                                    : `${formatCurrency(variant.happyHourPriceCents)}${variant.happyHourWindow ? ` · ${variant.happyHourWindow}` : ''}`}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="inventory-review-actions">
+                            {canEdit ? (
+                              <div className="inventory-variant-actions">
+                                {group.items.map((variant) => (
+                                  <div key={variant.id} className="inventory-variant-action-row">
+                                    <span>{getVariantDisplayLabel(variant)}</span>
+                                    <div className="inventory-review-action-buttons">
+                                      <button
+                                        className={variant.exportIncluded ? 'inventory-export-toggle is-included' : 'inventory-export-toggle'}
+                                        type="button"
+                                        onClick={() => updateItem(variant.id, { exportIncluded: !variant.exportIncluded })}
+                                      >
+                                        {variant.exportIncluded ? 'Export' : 'No export'}
+                                      </button>
+                                      <button
+                                        className="inventory-row-action"
+                                        type="button"
+                                        onClick={() => setSelectedItemId(variant.id)}
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="inventory-variant-stack">
+                                {group.items.map((variant) => (
+                                  <span key={variant.id}>
+                                    <strong>{getVariantDisplayLabel(variant)}</strong>
+                                    {variant.exportIncluded ? 'Exporting' : 'Not exporting'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
 
-              {filteredItems.length === 0 ? (
+              {filteredItemGroups.length === 0 ? (
                 <p className="inventory-empty-state">No menu items match the current filter.</p>
               ) : null}
 
@@ -1031,6 +1083,43 @@ function EditItemPanel({
           </section>
     </dialog>
   )
+}
+
+type MenuItemGroup = {
+  key: string
+  items: NormalizedMenuItem[]
+}
+
+function groupMenuItems(items: NormalizedMenuItem[]): MenuItemGroup[] {
+  const groups = new Map<string, NormalizedMenuItem[]>()
+
+  items.forEach((item) => {
+    const key = item.masterItemId ?? `variant:${item.id}`
+    const existing = groups.get(key)
+
+    if (existing) {
+      existing.push(item)
+    } else {
+      groups.set(key, [item])
+    }
+  })
+
+  return [...groups.entries()].map(([key, groupedItems]) => ({
+    key,
+    items: groupedItems.sort((left, right) =>
+      getVariantDisplayLabel(left).localeCompare(getVariantDisplayLabel(right)),
+    ),
+  }))
+}
+
+function getVariantDisplayLabel(item: NormalizedMenuItem) {
+  return item.variantLabel || item.notes[0] || 'Standard'
+}
+
+function getGroupStatus(items: NormalizedMenuItem[]): NormalizedMenuItem['status'] {
+  if (items.some((item) => item.status === 'review')) return 'review'
+  if (items.every((item) => item.status === 'ignored')) return 'ignored'
+  return 'ready'
 }
 
 function createSavedImportFile(items: NormalizedMenuItem[], savedAt: string): ParsedMenuImport {
