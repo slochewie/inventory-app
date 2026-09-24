@@ -656,8 +656,12 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
+  width: auto;
+  height: 2.75rem;
+  margin: 0;
+  padding: 0 0.75rem;
   line-height: 1;
+  vertical-align: middle;
 }
 
 .inventory-export-toggle.is-included {
