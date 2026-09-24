@@ -86,6 +86,40 @@ type ImportResponse = {
   error?: string
 }
 
+
+export type InventoryImportConflict = {
+  type: string
+  sourceKey?: string
+  sourceName?: string
+  variantId?: string
+  existingPriceCents?: number | null
+  incomingPriceCents?: number | null
+  category?: string | null
+  existingCategory?: string | null
+  incomingCategory?: string | null
+}
+
+export type InventoryImportHistoryEntry = {
+  id: string
+  sourceType: string
+  sourceName: string
+  importedByUserId: string
+  importedByName: string | null
+  importedByEmail: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+  itemCount: number
+  variantCount: number
+  conflictCount: number
+  conflicts: InventoryImportConflict[]
+}
+
+type ImportHistoryResponse = {
+  imports?: InventoryImportHistoryEntry[]
+  error?: string
+}
+
 function authEndpoint(path: string) {
   return `${authBaseURL.replace(/\/$/, "")}${path}`
 }
@@ -201,4 +235,29 @@ export async function persistInventoryImport(input: {
     importedItems: result.importedItems ?? 0,
     importedVariants: result.importedVariants ?? 0,
   }
+}
+
+
+export async function listInventoryImports(
+  organizationId: string,
+  signal?: AbortSignal,
+) {
+  const url = new URL(authEndpoint("/api/auth/inventory/imports"))
+  url.searchParams.set("organizationId", organizationId)
+
+  const response = await fetch(url, {
+    credentials: "include",
+    signal,
+  })
+  const result = (await response.json()) as ImportHistoryResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to load Inventory import history.",
+    )
+  }
+
+  return Array.isArray(result.imports) ? result.imports : []
 }
