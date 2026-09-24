@@ -66,6 +66,7 @@ export function AuthenticatedInventoryShell({
   >("idle")
   const {
     role: inventoryRole,
+    canImportExport,
     canManageAssignments,
   } = useInventoryAccessRole()
   const [allowedOrganizationIds, setAllowedOrganizationIds] = useState<Set<string> | null>(null)
@@ -273,6 +274,7 @@ export function AuthenticatedInventoryShell({
     <main className="inventory-shell">
       <InventorySidebar
         currentPath={currentPath}
+        canImportExport={canImportExport}
         canManageAssignments={canManageAssignments}
       />
 
