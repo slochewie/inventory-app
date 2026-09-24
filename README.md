@@ -98,25 +98,19 @@ Generated CLI output under `output/` is also ignored.
 
 ## Beer workbook behavior
 
-Beer records are treated as independent source items and then placed into the appropriate Toast Beer-tab slot.
+The Toast workbook is treated as a fixed template. Export generation writes menu data into existing cells but does not rename headers, add custom columns, or otherwise repurpose the workbook structure.
 
-Current supported slots include:
+Beer records remain independent source items and are mapped into the existing Toast Beer-tab slots:
 
-- Draft 10oz
-- Draft 16oz
-- Standard can
-- 24oz can
-- Bottle
+- 10oz draft -> existing 8oz draft slot
+- 16oz draft -> existing 16oz draft slot
+- standard can -> existing Can slot
+- 24oz can -> existing Bottle slot
+- bottle -> existing Bottle slot
 
-A 24oz can is **not** assumed to be the same item as a standard can with the same apparent beer name.
+A 24oz can is **not** assumed to be the same item as a standard can with the same apparent beer name. If both 24oz cans and bottles are present, both are written as separate rows in the existing Bottle section.
 
-For Toast templates that have a Bottle slot but no dedicated 24oz-can slot, the workbook writer currently uses this rule:
-
-- if the reviewed export contains 24oz cans,
-- and it contains no bottle beers,
-- the existing Bottle slot is renamed to **24oz Can** and reused for those items.
-
-If bottle beers are also present, the Bottle slot is preserved instead of being silently repurposed.
+Actual organization serving/package sizes are inventory data, not workbook-header changes. Differences from Toast's fixed labels should be called out in the Notes tab for the Toast representative.
 
 ## CLI normalization pipeline
 
