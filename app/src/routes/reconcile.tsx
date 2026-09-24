@@ -4,6 +4,7 @@ import {
   AuthenticatedInventoryShell,
   useInventoryAccessRole,
 } from '#/components/authenticated-inventory-shell'
+import { getInventoryVariantLabel } from '#/features/menu-import/catalog'
 import { authClient } from '#/lib/auth-client'
 import {
   listInventoryCatalog,
@@ -606,25 +607,14 @@ function formatSourceType(value: string) {
 }
 
 function variantLabel(item: InventoryCatalogRow) {
-  return [
-    item.variant.name,
-    item.variant.kind !== 'standard' ? item.variant.kind : null,
-    item.variant.sizeOz !== null ? `${item.variant.sizeOz}oz` : null,
-    item.variant.packageType,
-  ]
-    .filter(Boolean)
-    .join(' · ') || 'Standard'
+  return getInventoryVariantLabel(item.variant)
 }
 
 function mappingVariantLabel(mapping: InventorySourceMapping) {
-  return [
-    mapping.variantName,
-    mapping.variantKind && mapping.variantKind !== 'standard'
-      ? mapping.variantKind
-      : null,
-    mapping.variantSizeOz !== null ? `${mapping.variantSizeOz}oz` : null,
-    mapping.variantPackageType,
-  ]
-    .filter(Boolean)
-    .join(' · ') || 'Standard'
+  return getInventoryVariantLabel({
+    kind: mapping.variantKind ?? 'standard',
+    sizeOz: mapping.variantSizeOz,
+    packageType: mapping.variantPackageType,
+    name: mapping.variantName,
+  })
 }
