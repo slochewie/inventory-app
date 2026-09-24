@@ -4,14 +4,7 @@ import type { NormalizedMenuItem } from './types'
 export function catalogRowToNormalizedItem(
   row: InventoryCatalogRow,
 ): NormalizedMenuItem {
-  const variantLabel = [
-    row.variant.kind !== 'standard' ? row.variant.kind : null,
-    row.variant.sizeOz !== null ? `${row.variant.sizeOz}oz` : null,
-    row.variant.packageType,
-    row.variant.name,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const variantLabel = getInventoryVariantLabel(row.variant)
 
   const categoryName = row.category?.name ?? undefined
   const toastCategory =
@@ -42,4 +35,42 @@ export function catalogRowToNormalizedItem(
     notes: variantLabel ? [variantLabel] : [],
     rawRows: [],
   }
+}
+
+
+export function getInventoryVariantLabel(variant: {
+  kind: string
+  sizeOz: number | null
+  packageType: string | null
+  name: string | null
+}) {
+  if (variant.kind === 'draft') {
+    return variant.sizeOz !== null
+      ? `${variant.sizeOz}oz Draft`
+      : 'Draft'
+  }
+
+  if (variant.kind === 'can') {
+    return variant.sizeOz !== null
+      ? `${variant.sizeOz}oz Can`
+      : 'Can'
+  }
+
+  if (variant.kind === 'bottle') {
+    return variant.sizeOz !== null
+      ? `${variant.sizeOz}oz Bottle`
+      : 'Bottle'
+  }
+
+  if (variant.kind === 'standard') {
+    return variant.name?.trim() || 'Standard'
+  }
+
+  return variant.name?.trim() || [
+    variant.sizeOz !== null ? `${variant.sizeOz}oz` : null,
+    variant.packageType,
+    variant.kind,
+  ]
+    .filter(Boolean)
+    .join(' ') || 'Standard'
 }
