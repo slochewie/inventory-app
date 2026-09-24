@@ -18,6 +18,8 @@ export const Route = createFileRoute('/import-review')({ component: ImportReview
 
 type ReviewFilter = 'review' | 'included' | 'excluded' | 'all'
 
+const PAGE_SIZE = 50
+
 function ImportReviewPage() {
   const { canImportExport } = useInventoryAccessRole()
   const { data: activeOrganization } = authClient.useActiveOrganization()
@@ -29,6 +31,7 @@ function ImportReviewPage() {
   const [error, setError] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
 
@@ -51,6 +54,16 @@ function ImportReviewPage() {
       ].some((value) => value?.toLowerCase().includes(normalizedQuery))
     })
   }, [filter, items, query])
+
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const clampedPage = Math.min(page, pageCount)
+  const pageStart = (clampedPage - 1) * PAGE_SIZE
+  const pageItems = filteredItems.slice(pageStart, pageStart + PAGE_SIZE)
+  const pageEnd = pageStart + pageItems.length
+
+  useEffect(() => {
+    setPage(1)
+  }, [filter, query])
 
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null
 
@@ -248,7 +261,7 @@ function ImportReviewPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredItems.map((item) => (
+                      {pageItems.map((item) => (
                         <tr key={item.id}>
                           <td>
                             <strong>{item.name}</strong>
@@ -285,6 +298,31 @@ function ImportReviewPage() {
                   </table>
                 </div>
               )}
+
+              {filteredItems.length > PAGE_SIZE ? (
+                <div className="inventory-import-review-pagination">
+                  <span>
+                    Showing {(pageStart + 1).toLocaleString()}–{pageEnd.toLocaleString()} of {filteredItems.length.toLocaleString()}
+                  </span>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setPage((current) => Math.max(1, current - 1))}
+                      disabled={clampedPage <= 1}
+                    >
+                      Previous
+                    </button>
+                    <span>Page {clampedPage.toLocaleString()} of {pageCount.toLocaleString()}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+                      disabled={clampedPage >= pageCount}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="inventory-import-review-footer">
                 <div>
