@@ -120,6 +120,12 @@ type ImportHistoryResponse = {
   error?: string
 }
 
+
+type OrganizationVariantUpdateResponse = {
+  updated?: boolean
+  error?: string
+}
+
 function authEndpoint(path: string) {
   return `${authBaseURL.replace(/\/$/, "")}${path}`
 }
@@ -260,4 +266,40 @@ export async function listInventoryImports(
   }
 
   return Array.isArray(result.imports) ? result.imports : []
+}
+
+
+export async function updateInventoryOrganizationVariant(input: {
+  organizationId: string
+  variantId: string
+  enabled?: boolean
+  exportToToast?: boolean
+  priceOverrideCents?: number | null
+  happyHourPriceCents?: number | null
+  toastNameOverride?: string | null
+  toastCategoryOverride?: string | null
+  toastDestinationOverride?: string | null
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/organization-variant"),
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  )
+  const result = (await response.json()) as OrganizationVariantUpdateResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to update the Inventory item.",
+    )
+  }
+
+  return result.updated === true
 }
