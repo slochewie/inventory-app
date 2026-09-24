@@ -16,6 +16,9 @@ export type NormalizedMenuItem = {
   id: string
   masterItemId?: string
   variantLabel?: string
+  variantKind?: string
+  variantSizeOz?: number | null
+  variantPackageType?: string | null
   sourceKind: MenuImportSourceKind
   sourceItemNumber?: string
   name: string
