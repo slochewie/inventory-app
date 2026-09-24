@@ -1,9 +1,10 @@
 import type { ReactNode } from "react"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { OrganizationSelector } from "@niteowl/ui"
 
 import { InventorySidebar } from "#/inventory-sidebar"
 import { authBaseURL, authClient } from "#/lib/auth-client"
+import { getInventoryAccess } from "#/lib/inventory-access"
 
 function getInitials(value: string) {
   const parts = value.trim().split(/\s+/).filter(Boolean)
@@ -26,6 +27,9 @@ export function AuthenticatedInventoryShell({
     authClient.useListOrganizations()
   const { data: activeOrganization, isPending: isActiveOrganizationPending } =
     authClient.useActiveOrganization()
+  const [accessState, setAccessState] = useState<
+    "idle" | "checking" | "allowed" | "denied" | "error"
+  >("idle")
 
   useEffect(() => {
     if (
@@ -56,6 +60,28 @@ export function AuthenticatedInventoryShell({
     signInUrl.searchParams.set("callbackURL", window.location.href)
     window.location.assign(signInUrl.toString())
   }, [isSessionPending, session])
+
+
+  useEffect(() => {
+    if (!session || !activeOrganization?.id) {
+      setAccessState("idle")
+      return
+    }
+
+    const controller = new AbortController()
+    setAccessState("checking")
+
+    void getInventoryAccess(activeOrganization.id, controller.signal)
+      .then((result) => {
+        setAccessState(result.allowed ? "allowed" : "denied")
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setAccessState("error")
+      })
+
+    return () => controller.abort()
+  }, [activeOrganization?.id, session])
 
   if (isSessionPending || !session) {
     return (
@@ -113,7 +139,28 @@ export function AuthenticatedInventoryShell({
           </div>
         </header>
 
-        <div className="inventory-authenticated-content">{children}</div>
+        <div className="inventory-authenticated-content">
+          {accessState === "allowed" ? (
+            children
+          ) : accessState === "denied" ? (
+            <section className="inventory-auth-state">
+              <h1>Inventory access required</h1>
+              <p>
+                Your account does not have Inventory access for this organization.
+                Select another organization or contact an organization administrator.
+              </p>
+            </section>
+          ) : accessState === "error" ? (
+            <section className="inventory-auth-state">
+              <h1>Unable to verify Inventory access</h1>
+              <p>Refresh the page and try again.</p>
+            </section>
+          ) : (
+            <section className="inventory-auth-state">
+              <p>Checking Inventory access…</p>
+            </section>
+          )}
+        </div>
       </section>
     </main>
   )
