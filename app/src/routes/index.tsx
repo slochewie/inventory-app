@@ -16,6 +16,8 @@ export const Route = createFileRoute('/')({ component: CatalogPage })
 
 type AvailabilityFilter = 'carried' | 'not-carried' | 'all'
 
+const PAGE_SIZE = 50
+
 type CatalogGroup = {
   id: string
   name: string
@@ -34,6 +36,7 @@ function CatalogPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     if (!activeOrganization?.id) {
@@ -49,6 +52,7 @@ function CatalogPage() {
       .then((catalog) => {
         setItems(catalog.items.map(catalogRowToNormalizedItem))
         setSelectedGroupId(null)
+        setPage(1)
       })
       .catch((caught) => {
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -94,6 +98,16 @@ function CatalogPage() {
       ].some((value) => value?.toLowerCase().includes(normalizedQuery))
     })
   }, [availability, category, groups, query])
+
+  const pageCount = Math.max(1, Math.ceil(filteredGroups.length / PAGE_SIZE))
+  const clampedPage = Math.min(page, pageCount)
+  const pageStart = (clampedPage - 1) * PAGE_SIZE
+  const pageGroups = filteredGroups.slice(pageStart, pageStart + PAGE_SIZE)
+  const pageEnd = pageStart + pageGroups.length
+
+  useEffect(() => {
+    setPage(1)
+  }, [availability, category, query])
 
   const selectedGroup =
     groups.find((group) => group.id === selectedGroupId) ?? null
@@ -151,7 +165,7 @@ function CatalogPage() {
         <header className="inventory-page-heading">
           <div>
             <p className="inventory-kicker">Catalog</p>
-            <h1>Menu catalog</h1>
+            <h1>Catalog</h1>
             <p>
               Manage what {activeOrganization?.name ?? 'this organization'} carries,
               its prices, and what exports to Toast.
@@ -203,7 +217,9 @@ function CatalogPage() {
             <div>
               <h2>{activeOrganization?.name ?? 'Selected organization'}</h2>
               <p className="inventory-catalog-subtitle">
-                {filteredGroups.length.toLocaleString()} items
+                {filteredGroups.length === 0
+                  ? '0 items'
+                  : `Showing ${(pageStart + 1).toLocaleString()}–${pageEnd.toLocaleString()} of ${filteredGroups.length.toLocaleString()} items`}
               </p>
             </div>
           </div>
@@ -229,7 +245,7 @@ function CatalogPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredGroups.map((group) => {
+                  {pageGroups.map((group) => {
                     const carried = group.items.some((item) => item.exportIncluded)
 
                     return (
@@ -265,6 +281,26 @@ function CatalogPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          ) : null}
+
+          {filteredGroups.length > PAGE_SIZE ? (
+            <div className="inventory-catalog-pagination" aria-label="Catalog pagination">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={clampedPage <= 1}
+              >
+                Previous
+              </button>
+              <span>Page {clampedPage.toLocaleString()} of {pageCount.toLocaleString()}</span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+                disabled={clampedPage >= pageCount}
+              >
+                Next
+              </button>
             </div>
           ) : null}
         </section>
