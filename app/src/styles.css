@@ -1037,6 +1037,47 @@ select {
   white-space: nowrap;
 }
 
+
+.inventory-variant-stack {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.inventory-variant-stack > span {
+  display: grid !important;
+  grid-template-columns: minmax(5rem, auto) 1fr;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 !important;
+}
+
+.inventory-variant-stack > span > strong {
+  color: #6b7280;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.inventory-variant-actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.inventory-variant-action-row {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, auto) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.inventory-variant-action-row > span {
+  margin: 0 !important;
+  color: #6b7280;
+  font-size: 0.72rem !important;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .inventory-review-action-buttons button {
   display: inline-flex;
   align-items: center;
