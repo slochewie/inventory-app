@@ -9,6 +9,7 @@ import { formatCurrency, type NormalizedMenuItem } from '#/features/menu-import/
 import { authClient } from '#/lib/auth-client'
 import {
   listInventoryCatalog,
+  mergeInventoryItems,
   updateInventoryOrganizationVariant,
 } from '#/lib/inventory-access'
 
@@ -36,6 +37,7 @@ function CatalogPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null)
+  const [mergingItemId, setMergingItemId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -111,6 +113,33 @@ function CatalogPage() {
 
   const selectedGroup =
     groups.find((group) => group.id === selectedGroupId) ?? null
+
+  async function mergeGroup(sourceGroup: CatalogGroup, targetItemId: string) {
+    if (!canEdit || !activeOrganization?.id || mergingItemId) return
+
+    setMergingItemId(sourceGroup.id)
+    setError(null)
+
+    try {
+      await mergeInventoryItems({
+        organizationId: activeOrganization.id,
+        sourceItemId: sourceGroup.id,
+        targetItemId,
+      })
+
+      const catalog = await listInventoryCatalog(activeOrganization.id)
+      setItems(catalog.items.map(catalogRowToNormalizedItem))
+      setSelectedGroupId(targetItemId)
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to merge Inventory items.',
+      )
+    } finally {
+      setMergingItemId(null)
+    }
+  }
 
   async function updateVariant(
     item: NormalizedMenuItem,
@@ -331,9 +360,12 @@ function CatalogPage() {
           <CatalogDrawer
             group={selectedGroup}
             canEdit={canEdit}
+            allGroups={groups}
             savingVariantId={savingVariantId}
+            merging={mergingItemId === selectedGroup.id}
             onClose={() => setSelectedGroupId(null)}
             onUpdate={updateVariant}
+            onMerge={mergeGroup}
           />
         ) : null}
       </section>
@@ -344,18 +376,24 @@ function CatalogPage() {
 function CatalogDrawer({
   group,
   canEdit,
+  allGroups,
   savingVariantId,
+  merging,
   onClose,
   onUpdate,
+  onMerge,
 }: {
   group: CatalogGroup
   canEdit: boolean
+  allGroups: CatalogGroup[]
   savingVariantId: string | null
+  merging: boolean
   onClose: () => void
   onUpdate: (
     item: NormalizedMenuItem,
     patch: Partial<NormalizedMenuItem>,
   ) => Promise<void>
+  onMerge: (sourceGroup: CatalogGroup, targetItemId: string) => Promise<void>
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
 
@@ -371,6 +409,8 @@ function CatalogDrawer({
   const carriedCount = group.items.filter(
     (item) => item.organizationEnabled === true,
   ).length
+  const [mergeTargetId, setMergeTargetId] = useState('')
+  const mergeCandidates = allGroups.filter((candidate) => candidate.id !== group.id)
 
   return (
     <dialog
@@ -490,6 +530,59 @@ function CatalogDrawer({
           })}
         </div>
       </section>
+
+      {canEdit ? (
+        <section className="inventory-drawer-section inventory-merge-section">
+          <div className="inventory-drawer-section-heading">
+            <div>
+              <p className="inventory-kicker">Consolidate duplicate</p>
+              <h3>Merge with another item</h3>
+            </div>
+          </div>
+          <p>
+            Move this item's variants and source mappings into an existing master item.
+            The selected master item is kept.
+          </p>
+          <label className="inventory-search-control">
+            <span>Keep this master item</span>
+            <select
+              value={mergeTargetId}
+              disabled={merging}
+              onChange={(event) => setMergeTargetId(event.target.value)}
+            >
+              <option value="">Choose master item…</option>
+              {mergeCandidates.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.items[0]?.masterName ?? candidate.name} · {candidate.category}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="inventory-danger-button"
+            disabled={!mergeTargetId || merging}
+            onClick={() => {
+              if (!mergeTargetId) return
+              const target = mergeCandidates.find((candidate) => candidate.id === mergeTargetId)
+              if (!target) return
+
+              const sourceName = group.items[0]?.masterName ?? group.name
+              const targetName = target.items[0]?.masterName ?? target.name
+
+              if (
+                window.confirm(
+                  `Merge "${sourceName}" into "${targetName}"? This consolidates their master Inventory records.`,
+                )
+              ) {
+                void onMerge(group, mergeTargetId)
+              }
+            }}
+          >
+            {merging ? 'Merging…' : 'Merge items'}
+          </button>
+        </section>
+      ) : null}
 
       <section className="inventory-drawer-section inventory-drawer-help">
         <p className="inventory-kicker">How this works</p>
