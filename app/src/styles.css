@@ -546,8 +546,9 @@ select {
 
 .inventory-table {
   width: 100%;
-  min-width: 72rem;
-  border-collapse: collapse;
+  min-width: 58rem;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.9rem;
 }
 
@@ -594,21 +595,61 @@ select {
 .inventory-review-table td:nth-child(2),
 .inventory-review-table th:nth-child(3),
 .inventory-review-table td:nth-child(3) {
-  min-width: 10rem;
+  min-width: 9rem;
 }
 
 .inventory-review-table th:nth-child(4),
-.inventory-review-table td:nth-child(4),
-.inventory-review-table th:nth-child(6),
-.inventory-review-table td:nth-child(6),
-.inventory-review-table th:nth-child(7),
-.inventory-review-table td:nth-child(7) {
-  width: 7.5rem;
+.inventory-review-table td:nth-child(4) {
+  width: 6.5rem;
 }
 
 .inventory-review-table th:nth-child(5),
 .inventory-review-table td:nth-child(5) {
-  min-width: 12rem;
+  min-width: 11rem;
+}
+
+.inventory-review-table th:nth-child(6),
+.inventory-review-table td:nth-child(6) {
+  width: 11rem;
+}
+
+.inventory-item-name-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.inventory-item-name-line .inventory-status {
+  margin: 0;
+}
+
+.inventory-review-actions-heading,
+.inventory-review-actions {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: -8px 0 12px rgb(15 23 42 / 4%);
+}
+
+.inventory-review-actions-heading {
+  z-index: 3;
+}
+
+.inventory-review-table tbody tr:hover .inventory-review-actions {
+  background: #f9fafb;
+}
+
+.inventory-review-table tbody tr.is-selected .inventory-review-actions {
+  background: #f8fafc;
+}
+
+.inventory-review-action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  white-space: nowrap;
 }
 
 .inventory-export-toggle.is-included {
@@ -702,6 +743,24 @@ select {
 }
 
 @media (max-width: 760px) {
+  .inventory-table {
+    min-width: 50rem;
+  }
+
+  .inventory-review-actions-heading,
+  .inventory-review-actions {
+    width: 8.5rem !important;
+  }
+
+  .inventory-review-action-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inventory-review-action-buttons button {
+    width: 100%;
+  }
+
   .inventory-edit-drawer {
     width: 100%;
     height: min(90dvh, 48rem);
