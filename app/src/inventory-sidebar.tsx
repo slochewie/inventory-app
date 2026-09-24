@@ -3,91 +3,155 @@ import {
   buildNavigation,
   getDefaultAppUrls,
   getDeploymentBrand,
-} from '@niteowl/app-config'
-import { AppSidebarIdentity } from '@niteowl/ui'
-import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
+} from "@niteowl/app-config"
+import {
+  AppSidebarIdentity,
+  NiteOwlNavigationIcon,
+  useCurrentHostname,
+} from "@niteowl/ui"
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+  useSidebar,
+} from "#/components/ui/sidebar.tsx"
+
+const INVENTORY_APP = appDefinitionsById.inventory
+
+function SidebarIdentityToggle({
+  href,
+  brand,
+}: {
+  href: string
+  brand: string
+}) {
+  const { toggleSidebar } = useSidebar()
+
+  return (
+    <AppSidebarIdentity
+      href={href}
+      brand={brand}
+      appName={INVENTORY_APP.label}
+      onToggle={toggleSidebar}
+    />
+  )
+}
 
 export function InventorySidebar({
   currentPath,
-  open = true,
-  onToggle,
   canImportExport = false,
   canEdit = false,
   canManageAssignments = false,
 }: {
   currentPath: string
-  open?: boolean
-  onToggle?: () => void
   canImportExport?: boolean
   canEdit?: boolean
   canManageAssignments?: boolean
 }) {
-  const app = appDefinitionsById.inventory
-  const hostname = getHostname()
-  const brand = getDeploymentBrand(hostname)
-  const navigation = buildNavigation({
-    currentApp: 'inventory',
-    currentPath,
-    urls: getDefaultAppUrls(hostname),
-    canAccess: ({ key }) => {
-      if (key === 'inventory:manage-assignments') {
-        return canManageAssignments
-      }
+  const hostname = useCurrentHostname()
+  const appLinks = hostname ? getDefaultAppUrls(hostname) : null
+  const brand = hostname ? getDeploymentBrand(hostname) : null
+  const navigation = appLinks
+    ? buildNavigation({
+        currentApp: "inventory",
+        currentPath,
+        urls: appLinks,
+        canAccess: ({ key }) => {
+          if (key === "inventory:manage-assignments") {
+            return canManageAssignments
+          }
 
-      if (key === 'inventory:import-export') {
-        return canImportExport
-      }
+          if (key === "inventory:import-export") {
+            return canImportExport
+          }
 
-      if (key === 'inventory:edit') {
-        return canEdit
-      }
+          if (key === "inventory:edit") {
+            return canEdit
+          }
 
-      return true
-    },
-  })
+          return true
+        },
+      })
+    : null
+
+  const primarySection = navigation?.primary[0]
+  const appsSection = navigation?.apps[0]
+  const currentHref = appLinks
+    ? `${appLinks.inventory.replace(/\/$/, "")}${currentPath}`
+    : null
 
   return (
-    <aside
-      className={open ? "inventory-sidebar" : "inventory-sidebar is-collapsed"}
-      aria-label="Application navigation"
-    >
-      <div className="inventory-sidebar-brand-row">
-        <AppSidebarIdentity
-          href="/"
-          brand={brand}
-          appName={app.label}
-          onToggle={onToggle}
-        />
-      </div>
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        {currentHref && brand ? (
+          <SidebarIdentityToggle href={currentHref} brand={brand} />
+        ) : (
+          <div className="h-12" aria-hidden="true" />
+        )}
+      </SidebarHeader>
 
-      <nav className="inventory-nav">
-        {[...navigation.primary, ...navigation.apps].map((section) => (
-          <section key={section.id} className="inventory-nav-section">
-            {section.label ? <h2>{section.label}</h2> : null}
-            <ul>
-              {section.items.map((item) => (
-                <li key={item.id}>
-                  <a
-                    className={item.active ? 'inventory-nav-link is-active' : 'inventory-nav-link'}
-                    href={item.href}
-                    title={!open ? item.label : undefined}
-                  >
-                    <span className="inventory-nav-icon" aria-hidden="true">
+      <SidebarSeparator />
+
+      <SidebarContent>
+        {primarySection ? (
+          <SidebarGroup>
+            {primarySection.label ? (
+              <SidebarGroupLabel>{primarySection.label}</SidebarGroupLabel>
+            ) : null}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {primarySection.items.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      isActive={item.active}
+                      tooltip={item.label}
+                      onClick={() => window.location.assign(item.href)}
+                    >
                       <NiteOwlNavigationIcon icon={item.icon} />
-                    </span>
-                    <span>{item.label}</span>
-                    {item.external ? <span className="inventory-nav-external">↗</span> : null}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </nav>
-    </aside>
-  )
-}
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
 
-function getHostname() {
-  return typeof window === 'undefined' ? 'inventory.niteowl.dev' : window.location.hostname
+        <SidebarSeparator />
+
+        {appsSection ? (
+          <SidebarGroup>
+            {appsSection.label ? (
+              <SidebarGroupLabel className="text-sm">
+                {appsSection.label}
+              </SidebarGroupLabel>
+            ) : null}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {appsSection.items.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      tooltip={item.label}
+                      onClick={() => window.location.assign(item.href)}
+                    >
+                      <NiteOwlNavigationIcon icon={item.icon} />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
+      </SidebarContent>
+    </Sidebar>
+  )
 }
