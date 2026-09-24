@@ -51,9 +51,11 @@ export function useInventoryAccessRole() {
 
 export function AuthenticatedInventoryShell({
   currentPath,
+  requiredCapability,
   children,
 }: {
   currentPath: string
+  requiredCapability?: "import-export" | "manage-assignments"
   children: ReactNode
 }) {
   const { data: session, isPending: isSessionPending } = authClient.useSession()
@@ -248,6 +250,13 @@ export function AuthenticatedInventoryShell({
     )
   }
 
+  const routeAllowed =
+    requiredCapability === "manage-assignments"
+      ? canManageAssignments
+      : requiredCapability === "import-export"
+        ? canImportExport
+        : true
+
   const displayName = session.user.name || session.user.email
 
   async function switchAccount(sessionToken: string, userId: string) {
@@ -396,8 +405,15 @@ export function AuthenticatedInventoryShell({
         </header>
 
         <div className="inventory-authenticated-content">
-          {accessState === "allowed" && inventoryRole ? (
+          {accessState === "allowed" && inventoryRole && routeAllowed ? (
             children
+          ) : accessState === "allowed" && inventoryRole && !routeAllowed ? (
+            <section className="inventory-auth-state">
+              <h1>Inventory role required</h1>
+              <p>
+                Your Inventory role does not allow access to this page for the selected organization.
+              </p>
+            </section>
           ) : accessState === "denied" ? (
             <section className="inventory-auth-state">
               <h1>Inventory access required</h1>
