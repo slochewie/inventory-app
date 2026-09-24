@@ -24,7 +24,7 @@ import {
   type ParsedMenuImport,
 } from '#/features/menu-import/types'
 
-export const Route = createFileRoute('/toast-workbook')({ component: ToastWorkbook })
+export const Route = createFileRoute('/toast-workbook')({ component: ToastWorkbookRoute })
 
 const TOAST_TEMPLATE_FILE_NAME = 'Toast-Menu-Template-Your-Restaurant-Name.xlsx'
 const TOAST_TEMPLATE_URL = `/toast/menu/${TOAST_TEMPLATE_FILE_NAME}`
@@ -35,8 +35,20 @@ type WorkbookState = {
   info: ToastTemplateWorkbookInfo
 }
 
-function ToastWorkbook() {
+function ToastWorkbookRoute() {
   const { canImportExport } = useInventoryAccessRole()
+
+  return (
+    <AuthenticatedInventoryShell
+      currentPath="/toast-workbook"
+      requiredCapability="import-export"
+    >
+      {canImportExport ? <ToastWorkbook /> : null}
+    </AuthenticatedInventoryShell>
+  )
+}
+
+function ToastWorkbook() {
   const savedReviewSession = useMemo(() => loadReviewSession(), [])
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(savedReviewSession?.importFile ?? null)
@@ -140,8 +152,6 @@ function ToastWorkbook() {
   }, [])
 
   async function handleAlohaCsvChange(event: ChangeEvent<HTMLInputElement>) {
-    if (!canImportExport) return
-
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -168,8 +178,6 @@ function ToastWorkbook() {
   }
 
   async function handleReviewCsvChange(event: ChangeEvent<HTMLInputElement>) {
-    if (!canImportExport) return
-
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -204,8 +212,6 @@ function ToastWorkbook() {
   }
 
   async function handleDownloadWorkbook() {
-    if (!canImportExport) return
-
     setDownloadError(null)
 
     try {
@@ -218,8 +224,6 @@ function ToastWorkbook() {
   }
 
   async function handleDownloadWorkbookZip() {
-    if (!canImportExport) return
-
     setDownloadError(null)
 
     try {
@@ -233,7 +237,6 @@ function ToastWorkbook() {
   }
 
   return (
-    <AuthenticatedInventoryShell currentPath="/toast-workbook">
       <section className="inventory-content">
         <header className="inventory-hero">
           <p className="inventory-kicker">Toast workbook</p>
@@ -362,7 +365,7 @@ function ToastWorkbook() {
             <button
               className="inventory-template-download"
               type="button"
-              disabled={!canImportExport || !workbook || items.length === 0}
+              disabled={!workbook || items.length === 0}
               onClick={handleDownloadWorkbook}
             >
               Download populated XLSX
@@ -371,7 +374,7 @@ function ToastWorkbook() {
             <button
               className="inventory-template-download"
               type="button"
-              disabled={!canImportExport || !workbook || items.length === 0}
+              disabled={!workbook || items.length === 0}
               onClick={handleDownloadWorkbookZip}
             >
               Download ZIP for Toast
@@ -381,7 +384,6 @@ function ToastWorkbook() {
           {downloadError ? <p className="inventory-error">{downloadError}</p> : null}
         </section>
       </section>
-    </AuthenticatedInventoryShell>
   )
 }
 
