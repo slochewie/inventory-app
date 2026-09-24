@@ -433,18 +433,20 @@ function Home() {
                   <h2>{importFile.sourceName}</h2>
                 </div>
 
-                <button
-                  className="inventory-template-download"
-                  type="button"
-                  disabled={
-                    saveState === "saving" ||
-                    items.length === 0 ||
-                    !activeOrganization?.id
-                  }
-                  onClick={handleSaveToInventory}
-                >
-                  {saveState === "saving" ? "Saving…" : "Save to Inventory"}
-                </button>
+                {importFile.meta?.source !== 'inventory-catalog' ? (
+                  <button
+                    className="inventory-template-download"
+                    type="button"
+                    disabled={
+                      saveState === "saving" ||
+                      items.length === 0 ||
+                      !activeOrganization?.id
+                    }
+                    onClick={handleSaveToInventory}
+                  >
+                    {saveState === "saving" ? "Saving…" : "Save to Inventory"}
+                  </button>
+                ) : null}
               </div>
 
               {saveMessage ? (
