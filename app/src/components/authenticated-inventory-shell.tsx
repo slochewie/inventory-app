@@ -1,19 +1,18 @@
 import type { ReactNode } from "react"
 import { useEffect, useState } from "react"
-import { OrganizationSelector } from "@niteowl/ui"
+import { NiteOwlUserAvatar, OrganizationSelector } from "@niteowl/ui"
+import {
+  ArrowRightLeftIcon,
+  CheckIcon,
+  LogOutIcon,
+  PlusCircleIcon,
+  SettingsIcon,
+} from "lucide-react"
 
 import { InventorySidebar } from "#/inventory-sidebar"
 import { authBaseURL, authClient } from "#/lib/auth-client"
 import { getInventoryAccess } from "#/lib/inventory-access"
 
-function getInitials(value: string) {
-  const parts = value.trim().split(/\s+/).filter(Boolean)
-
-  if (parts.length === 0) return "?"
-  if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? "?"
-
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-}
 
 export function AuthenticatedInventoryShell({
   currentPath,
@@ -31,6 +30,16 @@ export function AuthenticatedInventoryShell({
     "idle" | "checking" | "allowed" | "denied" | "error"
   >("idle")
   const [allowedOrganizationIds, setAllowedOrganizationIds] = useState<Set<string> | null>(null)
+  const [deviceSessions, setDeviceSessions] = useState<Array<{
+    session: { token: string }
+    user: {
+      id: string
+      name?: string | null
+      email: string
+      image?: string | null
+    }
+  }>>([])
+  const [switchingToken, setSwitchingToken] = useState<string | null>(null)
 
   const visibleOrganizations = (organizations ?? []).filter((organization) =>
     allowedOrganizationIds?.has(organization.id) ?? false,
@@ -114,6 +123,24 @@ export function AuthenticatedInventoryShell({
   ])
 
   useEffect(() => {
+    if (!session) {
+      setDeviceSessions([])
+      return
+    }
+
+    let cancelled = false
+
+    void authClient.multiSession.listDeviceSessions().then(({ data }) => {
+      if (cancelled) return
+      setDeviceSessions((data ?? []) as typeof deviceSessions)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [session])
+
+  useEffect(() => {
     if (isSessionPending || session || typeof window === "undefined") return
 
     const signInUrl = new URL("/auth/sign-in", authBaseURL)
@@ -152,7 +179,26 @@ export function AuthenticatedInventoryShell({
   }
 
   const displayName = session.user.name || session.user.email
-  const initials = getInitials(displayName)
+
+  async function switchAccount(sessionToken: string, userId: string) {
+    if (userId === session.user.id || switchingToken) return
+
+    setSwitchingToken(sessionToken)
+    const { error } = await authClient.multiSession.setActive({ sessionToken })
+
+    if (error) {
+      setSwitchingToken(null)
+      return
+    }
+
+    window.location.reload()
+  }
+
+  function addAccount() {
+    const signInUrl = new URL("/auth/sign-in", authBaseURL)
+    signInUrl.searchParams.set("redirectTo", window.location.href)
+    window.location.assign(signInUrl.toString())
+  }
 
   return (
     <main className="inventory-shell">
@@ -191,25 +237,71 @@ export function AuthenticatedInventoryShell({
                 title={displayName}
                 aria-label={`Open account menu for ${displayName}`}
               >
-                {session.user.image ? (
-                  <img src={session.user.image} alt="" />
-                ) : (
-                  initials
-                )}
+                <NiteOwlUserAvatar user={session.user} />
               </summary>
 
               <div className="inventory-account-menu-content">
                 <div className="inventory-account-menu-user">
-                  <strong>{displayName}</strong>
-                  <span>{session.user.email}</span>
+                  <NiteOwlUserAvatar user={session.user} />
+                  <div>
+                    <strong>{displayName}</strong>
+                    <span>{session.user.email}</span>
+                  </div>
                 </div>
 
                 <div className="inventory-account-menu-separator" />
 
-                <a href={`${authBaseURL}/settings/account`}>Account</a>
-                <a href={`${authBaseURL}/settings/security`}>Security</a>
-                <a href={`${authBaseURL}/settings/organizations`}>Organizations</a>
-                <a href={`${authBaseURL}/settings`}>Settings</a>
+                <a href={`${authBaseURL}/settings/account`}>
+                  <SettingsIcon />
+                  Settings
+                </a>
+
+                <details className="inventory-account-switcher">
+                  <summary>
+                    <ArrowRightLeftIcon />
+                    <span>Switch Account</span>
+                    <span className="inventory-account-switcher-chevron">›</span>
+                  </summary>
+
+                  <div className="inventory-account-switcher-content">
+                    {deviceSessions.map((deviceSession) => {
+                      const accountName =
+                        deviceSession.user.name || deviceSession.user.email
+                      const current = deviceSession.user.id === session.user.id
+                      const switching =
+                        switchingToken === deviceSession.session.token
+
+                      return (
+                        <button
+                          key={deviceSession.session.token}
+                          type="button"
+                          disabled={current || Boolean(switchingToken)}
+                          onClick={() =>
+                            void switchAccount(
+                              deviceSession.session.token,
+                              deviceSession.user.id,
+                            )
+                          }
+                        >
+                          <NiteOwlUserAvatar user={deviceSession.user} />
+                          <span className="inventory-account-switcher-user">
+                            <strong>{accountName}</strong>
+                            <small>{deviceSession.user.email}</small>
+                          </span>
+                          {current ? <CheckIcon /> : null}
+                          {switching ? <small>Switching…</small> : null}
+                        </button>
+                      )
+                    })}
+
+                    <div className="inventory-account-menu-separator" />
+
+                    <button type="button" onClick={addAccount}>
+                      <PlusCircleIcon />
+                      Add Account
+                    </button>
+                  </div>
+                </details>
 
                 <div className="inventory-account-menu-separator" />
 
@@ -221,7 +313,8 @@ export function AuthenticatedInventoryShell({
                     })
                   }}
                 >
-                  Sign out
+                  <LogOutIcon />
+                  Sign Out
                 </button>
               </div>
             </details>
