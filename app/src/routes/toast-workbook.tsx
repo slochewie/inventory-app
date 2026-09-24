@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
+import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
+import { authClient } from '#/lib/auth-client'
+import { listInventoryCatalog } from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
 import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
@@ -31,10 +34,14 @@ type WorkbookState = {
 
 function ToastWorkbook() {
   const savedReviewSession = useMemo(() => loadReviewSession(), [])
+  const { data: activeOrganization } = authClient.useActiveOrganization()
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(savedReviewSession?.importFile ?? null)
   const [items, setItems] = useState<NormalizedMenuItem[]>(savedReviewSession?.items ?? [])
-  const [reviewSource, setReviewSource] = useState<'saved' | 'review-csv' | 'uploaded' | null>(savedReviewSession?.items.length ? 'saved' : null)
+  const [reviewSource, setReviewSource] = useState<
+    'catalog' | 'saved' | 'review-csv' | 'uploaded' | null
+  >(savedReviewSession?.items.length ? 'saved' : null)
   const [reviewSavedAt, setReviewSavedAt] = useState(savedReviewSession?.savedAt ?? null)
+  const [catalogLoading, setCatalogLoading] = useState(false)
   const [alohaError, setAlohaError] = useState<string | null>(null)
   const [workbook, setWorkbook] = useState<WorkbookState | null>(null)
   const [workbookError, setWorkbookError] = useState<string | null>(null)
@@ -44,6 +51,48 @@ function ToastWorkbook() {
   const beerExportItemCount = items.filter((item) => item.exportIncluded && item.toastCategory === 'Beer').length
   const liquorExportItemCount = items.filter((item) => item.exportIncluded && isLiquorItem(item)).length
   const organizationName = importFile?.meta?.store?.trim() || 'Organization'
+
+  useEffect(() => {
+    if (!activeOrganization?.id) return
+
+    const controller = new AbortController()
+    setCatalogLoading(true)
+
+    void listInventoryCatalog(activeOrganization.id, controller.signal)
+      .then((catalog) => {
+        if (catalog.items.length === 0) return
+
+        const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
+
+        setImportFile({
+          sourceKind: 'toast-template-sheet',
+          sourceName: 'Persistent Inventory catalog',
+          rows: [],
+          warnings: [],
+          meta: {
+            store: activeOrganization.name,
+            organizationId: activeOrganization.id,
+            source: 'inventory-catalog',
+          },
+        })
+        setItems(persistentItems)
+        setReviewSource('catalog')
+        setReviewSavedAt(null)
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setAlohaError(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load the persistent Inventory catalog',
+        )
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCatalogLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [activeOrganization?.id, activeOrganization?.name])
 
   useEffect(() => {
     let cancelled = false
@@ -178,8 +227,9 @@ function ToastWorkbook() {
           <p className="inventory-kicker">Toast workbook</p>
           <h1>Populate Toast template</h1>
           <p>
-            Populate a fresh copy of the bundled, unaltered Toast Menu Template using reviewed
-            menu rows from the main Inventory page or a saved toast-export-review.csv file.
+            Populate a fresh copy of the bundled, unaltered Toast Menu Template using the
+            selected organization's persistent Inventory catalog. Review CSV and raw Aloha
+            uploads remain available as manual fallbacks.
           </p>
         </header>
 
@@ -188,11 +238,17 @@ function ToastWorkbook() {
             <p className="inventory-kicker">Step 1</p>
             <h2>Reviewed menu state</h2>
             <p>
-              Preferred: upload <strong>toast-export-review.csv</strong>, your durable save file.
-              A saved browser review state is used automatically when present. Raw Aloha CSV is
-              still available as a fallback, but it starts from unedited normalized data.
+              The persistent Inventory catalog is loaded automatically for the selected
+              organization. You can still upload <strong>toast-export-review.csv</strong> or a
+              raw Aloha CSV as a temporary manual override for this workbook session.
             </p>
-            {reviewSource === 'saved' ? (
+            {catalogLoading ? (
+              <p>Loading persistent Inventory catalog…</p>
+            ) : reviewSource === 'catalog' ? (
+              <p>
+                Using the persistent Inventory catalog for {activeOrganization?.name ?? 'the selected organization'}.
+              </p>
+            ) : reviewSource === 'saved' ? (
               <p>
                 Using saved reviewed state{reviewSavedAt ? ` from ${new Date(reviewSavedAt).toLocaleString()}` : ''}.
               </p>
@@ -232,7 +288,15 @@ function ToastWorkbook() {
               <dl>
                 <div>
                   <dt>Source type</dt>
-                  <dd>{reviewSource === 'review-csv' ? 'Toast export review CSV' : reviewSource === 'saved' ? 'Reviewed Inventory state' : 'Aloha CSV'}</dd>
+                  <dd>
+                    {reviewSource === 'catalog'
+                      ? 'Persistent Inventory catalog'
+                      : reviewSource === 'review-csv'
+                        ? 'Toast export review CSV'
+                        : reviewSource === 'saved'
+                          ? 'Reviewed Inventory state'
+                          : 'Aloha CSV'}
+                  </dd>
                 </div>
                 <div>
                   <dt>Store</dt>
