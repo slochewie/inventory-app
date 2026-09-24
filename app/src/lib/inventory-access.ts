@@ -303,3 +303,41 @@ export async function updateInventoryOrganizationVariant(input: {
 
   return result.updated === true
 }
+
+
+export async function updateInventoryOrganizationVariants(input: {
+  organizationId: string
+  variantIds: string[]
+  enabled?: boolean
+  exportToToast?: boolean
+  priceOverrideCents?: number | null
+  happyHourPriceCents?: number | null
+  toastCategoryOverride?: string | null
+  toastDestinationOverride?: string | null
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/organization-variants"),
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  )
+  const result = (await response.json()) as {
+    updated?: number
+    error?: string
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to update Inventory items.",
+    )
+  }
+
+  return typeof result.updated === "number" ? result.updated : 0
+}
