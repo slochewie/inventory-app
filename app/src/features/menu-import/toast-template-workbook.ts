@@ -105,17 +105,54 @@ export function buildPopulatedToastTemplateWorkbook({
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
 
-export function downloadPopulatedToastWorkbook(filename: string, blob: Blob) {
-  const outputName = filename.replace(/\.xlsx$/i, '')
+export async function buildToastWorkbookZip(filename: string, workbook: Blob) {
+  const bytes = new Uint8Array(await workbook.arrayBuffer())
+  return new Blob(
+    [zipSync({ [filename]: bytes }, { level: 6 })],
+    { type: 'application/zip' },
+  )
+}
+
+export function downloadToastWorkbookFile(filename: string, blob: Blob) {
   const link = document.createElement('a')
   const url = URL.createObjectURL(blob)
 
   link.href = url
-  link.download = `${outputName}-populated.xlsx`
+  link.download = filename
   document.body.appendChild(link)
   link.click()
   link.remove()
   URL.revokeObjectURL(url)
+}
+
+export function buildToastWorkbookFilename(organizationName: string, now = new Date()) {
+  const safeOrganizationName = organizationName
+    .replace(/[’']/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'Organization'
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(now)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  )
+
+  return [
+    'Toast-Menu-Template',
+    safeOrganizationName,
+    `${parts.month}-${parts.day}-${parts.year}-${parts.hour}${parts.minute}`,
+  ].join('-') + '.xlsx'
 }
 
 function populateBeerSheet(workbookPackage: WorkbookPackage, items: NormalizedMenuItem[]) {
