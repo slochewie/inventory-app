@@ -14,6 +14,8 @@ export type NormalizedMenuItemStatus = 'ready' | 'review' | 'ignored'
 
 export type NormalizedMenuItem = {
   id: string
+  masterItemId?: string
+  variantLabel?: string
   sourceKind: MenuImportSourceKind
   sourceItemNumber?: string
   name: string
