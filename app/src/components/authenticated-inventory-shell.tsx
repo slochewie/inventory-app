@@ -171,14 +171,6 @@ export function AuthenticatedInventoryShell({
     return () => controller.abort()
   }, [activeOrganization?.id, session])
 
-  if (isSessionPending || !session) {
-    return (
-      <main className="inventory-auth-loading">
-        <p>Checking Inventory access…</p>
-      </main>
-    )
-  }
-
   useEffect(() => {
     function closeAccountMenu(event: MouseEvent) {
       const menu = accountMenuRef.current
@@ -207,6 +199,14 @@ export function AuthenticatedInventoryShell({
       document.removeEventListener("keydown", closeAccountMenuOnEscape)
     }
   }, [])
+
+  if (isSessionPending || !session) {
+    return (
+      <main className="inventory-auth-loading">
+        <p>Checking Inventory access…</p>
+      </main>
+    )
+  }
 
   const displayName = session.user.name || session.user.email
 
