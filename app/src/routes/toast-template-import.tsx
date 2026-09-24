@@ -166,7 +166,6 @@ function ToastTemplateImport() {
                   className="inventory-template-download"
                   type="button"
                   disabled={
-                    !canImportExport ||
                     saveState === 'saving' ||
                     items.length === 0 ||
                     !activeOrganization?.id
