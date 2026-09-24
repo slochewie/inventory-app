@@ -470,6 +470,194 @@ select {
   padding: 1.25rem;
 }
 
+
+.inventory-page-heading {
+  display: flex;
+  width: min(100%, 96rem);
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.inventory-page-heading h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.inventory-page-heading p:last-child {
+  max-width: 44rem;
+  margin: 0.75rem 0 0;
+  color: #4b5563;
+  line-height: 1.55;
+}
+
+.inventory-primary-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.7rem;
+  background: #111827;
+  color: #fff;
+  padding: 0.7rem 0.95rem;
+  font-weight: 800;
+}
+
+.inventory-catalog-toolbar {
+  display: grid;
+  width: min(100%, 96rem);
+  grid-template-columns: minmax(18rem, 1fr) minmax(12rem, 18rem) minmax(12rem, 16rem);
+  gap: 0.75rem;
+  align-items: end;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+}
+
+.inventory-catalog-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.inventory-catalog-card .inventory-table-heading {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.inventory-catalog-card .inventory-table-heading h2 {
+  margin: 0;
+}
+
+.inventory-catalog-subtitle {
+  margin: 0.25rem 0 0 !important;
+  text-align: left !important;
+}
+
+.inventory-catalog-table {
+  min-width: 64rem;
+}
+
+.inventory-catalog-table th:first-child,
+.inventory-catalog-table td:first-child {
+  min-width: 15rem;
+}
+
+.inventory-catalog-action-cell {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right !important;
+}
+
+.inventory-format-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.inventory-format-list span {
+  display: inline-flex !important;
+  margin: 0 !important;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151 !important;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem !important;
+  font-weight: 700;
+}
+
+.inventory-carry-status {
+  display: inline-flex !important;
+  width: fit-content;
+  margin: 0 !important;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280 !important;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem !important;
+  font-weight: 800;
+}
+
+.inventory-carry-status.is-on {
+  background: #dcfce7;
+  color: #166534 !important;
+}
+
+.inventory-catalog-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.inventory-catalog-drawer-heading,
+.inventory-catalog-variant-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.inventory-catalog-drawer-heading h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.inventory-catalog-drawer-heading > button {
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  border-radius: 0.65rem;
+  background: #fff;
+  padding: 0.5rem 0.75rem;
+  font-weight: 700;
+}
+
+.inventory-catalog-variants {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.inventory-catalog-variant-card {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  padding: 1rem;
+}
+
+.inventory-catalog-variant-heading > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.inventory-catalog-variant-heading > div > span {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.inventory-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.inventory-catalog-price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.inventory-save-note {
+  margin: 0 !important;
+  color: #6b7280;
+  font-size: 0.8rem !important;
+}
+
 .inventory-card h2,
 .inventory-edit-panel h3,
 .inventory-category-rule-panel h3 {
@@ -1157,7 +1345,8 @@ select {
 
 @media (max-width: 1100px) {
   .inventory-review-controls,
-  .inventory-reconcile-searches {
+  .inventory-reconcile-searches,
+  .inventory-catalog-toolbar {
     grid-template-columns: 1fr;
   }
 }
@@ -1166,8 +1355,14 @@ select {
   .inventory-import-card,
   .inventory-summary-grid,
   .inventory-source-card dl,
-  .inventory-edit-grid {
+  .inventory-edit-grid,
+  .inventory-catalog-price-grid {
     grid-template-columns: 1fr;
+  }
+
+  .inventory-page-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .inventory-table-heading,
