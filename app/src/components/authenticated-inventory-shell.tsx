@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { createContext, useContext, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { NiteOwlUserAvatar, OrganizationSelector } from "@niteowl/ui"
 import {
   ArrowRightLeftIcon,
@@ -16,23 +16,37 @@ import { getInventoryAccess } from "#/lib/inventory-access"
 
 type InventoryRole = "viewer" | "staff" | "manager" | "admin"
 
-type InventoryAccessContextValue = {
-  role: InventoryRole
-  canImportExport: boolean
-  canEdit: boolean
-  canManageAssignments: boolean
-}
-
-const InventoryAccessContext = createContext<InventoryAccessContextValue | null>(null)
-
 export function useInventoryAccessRole() {
-  const context = useContext(InventoryAccessContext)
+  const { data: activeOrganization } = authClient.useActiveOrganization()
+  const [role, setRole] = useState<InventoryRole | null>(null)
 
-  if (!context) {
-    throw new Error("useInventoryAccessRole must be used inside AuthenticatedInventoryShell")
+  useEffect(() => {
+    if (!activeOrganization?.id) {
+      setRole(null)
+      return
+    }
+
+    const controller = new AbortController()
+
+    void getInventoryAccess(activeOrganization.id, controller.signal)
+      .then((result) => {
+        setRole(result.allowed ? result.role : null)
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setRole(null)
+      })
+
+    return () => controller.abort()
+  }, [activeOrganization?.id])
+
+  return {
+    role,
+    loading: role === null,
+    canImportExport: role !== null && role !== "viewer",
+    canEdit: role === "manager" || role === "admin",
+    canManageAssignments: role === "admin",
   }
-
-  return context
 }
 
 export function AuthenticatedInventoryShell({
@@ -50,7 +64,10 @@ export function AuthenticatedInventoryShell({
   const [accessState, setAccessState] = useState<
     "idle" | "checking" | "allowed" | "denied" | "error"
   >("idle")
-  const [inventoryRole, setInventoryRole] = useState<InventoryRole | null>(null)
+  const {
+    role: inventoryRole,
+    canManageAssignments,
+  } = useInventoryAccessRole()
   const [allowedOrganizationIds, setAllowedOrganizationIds] = useState<Set<string> | null>(null)
   const [deviceSessions, setDeviceSessions] = useState<Array<{
     session: { token: string }
@@ -175,7 +192,6 @@ export function AuthenticatedInventoryShell({
   useEffect(() => {
     if (!session || !activeOrganization?.id) {
       setAccessState("idle")
-      setInventoryRole(null)
       return
     }
 
@@ -184,12 +200,10 @@ export function AuthenticatedInventoryShell({
 
     void getInventoryAccess(activeOrganization.id, controller.signal)
       .then((result) => {
-        setInventoryRole(result.role)
         setAccessState(result.allowed ? "allowed" : "denied")
       })
       .catch((error) => {
         if (error instanceof DOMException && error.name === "AbortError") return
-        setInventoryRole(null)
         setAccessState("error")
       })
 
@@ -259,7 +273,7 @@ export function AuthenticatedInventoryShell({
     <main className="inventory-shell">
       <InventorySidebar
         currentPath={currentPath}
-        canManageAssignments={inventoryRole === "admin"}
+        canManageAssignments={canManageAssignments}
       />
 
       <section className="inventory-authenticated-main">
@@ -381,16 +395,7 @@ export function AuthenticatedInventoryShell({
 
         <div className="inventory-authenticated-content">
           {accessState === "allowed" && inventoryRole ? (
-            <InventoryAccessContext.Provider
-              value={{
-                role: inventoryRole,
-                canImportExport: inventoryRole !== "viewer",
-                canEdit: inventoryRole === "manager" || inventoryRole === "admin",
-                canManageAssignments: inventoryRole === "admin",
-              }}
-            >
-              {children}
-            </InventoryAccessContext.Provider>
+            children
           ) : accessState === "denied" ? (
             <section className="inventory-auth-state">
               <h1>Inventory access required</h1>
