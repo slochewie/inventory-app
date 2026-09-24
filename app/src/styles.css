@@ -185,13 +185,27 @@ select {
   min-width: 7rem;
 }
 
+.inventory-account-menu {
+  position: relative;
+}
+
+.inventory-account-menu > summary {
+  list-style: none;
+}
+
+.inventory-account-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
 .inventory-auth-account {
   display: inline-flex;
   width: 2rem;
   height: 2rem;
   flex: 0 0 auto;
+  cursor: pointer;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   border: 1px solid #d1d5db;
   border-radius: 999px;
   background: #fff;
@@ -200,14 +214,69 @@ select {
   font-weight: 800;
 }
 
-.inventory-auth-signout {
-  cursor: pointer;
-  border: 1px solid #d1d5db;
-  border-radius: 0.65rem;
+.inventory-auth-account img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inventory-account-menu-content {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 50;
+  display: grid;
+  width: 16rem;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
   background: #fff;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 16%);
+  padding: 0.35rem;
+}
+
+.inventory-account-menu-user {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.7rem;
+}
+
+.inventory-account-menu-user strong,
+.inventory-account-menu-user span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventory-account-menu-user span {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.inventory-account-menu-content a,
+.inventory-account-menu-content button {
+  display: flex;
+  width: 100%;
+  cursor: pointer;
+  align-items: center;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
   color: #111827;
-  padding: 0.45rem 0.65rem;
-  font-weight: 700;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  font: inherit;
+}
+
+.inventory-account-menu-content a:hover,
+.inventory-account-menu-content button:hover {
+  background: #f3f4f6;
+}
+
+.inventory-account-menu-separator {
+  height: 1px;
+  margin: 0.3rem;
+  background: #e5e7eb;
 }
 
 .inventory-authenticated-content {
@@ -864,9 +933,6 @@ select {
     flex: 1;
   }
 
-  .inventory-auth-signout {
-    padding-inline: 0.55rem;
-  }
 
   .inventory-table {
     min-width: 50rem;
