@@ -29,6 +29,11 @@ select {
   display: grid;
   min-height: 100vh;
   grid-template-columns: 18rem minmax(0, 1fr);
+  transition: grid-template-columns 160ms ease;
+}
+
+.inventory-shell.is-collapsed {
+  grid-template-columns: 4.5rem minmax(0, 1fr);
 }
 
 .inventory-sidebar {
@@ -38,6 +43,88 @@ select {
   border-right: 1px solid #e5e7eb;
   background: #fff;
   padding: 1rem;
+}
+
+.inventory-sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.inventory-sidebar-brand-row .inventory-brand {
+  min-width: 0;
+  flex: 1;
+}
+
+.inventory-sidebar-toggle,
+.inventory-header-sidebar-trigger {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #4b5563;
+  font-weight: 800;
+}
+
+.inventory-sidebar-toggle:hover,
+.inventory-header-sidebar-trigger:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.inventory-header-sidebar-trigger {
+  display: none;
+}
+
+.inventory-sidebar.is-collapsed {
+  padding-inline: 0.65rem;
+}
+
+.inventory-sidebar.is-collapsed .inventory-sidebar-brand-row {
+  justify-content: center;
+}
+
+.inventory-sidebar.is-collapsed .inventory-brand {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  justify-content: center;
+  padding-inline: 0.25rem;
+}
+
+.inventory-sidebar.is-collapsed .inventory-brand > span:last-child,
+.inventory-sidebar.is-collapsed .inventory-nav-link > span:not(.inventory-nav-icon),
+.inventory-sidebar.is-collapsed .inventory-nav-section h2 {
+  display: none;
+}
+
+.inventory-sidebar.is-collapsed .inventory-nav-link {
+  justify-content: center;
+  padding-inline: 0.5rem;
+}
+
+.inventory-sidebar.is-collapsed .inventory-nav {
+  gap: 0.75rem;
+}
+
+.inventory-sidebar.is-collapsed .inventory-nav-section ul {
+  gap: 0.35rem;
+}
+
+.inventory-sidebar.is-collapsed .inventory-sidebar-toggle {
+  position: absolute;
+  left: 3.25rem;
+  margin-top: 0.35rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
 }
 
 .inventory-brand {
@@ -1549,6 +1636,19 @@ select {
 }
 
 @media (max-width: 760px) {
+  .inventory-shell,
+  .inventory-shell.is-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-sidebar.is-collapsed {
+    display: none;
+  }
+
+  .inventory-header-sidebar-trigger {
+    display: inline-flex;
+  }
+
   .inventory-auth-header {
     flex-wrap: wrap;
   }
