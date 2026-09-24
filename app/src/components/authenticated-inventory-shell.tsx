@@ -1,10 +1,8 @@
 import type { ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
 import {
-  NiteOwlSidebarProvider,
   NiteOwlUserAvatar,
   OrganizationSelector,
-  useNiteOwlSidebar,
 } from "@niteowl/ui"
 import {
   ArrowRightLeftIcon,
@@ -15,6 +13,12 @@ import {
 } from "lucide-react"
 
 import { InventorySidebar } from "#/inventory-sidebar"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "#/components/ui/sidebar.tsx"
+import { TooltipProvider } from "#/components/ui/tooltip.tsx"
 import { authBaseURL, authClient } from "#/lib/auth-client"
 import { getInventoryAccess } from "#/lib/inventory-access"
 
@@ -65,21 +69,7 @@ export function useInventoryAccessRole() {
   }
 }
 
-export function AuthenticatedInventoryShell(props: {
-  currentPath: string
-  requiredCapability?: "import-export" | "edit" | "manage-assignments"
-  children: ReactNode
-}) {
-  const sidebarDefaultOpen = getSidebarDefaultOpen()
-
-  return (
-    <NiteOwlSidebarProvider defaultOpen={sidebarDefaultOpen}>
-      <AuthenticatedInventoryShellInner {...props} />
-    </NiteOwlSidebarProvider>
-  )
-}
-
-function AuthenticatedInventoryShellInner({
+export function AuthenticatedInventoryShell({
   currentPath,
   requiredCapability,
   children,
@@ -113,10 +103,7 @@ function AuthenticatedInventoryShellInner({
     }
   }>>([])
   const [switchingToken, setSwitchingToken] = useState<string | null>(null)
-  const {
-    open: sidebarOpen,
-    toggleSidebar,
-  } = useNiteOwlSidebar()
+  const sidebarDefaultOpen = getSidebarDefaultOpen()
   const accountMenuRef = useRef<HTMLDetailsElement>(null)
 
   const visibleOrganizations = (organizations ?? []).filter((organization) =>
@@ -317,27 +304,18 @@ function AuthenticatedInventoryShellInner({
   }
 
   return (
-    <main className={sidebarOpen ? "inventory-shell" : "inventory-shell is-collapsed"}>
-      <InventorySidebar
-        currentPath={currentPath}
-        open={sidebarOpen}
-        onToggle={toggleSidebar}
-        canImportExport={canImportExport}
-        canEdit={canEdit}
-        canManageAssignments={canManageAssignments}
-      />
+    <TooltipProvider>
+      <SidebarProvider defaultOpen={sidebarDefaultOpen}>
+        <InventorySidebar
+          currentPath={currentPath}
+          canImportExport={canImportExport}
+          canEdit={canEdit}
+          canManageAssignments={canManageAssignments}
+        />
 
-      <section className="inventory-authenticated-main">
-        <header className="inventory-auth-header">
-          <button
-            type="button"
-            className="inventory-header-sidebar-trigger"
-            onClick={toggleSidebar}
-            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            <span aria-hidden="true">☰</span>
-          </button>
+        <SidebarInset className="inventory-authenticated-main">
+          <header className="inventory-auth-header">
+            <SidebarTrigger />
           <a className="inventory-auth-header-title" href="/">
             Inventory
           </a>
@@ -482,7 +460,8 @@ function AuthenticatedInventoryShellInner({
             </section>
           )}
         </div>
-      </section>
-    </main>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   )
 }
