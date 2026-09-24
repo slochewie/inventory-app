@@ -985,6 +985,37 @@ select {
   padding: 0.2rem 0.5rem;
 }
 
+.inventory-merge-section {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+}
+
+.inventory-merge-section > p {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.inventory-danger-button {
+  width: fit-content;
+  cursor: pointer;
+  border: 1px solid #fecaca;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #b91c1c;
+  padding: 0.55rem 0.75rem;
+  font-weight: 800;
+}
+
+.inventory-danger-button:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.inventory-danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .inventory-drawer-help {
   border: 1px solid #e5e7eb;
   border-radius: 0.85rem;
