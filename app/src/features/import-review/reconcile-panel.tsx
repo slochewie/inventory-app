@@ -160,16 +160,7 @@ export function ReconcilePanel() {
   }
 
   return (
-    <section className="inventory-content">
-      <header className="inventory-hero">
-        <p className="inventory-kicker">Reconciliation</p>
-        <h1>Source mappings</h1>
-        <p>
-          Review only source rows that may need attention. Confirmed mappings stay out of the
-          way, while possible duplicate names and unmapped rows surface for review.
-        </p>
-      </header>
-
+    <section className="inventory-import-workspace">
       <section className="inventory-summary-grid" aria-label="Reconciliation summary">
         <SummaryCard label="Needs review" value={counts.attention} />
         <SummaryCard label="Possible duplicates" value={counts.possibleDuplicate} />
