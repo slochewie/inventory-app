@@ -22,6 +22,8 @@ export function catalogRowToNormalizedItem(
 
   return {
     id: row.variant.id,
+    masterItemId: row.id,
+    variantLabel: variantLabel || 'Standard',
     sourceKind: 'toast-template-sheet',
     name: row.organization.toastNameOverride ?? row.name,
     category: categoryName,
