@@ -73,6 +73,15 @@ function populateLiquorSheet(workbookPackage: WorkbookPackage, items: Normalized
   const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
   const sheetDoc = parseXml(sheetXml)
   const rowsByKind = groupLiquorRowsByKind(liquorRows)
+  const templateKinds = new Set(mapping.slots.filter((slot) => slot.kind !== 'optional').map((slot) => slot.kind))
+  const unsupportedKinds = [...rowsByKind.keys()].filter((kind) => !templateKinds.has(kind))
+
+  if (unsupportedKinds.length > 0) {
+    throw new Error(
+      `Toast Liquor tab has no fixed category slot for: ${unsupportedKinds.join(', ')}. Template headers are not modified.`,
+    )
+  }
+
   const writtenRowCount = writeLiquorRowsToSheet(sheetDoc, mapping, rowsByKind)
 
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
