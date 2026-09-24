@@ -71,9 +71,14 @@ function ImportReviewPage() {
   }, [filter, query])
 
   useEffect(() => {
-    if (!canImportExport && workspace === 'new') setWorkspace('history')
+    if (canImportExport) {
+      setWorkspace((current) => current === 'history' ? 'new' : current)
+      return
+    }
+
+    if (workspace === 'new') setWorkspace('history')
     if (!canEdit && workspace === 'mappings') setWorkspace('history')
-  }, [canEdit, canImportExport, workspace])
+  }, [canEdit, canImportExport])
 
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null
 
