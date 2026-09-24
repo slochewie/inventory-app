@@ -24,6 +24,7 @@ import {
   type ParsedMenuImport,
 } from '#/features/menu-import/types'
 import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
+import { getDefaultToastCategory } from '#/features/menu-import/category-rules'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -1186,7 +1187,7 @@ function getReviewFilterKey(
   if (!persistentCatalog) return getCategoryKey(item.category)
 
   if (item.variantKind === 'standard') {
-    return `category:${getCategoryKey(item.category)}`
+    return `toast-category:${getPersistentToastCategory(item)}`
   }
 
   return `variant:${getVariantDisplayLabel(item)}`
@@ -1202,11 +1203,28 @@ function getReviewFilterLabel(
     return key.slice('variant:'.length)
   }
 
-  if (key.startsWith('category:')) {
-    return getCategoryLabel(key.slice('category:'.length))
+  if (key.startsWith('toast-category:')) {
+    return key.slice('toast-category:'.length)
   }
 
   return key
+}
+
+function getPersistentToastCategory(item: NormalizedMenuItem) {
+  const toastCategory = item.toastCategory?.trim()
+
+  if (toastCategory) {
+    const normalizedFromAloha = getDefaultToastCategory(item.category)
+    if (
+      toastCategory.toLowerCase() === (item.category ?? '').trim().toLowerCase()
+    ) {
+      return normalizedFromAloha
+    }
+
+    return toastCategory
+  }
+
+  return getDefaultToastCategory(item.category)
 }
 
 function getCategoryKey(category?: string) {
