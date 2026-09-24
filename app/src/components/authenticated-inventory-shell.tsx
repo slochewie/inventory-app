@@ -55,7 +55,7 @@ export function AuthenticatedInventoryShell({
   children,
 }: {
   currentPath: string
-  requiredCapability?: "import-export" | "manage-assignments"
+  requiredCapability?: "import-export" | "edit" | "manage-assignments"
   children: ReactNode
 }) {
   const { data: session, isPending: isSessionPending } = authClient.useSession()
@@ -69,6 +69,7 @@ export function AuthenticatedInventoryShell({
   const {
     role: inventoryRole,
     canImportExport,
+    canEdit,
     canManageAssignments,
   } = useInventoryAccessRole()
   const [allowedOrganizationIds, setAllowedOrganizationIds] = useState<Set<string> | null>(null)
@@ -253,9 +254,11 @@ export function AuthenticatedInventoryShell({
   const routeAllowed =
     requiredCapability === "manage-assignments"
       ? canManageAssignments
-      : requiredCapability === "import-export"
-        ? canImportExport
-        : true
+      : requiredCapability === "edit"
+        ? canEdit
+        : requiredCapability === "import-export"
+          ? canImportExport
+          : true
 
   const displayName = session.user.name || session.user.email
 
@@ -284,6 +287,7 @@ export function AuthenticatedInventoryShell({
       <InventorySidebar
         currentPath={currentPath}
         canImportExport={canImportExport}
+        canEdit={canEdit}
         canManageAssignments={canManageAssignments}
       />
 
