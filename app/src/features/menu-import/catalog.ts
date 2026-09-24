@@ -30,6 +30,8 @@ export function catalogRowToNormalizedItem(
     effectiveTimes: [],
     sourceRowCount: 0,
     status: row.active && row.variant.active ? 'ready' : 'ignored',
+    organizationEnabled: row.organization.enabled,
+    exportToToast: row.organization.exportToToast,
     exportIncluded:
       row.organization.enabled && row.organization.exportToToast,
     notes: variantLabel ? [variantLabel] : [],
