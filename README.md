@@ -2,7 +2,7 @@
 
 NiteOwl inventory/menu tooling for moving menu data between point-of-sale systems.
 
-The current workflow imports an **Aloha menu-price CSV**, normalizes it into a reusable menu-item model, lets the operator review and edit the staged items in the browser, and then populates a downloaded **Toast Menu Template** workbook.
+The current workflow imports an **Aloha menu-price CSV**, normalizes it into a reusable menu-item model, lets the operator review and edit the staged items in the browser, and then populates a fresh copy of the repository's pristine **Toast Menu Template** workbook.
 
 ## Current capabilities
 
@@ -15,7 +15,7 @@ The current workflow imports an **Aloha menu-price CSV**, normalizes it into a r
 - Download a durable `toast-export-review.csv` file.
 - Restore reviewed state from `toast-export-review.csv`.
 - Generate Toast-facing CSV exports.
-- Upload a Toast `.xlsx` Menu Template and populate the Beer and Liquor tabs.
+- Populate the bundled pristine Toast `.xlsx` Menu Template without changing its headers or structure.
 - Import an already populated Toast Menu Template `.xlsx` back into reviewed menu state.
 - Map draft beer sizes and packaged beer slots, including separate standard-can and 24oz-can items.
 
