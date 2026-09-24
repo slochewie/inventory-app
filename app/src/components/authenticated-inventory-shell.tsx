@@ -21,6 +21,17 @@ import { getInventoryAccess } from "#/lib/inventory-access"
 
 type InventoryRole = "viewer" | "staff" | "manager" | "admin"
 
+function getSidebarDefaultOpen() {
+  if (typeof document === "undefined") return true
+
+  const sidebarState = document.cookie
+    .split("; ")
+    .find((cookie) => cookie.startsWith("sidebar_state="))
+    ?.split("=")[1]
+
+  return sidebarState !== "false"
+}
+
 export function useInventoryAccessRole() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [role, setRole] = useState<InventoryRole | null>(null)
@@ -59,8 +70,10 @@ export function AuthenticatedInventoryShell(props: {
   requiredCapability?: "import-export" | "edit" | "manage-assignments"
   children: ReactNode
 }) {
+  const sidebarDefaultOpen = getSidebarDefaultOpen()
+
   return (
-    <NiteOwlSidebarProvider>
+    <NiteOwlSidebarProvider defaultOpen={sidebarDefaultOpen}>
       <AuthenticatedInventoryShellInner {...props} />
     </NiteOwlSidebarProvider>
   )
@@ -102,8 +115,7 @@ function AuthenticatedInventoryShellInner({
   const [switchingToken, setSwitchingToken] = useState<string | null>(null)
   const {
     open: sidebarOpen,
-    setOpen: setSidebarOpen,
-    hydrated: sidebarHydrated,
+    toggleSidebar,
   } = useNiteOwlSidebar()
   const accountMenuRef = useRef<HTMLDetailsElement>(null)
 
@@ -265,7 +277,7 @@ function AuthenticatedInventoryShellInner({
     }
   }, [])
 
-  if (!sidebarHydrated || isSessionPending || !session) {
+  if (isSessionPending || !session) {
     return (
       <main className="inventory-auth-loading">
         <p>Checking Inventory access…</p>
@@ -309,7 +321,7 @@ function AuthenticatedInventoryShellInner({
       <InventorySidebar
         currentPath={currentPath}
         open={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onToggle={toggleSidebar}
         canImportExport={canImportExport}
         canEdit={canEdit}
         canManageAssignments={canManageAssignments}
@@ -320,7 +332,7 @@ function AuthenticatedInventoryShellInner({
           <button
             type="button"
             className="inventory-header-sidebar-trigger"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={toggleSidebar}
             aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
