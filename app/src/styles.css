@@ -587,6 +587,114 @@ select {
   margin-bottom: 1rem;
 }
 
+
+.inventory-reconcile-filters {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.inventory-reconcile-searches {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(16rem, 1fr);
+  gap: 0.75rem;
+}
+
+.inventory-reconcile-table th:nth-child(1),
+.inventory-reconcile-table td:nth-child(1) {
+  min-width: 14rem;
+}
+
+.inventory-reconcile-table th:nth-child(2),
+.inventory-reconcile-table td:nth-child(2) {
+  min-width: 8rem;
+}
+
+.inventory-reconcile-table th:nth-child(3),
+.inventory-reconcile-table td:nth-child(3) {
+  min-width: 10rem;
+}
+
+.inventory-reconcile-table th:nth-child(4),
+.inventory-reconcile-table td:nth-child(4) {
+  min-width: 14rem;
+}
+
+.inventory-reconcile-table th:nth-child(5),
+.inventory-reconcile-table td:nth-child(5) {
+  min-width: 20rem;
+}
+
+.inventory-reconcile-status {
+  display: inline-flex !important;
+  width: fit-content;
+  margin: 0 !important;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem !important;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.inventory-reconcile-status-mapped {
+  background: #dcfce7;
+  color: #166534 !important;
+}
+
+.inventory-reconcile-status-unmapped,
+.inventory-reconcile-status-possible-duplicate {
+  background: #fef3c7;
+  color: #92400e !important;
+}
+
+.inventory-reconcile-action > .inventory-row-action {
+  width: auto;
+}
+
+.inventory-reconcile-editor {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 18rem;
+}
+
+.inventory-reconcile-editor input,
+.inventory-reconcile-editor select {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #111827;
+  padding: 0.5rem 0.6rem;
+  outline: none;
+}
+
+.inventory-reconcile-editor input:focus,
+.inventory-reconcile-editor select:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgb(17 24 39 / 12%);
+}
+
+.inventory-reconcile-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.inventory-reconcile-editor-actions span {
+  margin: 0 !important;
+}
+
+.inventory-reconcile-editor-actions button {
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #111827;
+  padding: 0.4rem 0.65rem;
+  font-weight: 700;
+}
+
 .inventory-filter-group {
   display: flex;
   flex-wrap: wrap;
@@ -1007,7 +1115,8 @@ select {
 }
 
 @media (max-width: 1100px) {
-  .inventory-review-controls {
+  .inventory-review-controls,
+  .inventory-reconcile-searches {
     grid-template-columns: 1fr;
   }
 }
