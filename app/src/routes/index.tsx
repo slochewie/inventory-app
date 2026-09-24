@@ -237,9 +237,8 @@ function CatalogPage() {
                 <thead>
                   <tr>
                     <th>Item</th>
-                    <th>Toast category</th>
-                    <th>Formats</th>
                     <th>Price</th>
+                    <th>Happy hour</th>
                     <th>Available here</th>
                     <th />
                   </tr>
@@ -249,32 +248,38 @@ function CatalogPage() {
                     const carried = group.items.some((item) => item.exportIncluded)
 
                     return (
-                      <tr key={group.id}>
+                      <tr
+                        key={group.id}
+                        className="inventory-catalog-row"
+                        tabIndex={0}
+                        onClick={() => setSelectedGroupId(group.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            setSelectedGroupId(group.id)
+                          }
+                        }}
+                      >
                         <td>
-                          <strong>{group.name}</strong>
-                        </td>
-                        <td>{group.category}</td>
-                        <td>
-                          <div className="inventory-format-list">
-                            {group.items.map((item) => (
-                              <span key={item.id}>{item.variantLabel || 'Standard'}</span>
-                            ))}
+                          <div className="inventory-catalog-item-cell">
+                            <strong>{group.name}</strong>
+                            <span>{group.category}</span>
+                            <div className="inventory-format-list">
+                              {group.items.map((item) => (
+                                <span key={item.id}>{item.variantLabel || 'Standard'}</span>
+                              ))}
+                            </div>
                           </div>
                         </td>
                         <td>{getPriceRange(group.items)}</td>
+                        <td>{getHappyHourRange(group.items)}</td>
                         <td>
                           <span className={carried ? 'inventory-carry-status is-on' : 'inventory-carry-status'}>
                             {carried ? 'Yes' : 'No'}
                           </span>
                         </td>
-                        <td className="inventory-catalog-action-cell">
-                          <button
-                            className="inventory-row-action"
-                            type="button"
-                            onClick={() => setSelectedGroupId(group.id)}
-                          >
-                            {canEdit ? 'Manage' : 'View'}
-                          </button>
+                        <td className="inventory-catalog-action-cell" aria-hidden="true">
+                          <span className="inventory-catalog-chevron">›</span>
                         </td>
                       </tr>
                     )
@@ -491,6 +496,21 @@ function groupCatalogItems(items: NormalizedMenuItem[]): CatalogGroup[] {
     .sort((a, b) =>
       a.category.localeCompare(b.category) || a.name.localeCompare(b.name),
     )
+}
+
+function getHappyHourRange(items: NormalizedMenuItem[]) {
+  const prices = items
+    .map((item) => item.happyHourPriceCents)
+    .filter((value): value is number => value !== null)
+
+  if (prices.length === 0) return '—'
+
+  const minimum = Math.min(...prices)
+  const maximum = Math.max(...prices)
+
+  return minimum === maximum
+    ? formatCurrency(minimum)
+    : `${formatCurrency(minimum)}–${formatCurrency(maximum)}`
 }
 
 function getPriceRange(items: NormalizedMenuItem[]) {
