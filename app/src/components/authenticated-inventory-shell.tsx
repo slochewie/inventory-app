@@ -16,6 +16,17 @@ import { getInventoryAccess } from "#/lib/inventory-access"
 
 type InventoryRole = "viewer" | "staff" | "manager" | "admin"
 
+function getSidebarDefaultOpen() {
+  if (typeof document === "undefined") return true
+
+  const sidebarState = document.cookie
+    .split("; ")
+    .find((cookie) => cookie.startsWith("sidebar_state="))
+    ?.split("=")[1]
+
+  return sidebarState !== "false"
+}
+
 export function useInventoryAccessRole() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [role, setRole] = useState<InventoryRole | null>(null)
@@ -83,6 +94,7 @@ export function AuthenticatedInventoryShell({
     }
   }>>([])
   const [switchingToken, setSwitchingToken] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(getSidebarDefaultOpen)
   const accountMenuRef = useRef<HTMLDetailsElement>(null)
 
   const visibleOrganizations = (organizations ?? []).filter((organization) =>
@@ -243,6 +255,13 @@ export function AuthenticatedInventoryShell({
     }
   }, [])
 
+  function setSidebarState(open: boolean) {
+    setSidebarOpen(open)
+    if (typeof document !== "undefined") {
+      document.cookie = `sidebar_state=${open}; path=/; max-age=31536000; samesite=lax`
+    }
+  }
+
   if (isSessionPending || !session) {
     return (
       <main className="inventory-auth-loading">
@@ -283,9 +302,11 @@ export function AuthenticatedInventoryShell({
   }
 
   return (
-    <main className="inventory-shell">
+    <main className={sidebarOpen ? "inventory-shell" : "inventory-shell is-collapsed"}>
       <InventorySidebar
         currentPath={currentPath}
+        open={sidebarOpen}
+        onToggle={() => setSidebarState(!sidebarOpen)}
         canImportExport={canImportExport}
         canEdit={canEdit}
         canManageAssignments={canManageAssignments}
@@ -293,6 +314,15 @@ export function AuthenticatedInventoryShell({
 
       <section className="inventory-authenticated-main">
         <header className="inventory-auth-header">
+          <button
+            type="button"
+            className="inventory-header-sidebar-trigger"
+            onClick={() => setSidebarState(!sidebarOpen)}
+            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            <span aria-hidden="true">☰</span>
+          </button>
           <a className="inventory-auth-header-title" href="/">
             Inventory
           </a>
