@@ -185,6 +185,40 @@ select {
   min-width: 7rem;
 }
 
+.niteowl-user-avatar {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.niteowl-user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.niteowl-user-avatar-fallback {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.niteowl-user-avatar-fallback svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 .inventory-account-menu {
   position: relative;
 }
@@ -205,19 +239,15 @@ select {
   cursor: pointer;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  border: 1px solid #d1d5db;
+  border: 0;
   border-radius: 999px;
-  background: #fff;
-  color: #111827;
-  font-size: 0.75rem;
-  font-weight: 800;
+  background: transparent;
+  padding: 0;
 }
 
-.inventory-auth-account img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.inventory-auth-account > .niteowl-user-avatar {
+  width: 2rem;
+  height: 2rem;
 }
 
 .inventory-account-menu-content {
@@ -226,8 +256,8 @@ select {
   right: 0;
   z-index: 50;
   display: grid;
-  width: 16rem;
-  overflow: hidden;
+  width: 18rem;
+  overflow: visible;
   border: 1px solid #e5e7eb;
   border-radius: 0.75rem;
   background: #fff;
@@ -236,9 +266,17 @@ select {
 }
 
 .inventory-account-menu-user {
-  display: grid;
-  gap: 0.2rem;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
   padding: 0.65rem 0.7rem;
+}
+
+.inventory-account-menu-user > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
 }
 
 .inventory-account-menu-user strong,
@@ -254,11 +292,14 @@ select {
 }
 
 .inventory-account-menu-content a,
-.inventory-account-menu-content button {
+.inventory-account-menu-content > button,
+.inventory-account-switcher > summary,
+.inventory-account-switcher-content button {
   display: flex;
   width: 100%;
   cursor: pointer;
   align-items: center;
+  gap: 0.6rem;
   border: 0;
   border-radius: 0.5rem;
   background: transparent;
@@ -269,14 +310,85 @@ select {
 }
 
 .inventory-account-menu-content a:hover,
-.inventory-account-menu-content button:hover {
+.inventory-account-menu-content > button:hover,
+.inventory-account-switcher > summary:hover,
+.inventory-account-switcher-content button:hover:not(:disabled) {
   background: #f3f4f6;
+}
+
+.inventory-account-menu-content svg,
+.inventory-account-switcher-content button > svg {
+  width: 1rem;
+  height: 1rem;
+  color: #6b7280;
 }
 
 .inventory-account-menu-separator {
   height: 1px;
   margin: 0.3rem;
   background: #e5e7eb;
+}
+
+.inventory-account-switcher {
+  position: relative;
+}
+
+.inventory-account-switcher > summary {
+  list-style: none;
+}
+
+.inventory-account-switcher > summary::-webkit-details-marker {
+  display: none;
+}
+
+.inventory-account-switcher-chevron {
+  margin-left: auto;
+  color: #6b7280;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.inventory-account-switcher-content {
+  position: absolute;
+  top: -0.35rem;
+  right: calc(100% + 0.45rem);
+  z-index: 60;
+  display: grid;
+  width: 20rem;
+  max-height: 24rem;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 16%);
+  padding: 0.35rem;
+}
+
+.inventory-account-switcher-content button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.inventory-account-switcher-content button .niteowl-user-avatar {
+  width: 2rem;
+  height: 2rem;
+}
+
+.inventory-account-switcher-user {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.inventory-account-switcher-user strong,
+.inventory-account-switcher-user small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventory-account-switcher-user small {
+  color: #6b7280;
 }
 
 .inventory-authenticated-content {
