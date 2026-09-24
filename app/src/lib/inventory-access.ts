@@ -65,6 +65,27 @@ type CatalogResponse = {
   error?: string
 }
 
+
+export type InventoryImportItem = {
+  id: string
+  sourceItemNumber?: string
+  name: string
+  category?: string
+  toastCategory: string
+  toastDestination: string
+  basePriceCents: number | null
+  happyHourPriceCents: number | null
+  status: "ready" | "review" | "ignored"
+  exportIncluded: boolean
+}
+
+type ImportResponse = {
+  importId?: string
+  importedItems?: number
+  importedVariants?: number
+  error?: string
+}
+
 function authEndpoint(path: string) {
   return `${authBaseURL.replace(/\/$/, "")}${path}`
 }
@@ -147,5 +168,37 @@ export async function listInventoryCatalog(
         : organizationId,
     role: result.role ?? null,
     items: Array.isArray(result.items) ? result.items : [],
+  }
+}
+
+
+export async function persistInventoryImport(input: {
+  organizationId: string
+  sourceType: "aloha-csv" | "toast-template"
+  sourceName: string
+  items: InventoryImportItem[]
+}) {
+  const response = await fetch(authEndpoint("/api/auth/inventory/import"), {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+  const result = (await response.json()) as ImportResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to save the Inventory import.",
+    )
+  }
+
+  return {
+    importId: result.importId ?? null,
+    importedItems: result.importedItems ?? 0,
+    importedVariants: result.importedVariants ?? 0,
   }
 }
