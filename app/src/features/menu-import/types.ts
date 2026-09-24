@@ -31,6 +31,8 @@ export type NormalizedMenuItem = {
   effectiveTimes: string[]
   sourceRowCount: number
   status: NormalizedMenuItemStatus
+  organizationEnabled?: boolean
+  exportToToast?: boolean
   exportIncluded: boolean
   notes: string[]
   rawRows: RawMenuRow[]
