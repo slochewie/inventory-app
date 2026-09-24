@@ -1,6 +1,6 @@
 import { appDefinitionsById } from '@niteowl/app-config'
 import { createFileRoute } from '@tanstack/react-router'
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { InventorySidebar } from '#/inventory-sidebar'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from '#/features/menu-import/beer-preview'
@@ -596,115 +596,121 @@ function EditItemPanel({
   onChange: (itemId: string, patch: Partial<NormalizedMenuItem>) => void
   onClose: () => void
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    if (!dialog.open) dialog.showModal()
+
+    return () => {
+      if (dialog.open) dialog.close()
+    }
+  }, [])
+
   return (
-    <section className="inventory-edit-panel" aria-label={`Edit ${item.name}`}>
-      <div className="inventory-edit-panel-heading">
-        <div>
-          <p className="inventory-kicker">Editing {item.sourceItemNumber ? `Aloha #${item.sourceItemNumber}` : 'item'}</p>
-          <h3>{item.name}</h3>
-        </div>
-        <button type="button" onClick={onClose}>Close</button>
-      </div>
-
-      <div className="inventory-edit-grid">
-        <label>
-          <span>Name</span>
-          <input
-            value={item.name}
-            onChange={(event) => onChange(item.id, { name: event.target.value })}
-          />
-        </label>
-
-        <label>
-          <span>Aloha category</span>
-          <input
-            value={item.category || ''}
-            onChange={(event) => onChange(item.id, { category: event.target.value || undefined })}
-            placeholder="Uncategorized"
-          />
-        </label>
-
-        <label>
-          <span>Toast category</span>
-          <input
-            value={item.toastCategory}
-            onChange={(event) => onChange(item.id, { toastCategory: event.target.value })}
-            placeholder="Toast category"
-          />
-        </label>
-
-        <label>
-          <span>Base price</span>
-          <input
-            inputMode="decimal"
-            value={formatCentsInput(item.basePriceCents)}
-            onChange={(event) => onChange(item.id, { basePriceCents: parseCurrencyInput(event.target.value) })}
-            placeholder="Review"
-          />
-        </label>
-
-        <label>
-          <span>Happy-hour price</span>
-          <input
-            inputMode="decimal"
-            value={formatCentsInput(item.happyHourPriceCents)}
-            onChange={(event) => onChange(item.id, { happyHourPriceCents: parseCurrencyInput(event.target.value) })}
-            placeholder="None"
-          />
-        </label>
-
-        <label>
-          <span>Happy-hour window</span>
-          <input
-            value={item.happyHourWindow || ''}
-            onChange={(event) => onChange(item.id, { happyHourWindow: event.target.value || undefined })}
-            placeholder="17:00–19:00"
-          />
-        </label>
-
-        <label>
-          <span>Status</span>
-          <select
-            value={item.status}
-            onChange={(event) => onChange(item.id, { status: event.target.value as NormalizedMenuItem['status'] })}
-          >
-            <option value="ready">Ready</option>
-            <option value="review">Review</option>
-            <option value="ignored">Ignored</option>
-          </select>
-        </label>
-
-        <label className="inventory-checkbox-label">
-          <input
-            type="checkbox"
-            checked={item.exportIncluded}
-            onChange={(event) => onChange(item.id, { exportIncluded: event.target.checked })}
-          />
-          <span>Include this item in Toast export</span>
-        </label>
-      </div>
-    </section>
+    <dialog
+      ref={dialogRef}
+      className="inventory-edit-drawer"
+      aria-labelledby="inventory-edit-drawer-title"
+      onCancel={(event) => {
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(event) => {
+        if (event.currentTarget === event.target) onClose()
+      }}
+    >
+      <section className="inventory-edit-panel" aria-label={`Edit ${item.name}`}>
+            <div className="inventory-edit-panel-heading">
+              <div>
+                <p className="inventory-kicker">Editing {item.sourceItemNumber ? `Aloha #${item.sourceItemNumber}` : 'item'}</p>
+                <h3 id="inventory-edit-drawer-title">{item.name}</h3>
+              </div>
+              <button type="button" onClick={onClose}>Close</button>
+            </div>
+      
+            <div className="inventory-edit-grid">
+              <label>
+                <span>Name</span>
+                <input
+                  value={item.name}
+                  onChange={(event) => onChange(item.id, { name: event.target.value })}
+                />
+              </label>
+      
+              <label>
+                <span>Aloha category</span>
+                <input
+                  value={item.category || ''}
+                  onChange={(event) => onChange(item.id, { category: event.target.value || undefined })}
+                  placeholder="Uncategorized"
+                />
+              </label>
+      
+              <label>
+                <span>Toast category</span>
+                <input
+                  value={item.toastCategory}
+                  onChange={(event) => onChange(item.id, { toastCategory: event.target.value })}
+                  placeholder="Toast category"
+                />
+              </label>
+      
+              <label>
+                <span>Base price</span>
+                <input
+                  inputMode="decimal"
+                  value={formatCentsInput(item.basePriceCents)}
+                  onChange={(event) => onChange(item.id, { basePriceCents: parseCurrencyInput(event.target.value) })}
+                  placeholder="Review"
+                />
+              </label>
+      
+              <label>
+                <span>Happy-hour price</span>
+                <input
+                  inputMode="decimal"
+                  value={formatCentsInput(item.happyHourPriceCents)}
+                  onChange={(event) => onChange(item.id, { happyHourPriceCents: parseCurrencyInput(event.target.value) })}
+                  placeholder="None"
+                />
+              </label>
+      
+              <label>
+                <span>Happy-hour window</span>
+                <input
+                  value={item.happyHourWindow || ''}
+                  onChange={(event) => onChange(item.id, { happyHourWindow: event.target.value || undefined })}
+                  placeholder="17:00–19:00"
+                />
+              </label>
+      
+              <label>
+                <span>Status</span>
+                <select
+                  value={item.status}
+                  onChange={(event) => onChange(item.id, { status: event.target.value as NormalizedMenuItem['status'] })}
+                >
+                  <option value="ready">Ready</option>
+                  <option value="review">Review</option>
+                  <option value="ignored">Ignored</option>
+                </select>
+              </label>
+      
+              <label className="inventory-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={item.exportIncluded}
+                  onChange={(event) => onChange(item.id, { exportIncluded: event.target.checked })}
+                />
+                <span>Include this item in Toast export</span>
+              </label>
+            </div>
+          </section>
+    </dialog>
   )
-}
-
-function createSavedImportFile(items: NormalizedMenuItem[], savedAt: string): ParsedMenuImport {
-  const firstItem = items[0]
-
-  return {
-    sourceKind: firstItem?.sourceKind ?? 'toast-template-sheet',
-    sourceName: 'Saved reviewed menu items',
-    rows: [],
-    warnings: [`Loaded reviewed state saved ${new Date(savedAt).toLocaleString()}`],
-    meta: {
-      store: firstItem?.rawRows?.[0]?.Store || firstItem?.rawRows?.[0]?.store || 'Saved review session',
-      savedAt,
-    },
-  }
-}
-
-function getSourceTypeLabel(sourceKind: ParsedMenuImport['sourceKind']) {
-  if (sourceKind === 'aloha-csv') return 'Aloha CSV'
-  return 'Toast template workbook'
 }
 
 function formatCentsInput(cents: number | null) {
