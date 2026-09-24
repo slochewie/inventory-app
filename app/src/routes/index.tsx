@@ -26,7 +26,7 @@ type CatalogGroup = {
 }
 
 function CatalogPage() {
-  const { canEdit } = useInventoryAccessRole()
+  const { canEdit, canImportExport } = useInventoryAccessRole()
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
   const [query, setQuery] = useState('')
@@ -82,7 +82,7 @@ function CatalogPage() {
     return groups.filter((group) => {
       if (category !== 'all' && group.category !== category) return false
 
-      const carried = group.items.some((item) => item.exportIncluded)
+      const carried = group.items.some((item) => item.organizationEnabled === true)
       if (availability === 'carried' && !carried) return false
       if (availability === 'not-carried' && carried) return false
 
@@ -126,9 +126,12 @@ function CatalogPage() {
       variantId: item.id,
     }
 
-    if (Object.hasOwn(patch, 'exportIncluded')) {
-      payload.enabled = true
-      payload.exportToToast = patch.exportIncluded
+    if (Object.hasOwn(patch, 'organizationEnabled')) {
+      payload.enabled = patch.organizationEnabled
+    }
+
+    if (Object.hasOwn(patch, 'exportToToast')) {
+      payload.exportToToast = patch.exportToToast
     }
 
     if (Object.hasOwn(patch, 'basePriceCents')) {
@@ -144,7 +147,13 @@ function CatalogPage() {
       setItems((current) =>
         current.map((currentItem) =>
           currentItem.id === item.id
-            ? { ...currentItem, ...patch }
+            ? {
+                ...currentItem,
+                ...patch,
+                exportIncluded:
+                  (patch.organizationEnabled ?? currentItem.organizationEnabled) === true &&
+                  (patch.exportToToast ?? currentItem.exportToToast) === true,
+              }
             : currentItem,
         ),
       )
@@ -171,9 +180,11 @@ function CatalogPage() {
               its prices, and what exports to Toast.
             </p>
           </div>
-          <a className="inventory-primary-link" href="/import-review">
-            Import menu
-          </a>
+          {canImportExport ? (
+            <a className="inventory-primary-link" href="/import-review">
+              Import menu
+            </a>
+          ) : null}
         </header>
 
         <section className="inventory-catalog-toolbar" aria-label="Catalog filters">
@@ -245,7 +256,7 @@ function CatalogPage() {
                 </thead>
                 <tbody>
                   {pageGroups.map((group) => {
-                    const carried = group.items.some((item) => item.exportIncluded)
+                    const carried = group.items.some((item) => item.organizationEnabled === true)
 
                     return (
                       <tr
@@ -351,7 +362,9 @@ function CatalogDrawer({
     }
   }, [])
 
-  const carriedCount = group.items.filter((item) => item.exportIncluded).length
+  const carriedCount = group.items.filter(
+    (item) => item.organizationEnabled === true,
+  ).length
 
   return (
     <dialog
@@ -399,17 +412,43 @@ function CatalogDrawer({
                       {item.toastDestination || 'No Toast destination'}
                     </span>
                   </div>
-                  <label className="inventory-inline-toggle">
-                    <input
-                      type="checkbox"
-                      checked={item.exportIncluded}
-                      disabled={!canEdit || saving}
-                      onChange={(event) =>
-                        void onUpdate(item, { exportIncluded: event.target.checked })
-                      }
-                    />
-                    <span>{item.exportIncluded ? 'Available here' : 'Not carried here'}</span>
-                  </label>
+                  <div className="inventory-variant-toggles">
+                    <label className="inventory-inline-toggle">
+                      <input
+                        type="checkbox"
+                        checked={item.organizationEnabled === true}
+                        disabled={!canEdit || saving}
+                        onChange={(event) =>
+                          void onUpdate(item, {
+                            organizationEnabled: event.target.checked,
+                          })
+                        }
+                      />
+                      <span>
+                        {item.organizationEnabled === true
+                          ? 'Available here'
+                          : 'Not carried here'}
+                      </span>
+                    </label>
+
+                    <label className="inventory-inline-toggle">
+                      <input
+                        type="checkbox"
+                        checked={item.exportToToast === true}
+                        disabled={
+                          !canEdit ||
+                          saving ||
+                          item.organizationEnabled !== true
+                        }
+                        onChange={(event) =>
+                          void onUpdate(item, {
+                            exportToToast: event.target.checked,
+                          })
+                        }
+                      />
+                      <span>Export to Toast</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="inventory-catalog-price-grid">
@@ -442,7 +481,7 @@ function CatalogDrawer({
       <section className="inventory-drawer-section inventory-drawer-help">
         <p className="inventory-kicker">How this works</p>
         <p>
-          Availability, price, and Happy Hour values are specific to the selected organization.
+          Availability, Toast export, price, and Happy Hour values are specific to the selected organization.
           The master item remains shared across organizations.
         </p>
       </section>
