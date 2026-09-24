@@ -1,11 +1,16 @@
 import { appDefinitionsById } from '@niteowl/app-config'
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
+import {
+  AuthenticatedInventoryShell,
+  useInventoryAccessRole,
+} from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import {
   listInventoryCatalog,
-  persistInventoryImport
+  persistInventoryImport,
+  updateInventoryOrganizationVariant,
+  updateInventoryOrganizationVariants,
 } from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from '#/features/menu-import/beer-preview'
@@ -44,6 +49,7 @@ const UNCATEGORIZED = '__uncategorized__'
 
 function Home() {
   const app = appDefinitionsById.inventory
+  const { canEdit, canImportExport } = useInventoryAccessRole()
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(null)
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
   const [importError, setImportError] = useState<string | null>(null)
@@ -223,6 +229,8 @@ function Home() {
   )
 
   async function handleAlohaCsvChange(event: ChangeEvent<HTMLInputElement>) {
+    if (!canImportExport) return
+
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -250,6 +258,8 @@ function Home() {
   }
 
   function updateItem(itemId: string, patch: Partial<NormalizedMenuItem>) {
+    if (!canEdit) return
+
     setItems((currentItems) => currentItems.map((item) => (
       item.id === itemId ? { ...item, ...patch } : item
     )))
@@ -315,6 +325,7 @@ function Home() {
     patch: Partial<NormalizedMenuItem>,
   ) {
     if (
+      !canEdit ||
       importFile?.meta?.source !== 'inventory-catalog' ||
       !activeOrganization?.id ||
       itemIds.length === 0
@@ -423,7 +434,7 @@ function Home() {
 
 
   async function handleSaveToInventory() {
-    if (!activeOrganization?.id || !importFile || items.length === 0) return
+    if (!canImportExport || !activeOrganization?.id || !importFile || items.length === 0) return
 
     setSaveState("saving")
     setSaveMessage(null)
@@ -516,10 +527,14 @@ function Home() {
             </p>
           </div>
 
-          <label className="inventory-upload-control">
-            <span>Choose Aloha CSV</span>
-            <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
-          </label>
+          {canImportExport ? (
+            <label className="inventory-upload-control">
+              <span>Choose Aloha CSV</span>
+              <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
+            </label>
+          ) : (
+            <p className="inventory-readonly-note">Viewer access is read-only.</p>
+          )}
 
           {catalogLoading ? (
             <p>Loading persistent Inventory catalog…</p>
@@ -553,7 +568,7 @@ function Home() {
                   <h2>{importFile.sourceName}</h2>
                 </div>
 
-                {importFile.meta?.source !== 'inventory-catalog' ? (
+                {canImportExport && importFile.meta?.source !== 'inventory-catalog' ? (
                   <button
                     className="inventory-template-download"
                     type="button"
@@ -598,7 +613,7 @@ function Home() {
               ) : null}
             </section>
 
-            <ToastExportPanelView files={toastExportFiles} />
+            {canImportExport ? <ToastExportPanelView files={toastExportFiles} /> : null}
 
             <section className="inventory-card inventory-table-card">
               <div className="inventory-table-heading">
@@ -651,7 +666,7 @@ function Home() {
                 </div>
               </div>
 
-              {categoryFilter !== ALL_CATEGORIES ? (
+              {canEdit && categoryFilter !== ALL_CATEGORIES ? (
                 <section className="inventory-category-rule-panel">
                   <div>
                     <p className="inventory-kicker">Toast category rule</p>
@@ -682,17 +697,23 @@ function Home() {
 
               {beerTabRows.length > 0 ? <BeerTabPreview rows={beerTabRows} /> : null}
 
-              <div className="inventory-bulk-bar">
-                <strong>{filteredItems.length.toLocaleString()} matching items</strong>
-                <button type="button" onClick={() => updateFilteredItems({ exportIncluded: false })}>Exclude filtered from export</button>
-                <button type="button" onClick={() => updateFilteredItems({ exportIncluded: true })}>Include filtered in export</button>
-                <button type="button" onClick={() => updatePageItems({ exportIncluded: false })}>Exclude this page</button>
-              </div>
+              {canEdit ? (
+                <>
+                  <div className="inventory-bulk-bar">
+                    <strong>{filteredItems.length.toLocaleString()} matching items</strong>
+                    <button type="button" onClick={() => updateFilteredItems({ exportIncluded: false })}>Exclude filtered from export</button>
+                    <button type="button" onClick={() => updateFilteredItems({ exportIncluded: true })}>Include filtered in export</button>
+                    <button type="button" onClick={() => updatePageItems({ exportIncluded: false })}>Exclude this page</button>
+                  </div>
 
-              {selectedItem ? (
-                <EditItemPanel item={selectedItem} onChange={updateItem} onClose={() => setSelectedItemId(null)} />
+                  {selectedItem ? (
+                    <EditItemPanel item={selectedItem} onChange={updateItem} onClose={() => setSelectedItemId(null)} />
+                  ) : (
+                    <p className="inventory-edit-hint">Select Edit on a row to adjust its normalized Toast-ready values and export setting.</p>
+                  )}
+                </>
               ) : (
-                <p className="inventory-edit-hint">Select Edit on a row to adjust its normalized Toast-ready values and export setting.</p>
+                <p className="inventory-edit-hint">Your Inventory role can view these items but cannot change organization item settings.</p>
               )}
 
               <div className="inventory-table-wrap">
@@ -728,22 +749,26 @@ function Home() {
                             : `${formatCurrency(item.happyHourPriceCents)}${item.happyHourWindow ? ` · ${item.happyHourWindow}` : ''}`}
                         </td>
                         <td className="inventory-review-actions">
-                          <div className="inventory-review-action-buttons">
-                            <button
-                              className={item.exportIncluded ? 'inventory-export-toggle is-included' : 'inventory-export-toggle'}
-                              type="button"
-                              onClick={() => updateItem(item.id, { exportIncluded: !item.exportIncluded })}
-                            >
-                              {item.exportIncluded ? 'Export' : 'No export'}
-                            </button>
-                            <button
-                              className="inventory-row-action"
-                              type="button"
-                              onClick={() => setSelectedItemId(item.id)}
-                            >
-                              Edit
-                            </button>
-                          </div>
+                          {canEdit ? (
+                            <div className="inventory-review-action-buttons">
+                              <button
+                                className={item.exportIncluded ? 'inventory-export-toggle is-included' : 'inventory-export-toggle'}
+                                type="button"
+                                onClick={() => updateItem(item.id, { exportIncluded: !item.exportIncluded })}
+                              >
+                                {item.exportIncluded ? 'Export' : 'No export'}
+                              </button>
+                              <button
+                                className="inventory-row-action"
+                                type="button"
+                                onClick={() => setSelectedItemId(item.id)}
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          ) : (
+                            <span>{item.exportIncluded ? 'Exporting' : 'Not exporting'}</span>
+                          )}
                         </td>
                       </tr>
                     ))}
