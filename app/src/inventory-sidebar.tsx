@@ -8,11 +8,15 @@ import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 
 export function InventorySidebar({
   currentPath,
+  open = true,
+  onToggle,
   canImportExport = false,
   canEdit = false,
   canManageAssignments = false,
 }: {
   currentPath: string
+  open?: boolean
+  onToggle?: () => void
   canImportExport?: boolean
   canEdit?: boolean
   canManageAssignments?: boolean
@@ -42,8 +46,12 @@ export function InventorySidebar({
   })
 
   return (
-    <aside className="inventory-sidebar" aria-label="Application navigation">
-      <a className="inventory-brand" href="/">
+    <aside
+      className={open ? "inventory-sidebar" : "inventory-sidebar is-collapsed"}
+      aria-label="Application navigation"
+    >
+      <div className="inventory-sidebar-brand-row">
+        <a className="inventory-brand" href="/" title={app.label}>
         <span className="inventory-brand-icon" aria-hidden="true">
           <NiteOwlNavigationIcon icon={app.icon} />
         </span>
@@ -51,7 +59,17 @@ export function InventorySidebar({
           <span className="inventory-brand-eyebrow">{brand}</span>
           <span className="inventory-brand-title">{app.label}</span>
         </span>
-      </a>
+        </a>
+        <button
+          type="button"
+          className="inventory-sidebar-toggle"
+          onClick={onToggle}
+          aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+          title={open ? "Collapse sidebar" : "Expand sidebar"}
+        >
+          <span aria-hidden="true">{open ? "‹" : "›"}</span>
+        </button>
+      </div>
 
       <nav className="inventory-nav">
         {[...navigation.primary, ...navigation.apps].map((section) => (
