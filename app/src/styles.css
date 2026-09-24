@@ -652,6 +652,14 @@ select {
   white-space: nowrap;
 }
 
+.inventory-review-action-buttons button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  line-height: 1;
+}
+
 .inventory-export-toggle.is-included {
   border-color: #bbf7d0;
   background: #dcfce7;
