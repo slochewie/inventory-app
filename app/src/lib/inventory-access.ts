@@ -421,6 +421,49 @@ export async function listInventorySourceMappings(
   return Array.isArray(result.mappings) ? result.mappings : []
 }
 
+export async function mergeInventoryItems(input: {
+  organizationId: string
+  sourceItemId: string
+  targetItemId: string
+}) {
+  const response = await fetch(authEndpoint("/api/auth/inventory/item-merge"), {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+  const result = (await response.json()) as {
+    merged?: boolean
+    targetItemId?: string
+    movedVariants?: number
+    mergedVariants?: number
+    error?: string
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to merge Inventory items.",
+    )
+  }
+
+  return {
+    merged: result.merged === true,
+    targetItemId:
+      typeof result.targetItemId === "string"
+        ? result.targetItemId
+        : input.targetItemId,
+    movedVariants:
+      typeof result.movedVariants === "number" ? result.movedVariants : 0,
+    mergedVariants:
+      typeof result.mergedVariants === "number" ? result.mergedVariants : 0,
+  }
+}
+
+
 export async function updateInventorySourceMapping(input: {
   organizationId: string
   sourceType: string
