@@ -81,6 +81,7 @@ export function InventorySidebar({
                   <a
                     className={item.active ? 'inventory-nav-link is-active' : 'inventory-nav-link'}
                     href={item.href}
+                    title={!open ? item.label : undefined}
                   >
                     <span className="inventory-nav-icon" aria-hidden="true">
                       <NiteOwlNavigationIcon icon={item.icon} />
