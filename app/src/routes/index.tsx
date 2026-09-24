@@ -331,15 +331,39 @@ function Home() {
         })),
       })
 
+      const catalog = await listInventoryCatalog(activeOrganization.id)
+      const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
+
+      setImportFile({
+        sourceKind: 'toast-template-sheet',
+        sourceName: 'Persistent Inventory catalog',
+        rows: [],
+        warnings: [],
+        meta: {
+          store: activeOrganization.name,
+          organizationId: activeOrganization.id,
+          source: 'inventory-catalog',
+        },
+      })
+      setItems(persistentItems)
+      setFilter('included')
+      setCategoryFilter(ALL_CATEGORIES)
+      setToastCategoryDraft('')
+      setQuery('')
+      setPage(1)
+      setSelectedItemId(null)
+      setCatalogOrganizationId(activeOrganization.id)
+
       setSaveState("saved")
       setSaveMessage(
         "Saved " +
           result.importedItems.toLocaleString() +
           " items and " +
           result.importedVariants.toLocaleString() +
-          " variants to the persistent Inventory catalog.",
+          " variants. Reloaded " +
+          persistentItems.length.toLocaleString() +
+          " persistent catalog rows.",
       )
-      setCatalogOrganizationId(null)
     } catch (error) {
       setSaveState("error")
       setSaveMessage(
