@@ -917,6 +917,189 @@ select {
   font-size: 0.8rem !important;
 }
 
+
+.inventory-secondary-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  border-radius: 0.7rem;
+  background: #fff;
+  color: #111827;
+  padding: 0.7rem 0.95rem;
+  font-weight: 800;
+}
+
+.inventory-import-drop-card {
+  display: flex;
+  width: min(100%, 96rem);
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1.25rem;
+}
+
+.inventory-import-drop-card strong {
+  font-size: 1rem;
+}
+
+.inventory-import-drop-card p {
+  max-width: 44rem;
+  margin: 0.35rem 0 0;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.inventory-import-message {
+  width: min(100%, 96rem);
+  margin: 1rem 0 0;
+}
+
+.inventory-import-review-summary {
+  display: grid;
+  width: min(100%, 96rem);
+  grid-template-columns: minmax(16rem, 2fr) repeat(3, minmax(8rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.inventory-import-review-summary > div {
+  min-width: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  background: #fff;
+  padding: 0.9rem 1rem;
+}
+
+.inventory-import-review-summary span {
+  display: block;
+  color: #6b7280;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.inventory-import-review-summary strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 0.2rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+}
+
+.inventory-import-review-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.inventory-import-review-actions {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1rem;
+}
+
+.inventory-import-review-search {
+  width: min(24rem, 100%);
+}
+
+.inventory-import-review-table {
+  min-width: 70rem;
+}
+
+.inventory-import-review-table th:nth-child(1),
+.inventory-import-review-table td:nth-child(1) {
+  min-width: 16rem;
+}
+
+.inventory-import-review-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid #e5e7eb;
+  padding: 1rem;
+}
+
+.inventory-import-review-footer p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.inventory-primary-button {
+  cursor: pointer;
+  border: 0;
+  border-radius: 0.7rem;
+  background: #111827;
+  color: #fff;
+  padding: 0.7rem 0.95rem;
+  font-weight: 800;
+}
+
+.inventory-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.inventory-save-success {
+  color: #166534 !important;
+  font-weight: 700;
+}
+
+.inventory-import-toggle {
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  padding: 0.35rem 0.6rem;
+  font-weight: 800;
+}
+
+.inventory-import-toggle.is-on {
+  border-color: #bbf7d0;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.inventory-empty-workflow {
+  display: grid;
+  width: min(100%, 96rem);
+  place-items: center;
+  gap: 0.35rem;
+  min-height: 14rem;
+  margin-top: 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 1rem;
+  background: #fff;
+  color: #4b5563;
+  text-align: center;
+}
+
+.inventory-empty-workflow p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.inventory-import-edit-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.inventory-import-drawer-toggle {
+  justify-self: start;
+  margin-top: 0.25rem;
+}
+
 .inventory-card h2,
 .inventory-edit-panel h3,
 .inventory-category-rule-panel h3 {
@@ -1615,8 +1798,16 @@ select {
   .inventory-summary-grid,
   .inventory-source-card dl,
   .inventory-edit-grid,
-  .inventory-catalog-price-grid {
+  .inventory-catalog-price-grid,
+  .inventory-import-review-summary {
     grid-template-columns: 1fr;
+  }
+
+  .inventory-import-drop-card,
+  .inventory-import-review-actions,
+  .inventory-import-review-footer {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .inventory-page-heading {
