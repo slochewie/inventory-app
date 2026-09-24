@@ -73,10 +73,9 @@ function populateLiquorSheet(workbookPackage: WorkbookPackage, items: Normalized
   const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
   const sheetDoc = parseXml(sheetXml)
   const rowsByKind = groupLiquorRowsByKind(liquorRows)
-  const mappingWithOptionalSlots = configureOptionalLiquorSlots(sheetDoc, mapping, rowsByKind)
-  const writtenRowCount = writeLiquorRowsToSheet(sheetDoc, mappingWithOptionalSlots, rowsByKind)
+  const writtenRowCount = writeLiquorRowsToSheet(sheetDoc, mapping, rowsByKind)
 
-  updateWorksheetDimension(sheetDoc, mappingWithOptionalSlots, writtenRowCount)
+  updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
   workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
 }
 
@@ -109,31 +108,6 @@ function groupLiquorRowsByKind(rows: LiquorRow[]) {
   groups.forEach((groupRows) => groupRows.sort((left, right) => left.itemName.localeCompare(right.itemName)))
 
   return groups
-}
-
-function configureOptionalLiquorSlots(sheetDoc: Document, mapping: LiquorTemplateMapping, rowsByKind: Map<string, LiquorRow[]>) {
-  const usedKinds = new Set(mapping.slots.map((slot) => slot.kind))
-  const unknownKinds = [...rowsByKind.keys()].filter((kind) => !usedKinds.has(kind))
-  if (unknownKinds.length === 0) return mapping
-
-  const optionalSlots = mapping.slots.filter((slot) => slot.kind === 'optional')
-  const slots = [...mapping.slots]
-
-  unknownKinds.forEach((kind, index) => {
-    const optionalSlot = optionalSlots[index]
-    if (!optionalSlot) return
-
-    const renamedSlot = {
-      ...optionalSlot,
-      label: displayLiquorKind(kind),
-      kind,
-    }
-    const slotIndex = slots.indexOf(optionalSlot)
-    slots[slotIndex] = renamedSlot
-    writeCellValueWithStyleSource(sheetDoc, optionalSlot.categoryCol, mapping.categoryRow, renamedSlot.label, optionalSlot.categoryCol)
-  })
-
-  return { ...mapping, slots }
 }
 
 function writeLiquorRowsToSheet(sheetDoc: Document, mapping: LiquorTemplateMapping, rowsByKind: Map<string, LiquorRow[]>) {
@@ -232,14 +206,6 @@ function normalizeLiquorKind(value: string) {
   return key
 }
 
-function displayLiquorKind(kind: string) {
-  if (kind === 'WHISKEY/BOURBON') return 'Whiskey/Bourbon'
-  if (kind === 'LIQUEURS/CORDIALS') return 'Liqueurs/Cordials'
-  if (kind === 'BRANDY/COGNAC') return 'Brandy/Cognac'
-
-  return kind.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
 function readWorkbookPackage(arrayBuffer: ArrayBuffer): WorkbookPackage {
   const files = unzipSync(new Uint8Array(arrayBuffer.slice(0)))
   const workbookXml = getTextFile(files, WORKBOOK_PATH)
@@ -304,11 +270,6 @@ function writeCellValue(sheetDoc: Document, column: number, rowNumber: number, v
   setCellValue(sheetDoc, cell, value)
 }
 
-function writeCellValueWithStyleSource(sheetDoc: Document, column: number, rowNumber: number, value: string | number, styleSourceColumn: number) {
-  const cell = getOrCreateCellWithStyleSource(sheetDoc, column, rowNumber, styleSourceColumn)
-  setCellValue(sheetDoc, cell, value)
-}
-
 function setCellValue(sheetDoc: Document, cell: Element, value: string | number) {
   removeChildren(cell, ['v', 'is'])
 
@@ -350,22 +311,6 @@ function getOrCreateCell(sheetDoc: Document, column: number, rowNumber: number, 
   copyStyleFromSource(sheetDoc, cell, column, templateRow)
 
   insertCellSorted(row, cell, column)
-  return cell
-}
-
-function getOrCreateCellWithStyleSource(sheetDoc: Document, column: number, rowNumber: number, styleSourceColumn: number) {
-  const row = getOrCreateRow(sheetDoc, rowNumber)
-  const reference = `${numberToColumnLetters(column)}${rowNumber}`
-  const existing = findCellInRow(row, reference)
-  if (existing) {
-    copyStyleFromSource(sheetDoc, existing, styleSourceColumn, rowNumber)
-    return existing
-  }
-
-  const cell = sheetDoc.createElementNS(SPREADSHEET_NS, 'c')
-  cell.setAttribute('r', reference)
-  copyStyleFromSource(sheetDoc, cell, styleSourceColumn, rowNumber)
-  insertCellSorted(row, cell)
   return cell
 }
 
