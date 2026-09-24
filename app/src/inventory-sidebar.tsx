@@ -9,10 +9,12 @@ import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 export function InventorySidebar({
   currentPath,
   canImportExport = false,
+  canEdit = false,
   canManageAssignments = false,
 }: {
   currentPath: string
   canImportExport?: boolean
+  canEdit?: boolean
   canManageAssignments?: boolean
 }) {
   const app = appDefinitionsById.inventory
@@ -29,6 +31,10 @@ export function InventorySidebar({
 
       if (key === 'inventory:import-export') {
         return canImportExport
+      }
+
+      if (key === 'inventory:edit') {
+        return canEdit
       }
 
       return true
