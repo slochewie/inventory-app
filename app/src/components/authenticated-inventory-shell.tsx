@@ -1,9 +1,10 @@
 import type { ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
 import {
+  NiteOwlSidebarProvider,
   NiteOwlUserAvatar,
   OrganizationSelector,
-  useNiteOwlSidebarState,
+  useNiteOwlSidebar,
 } from "@niteowl/ui"
 import {
   ArrowRightLeftIcon,
@@ -53,7 +54,19 @@ export function useInventoryAccessRole() {
   }
 }
 
-export function AuthenticatedInventoryShell({
+export function AuthenticatedInventoryShell(props: {
+  currentPath: string
+  requiredCapability?: "import-export" | "edit" | "manage-assignments"
+  children: ReactNode
+}) {
+  return (
+    <NiteOwlSidebarProvider>
+      <AuthenticatedInventoryShellInner {...props} />
+    </NiteOwlSidebarProvider>
+  )
+}
+
+function AuthenticatedInventoryShellInner({
   currentPath,
   requiredCapability,
   children,
@@ -89,9 +102,9 @@ export function AuthenticatedInventoryShell({
   const [switchingToken, setSwitchingToken] = useState<string | null>(null)
   const {
     open: sidebarOpen,
-    toggle: toggleSidebar,
+    toggleSidebar,
     hydrated: sidebarHydrated,
-  } = useNiteOwlSidebarState()
+  } = useNiteOwlSidebar()
   const accountMenuRef = useRef<HTMLDetailsElement>(null)
 
   const visibleOrganizations = (organizations ?? []).filter((organization) =>
