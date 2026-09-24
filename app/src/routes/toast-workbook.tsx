@@ -275,20 +275,16 @@ function ToastWorkbook() {
               <p>No reviewed state found yet. Upload toast-export-review.csv or go to Menu Items to review the Aloha CSV.</p>
             )}
           </div>
-          {canImportExport ? (
-            <div className="inventory-upload-stack">
-              <label className="inventory-upload-control">
-                <span>Choose toast-export-review.csv</span>
-                <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
-              </label>
-              <label className="inventory-upload-control">
-                <span>Choose raw Aloha CSV</span>
-                <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
-              </label>
-            </div>
-          ) : (
-            <p className="inventory-readonly-note">Viewer access is read-only.</p>
-          )}
+          <div className="inventory-upload-stack">
+            <label className="inventory-upload-control">
+              <span>Choose toast-export-review.csv</span>
+              <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
+            </label>
+            <label className="inventory-upload-control">
+              <span>Choose raw Aloha CSV</span>
+              <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
+            </label>
+          </div>
           {alohaError ? <p className="inventory-error">{alohaError}</p> : null}
         </section>
 
