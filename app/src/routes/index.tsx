@@ -2,6 +2,11 @@ import { appDefinitionsById } from '@niteowl/app-config'
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
+import { authClient } from '#/lib/auth-client'
+import {
+  listInventoryCatalog,
+  type InventoryCatalogRow,
+} from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from '#/features/menu-import/beer-preview'
 import { loadReviewSession } from '#/features/menu-import/review-session'
@@ -47,6 +52,10 @@ function Home() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const { data: activeOrganization } = authClient.useActiveOrganization()
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState<string | null>(null)
+  const [catalogOrganizationId, setCatalogOrganizationId] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const toastExportFiles = useMemo(() => buildToastExportFiles(items), [items])
@@ -89,18 +98,76 @@ function Home() {
   const selectedCategoryToastCategory = selectedCategoryItems[0]?.toastCategory ?? ''
 
   useEffect(() => {
-    const savedSession = loadReviewSession()
-    if (!savedSession || savedSession.items.length === 0) return
+    if (!activeOrganization?.id) return
 
-    setImportFile(savedSession.importFile ?? createSavedImportFile(savedSession.items, savedSession.savedAt))
-    setItems(savedSession.items)
-    setFilter('included')
-    setCategoryFilter(ALL_CATEGORIES)
-    setToastCategoryDraft('')
-    setQuery('')
-    setPage(1)
-    setSelectedItemId(null)
-  }, [])
+    const controller = new AbortController()
+    setCatalogLoading(true)
+    setCatalogError(null)
+
+    void listInventoryCatalog(activeOrganization.id, controller.signal)
+      .then((catalog) => {
+        if (catalog.items.length === 0) {
+          const savedSession = loadReviewSession()
+
+          if (savedSession?.items.length) {
+            setImportFile(
+              savedSession.importFile ??
+                createSavedImportFile(savedSession.items, savedSession.savedAt),
+            )
+            setItems(savedSession.items)
+          } else {
+            setImportFile(null)
+            setItems([])
+          }
+        } else {
+          const normalizedItems = catalog.items.map(catalogRowToNormalizedItem)
+
+          setImportFile({
+            sourceKind: 'toast-template-sheet',
+            sourceName: 'Persistent Inventory catalog',
+            rows: [],
+            warnings: [],
+            meta: {
+              store: activeOrganization.name,
+              organizationId: activeOrganization.id,
+              source: 'inventory-catalog',
+            },
+          })
+          setItems(normalizedItems)
+        }
+
+        setCatalogOrganizationId(activeOrganization.id)
+        setFilter('included')
+        setCategoryFilter(ALL_CATEGORIES)
+        setToastCategoryDraft('')
+        setQuery('')
+        setPage(1)
+        setSelectedItemId(null)
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+
+        setCatalogError(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load the persistent Inventory catalog',
+        )
+
+        const savedSession = loadReviewSession()
+        if (savedSession?.items.length) {
+          setImportFile(
+            savedSession.importFile ??
+              createSavedImportFile(savedSession.items, savedSession.savedAt),
+          )
+          setItems(savedSession.items)
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCatalogLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [activeOrganization?.id, activeOrganization?.name])
 
   useEffect(() => {
     if (categoryFilter === ALL_CATEGORIES) {
@@ -258,6 +325,16 @@ function Home() {
             <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
           </label>
 
+          {catalogLoading ? (
+            <p>Loading persistent Inventory catalog…</p>
+          ) : catalogOrganizationId === activeOrganization?.id && items.length > 0 ? (
+            <p>
+              Loaded {items.length.toLocaleString()} item variant
+              {items.length === 1 ? '' : 's'} for {activeOrganization.name}.
+            </p>
+          ) : null}
+
+          {catalogError ? <p className="inventory-error">{catalogError}</p> : null}
           {importError ? <p className="inventory-error">{importError}</p> : null}
         </section>
 
@@ -705,6 +782,42 @@ function EditItemPanel({
           </section>
     </dialog>
   )
+}
+
+function catalogRowToNormalizedItem(row: InventoryCatalogRow): NormalizedMenuItem {
+  const variantLabel = [
+    row.variant.kind !== 'standard' ? row.variant.kind : null,
+    row.variant.sizeOz !== null ? `${row.variant.sizeOz}oz` : null,
+    row.variant.packageType,
+    row.variant.name,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  const categoryName = row.category?.name ?? undefined
+  const toastCategory =
+    row.organization.toastCategoryOverride ??
+    row.category?.toastCategory ??
+    categoryName ??
+    'Uncategorized'
+
+  return {
+    id: row.variant.id,
+    sourceKind: 'toast-template-sheet',
+    name: row.organization.toastNameOverride ?? row.name,
+    category: categoryName,
+    toastCategory,
+    toastDestination: row.organization.toastDestinationOverride ?? '',
+    basePriceCents: row.effectivePriceCents,
+    happyHourPriceCents: row.organization.happyHourPriceCents,
+    effectiveTimes: [],
+    sourceRowCount: 0,
+    status: row.active && row.variant.active ? 'ready' : 'ignored',
+    exportIncluded:
+      row.organization.enabled && row.organization.exportToToast,
+    notes: variantLabel ? [variantLabel] : [],
+    rawRows: [],
+  }
 }
 
 function createSavedImportFile(items: NormalizedMenuItem[], savedAt: string): ParsedMenuImport {
