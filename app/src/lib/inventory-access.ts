@@ -26,6 +26,45 @@ type AssignmentsResponse = {
   error?: string
 }
 
+export type InventoryCatalogRow = {
+  id: string
+  name: string
+  normalizedName: string
+  active: boolean
+  category: {
+    id: string
+    name: string | null
+    toastCategory: string | null
+  } | null
+  variant: {
+    id: string
+    kind: string
+    sizeOz: number | null
+    packageType: string | null
+    name: string | null
+    defaultPriceCents: number | null
+    active: boolean
+  }
+  organization: {
+    enabled: boolean
+    exportToToast: boolean
+    priceOverrideCents: number | null
+    happyHourPriceCents: number | null
+    toastNameOverride: string | null
+    toastCategoryOverride: string | null
+    toastDestinationOverride: string | null
+    toastSlot: string | null
+  }
+  effectivePriceCents: number | null
+}
+
+type CatalogResponse = {
+  organizationId?: string
+  role?: InventoryRole | null
+  items?: InventoryCatalogRow[]
+  error?: string
+}
+
 function authEndpoint(path: string) {
   return `${authBaseURL.replace(/\/$/, "")}${path}`
 }
@@ -77,4 +116,36 @@ export async function listInventoryAssignments(organizationId: string) {
   }
 
   return Array.isArray(result.assignments) ? result.assignments : []
+}
+
+
+export async function listInventoryCatalog(
+  organizationId: string,
+  signal?: AbortSignal,
+) {
+  const url = new URL(authEndpoint("/api/auth/inventory/catalog"))
+  url.searchParams.set("organizationId", organizationId)
+
+  const response = await fetch(url, {
+    credentials: "include",
+    signal,
+  })
+  const result = (await response.json()) as CatalogResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to load the Inventory catalog.",
+    )
+  }
+
+  return {
+    organizationId:
+      typeof result.organizationId === "string"
+        ? result.organizationId
+        : organizationId,
+    role: result.role ?? null,
+    items: Array.isArray(result.items) ? result.items : [],
+  }
 }
