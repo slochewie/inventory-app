@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { NiteOwlUserAvatar, OrganizationSelector } from "@niteowl/ui"
 import {
   ArrowRightLeftIcon,
@@ -40,6 +40,7 @@ export function AuthenticatedInventoryShell({
     }
   }>>([])
   const [switchingToken, setSwitchingToken] = useState<string | null>(null)
+  const accountMenuRef = useRef<HTMLDetailsElement>(null)
 
   const visibleOrganizations = (organizations ?? []).filter((organization) =>
     allowedOrganizationIds?.has(organization.id) ?? false,
@@ -178,6 +179,35 @@ export function AuthenticatedInventoryShell({
     )
   }
 
+  useEffect(() => {
+    function closeAccountMenu(event: MouseEvent) {
+      const menu = accountMenuRef.current
+      if (!menu?.open) return
+
+      if (event.target instanceof Node && !menu.contains(event.target)) {
+        menu.open = false
+      }
+    }
+
+    function closeAccountMenuOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return
+
+      const menu = accountMenuRef.current
+      if (!menu?.open) return
+
+      menu.open = false
+      menu.querySelector<HTMLElement>("summary")?.focus()
+    }
+
+    document.addEventListener("mousedown", closeAccountMenu)
+    document.addEventListener("keydown", closeAccountMenuOnEscape)
+
+    return () => {
+      document.removeEventListener("mousedown", closeAccountMenu)
+      document.removeEventListener("keydown", closeAccountMenuOnEscape)
+    }
+  }, [])
+
   const displayName = session.user.name || session.user.email
 
   async function switchAccount(sessionToken: string, userId: string) {
@@ -231,7 +261,7 @@ export function AuthenticatedInventoryShell({
               }}
             />
 
-            <details className="inventory-account-menu">
+            <details ref={accountMenuRef} className="inventory-account-menu">
               <summary
                 className="inventory-auth-account"
                 title={displayName}
