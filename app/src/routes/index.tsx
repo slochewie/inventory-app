@@ -400,7 +400,6 @@ function Home() {
                 <table className="inventory-table inventory-review-table">
                   <thead>
                     <tr>
-                      <th>Aloha #</th>
                       <th>Name</th>
                       <th>Aloha category</th>
                       <th>Toast category</th>
@@ -414,7 +413,6 @@ function Home() {
                   <tbody>
                     {pageItems.map((item) => (
                       <tr key={item.id} className={selectedItemId === item.id ? 'is-selected' : undefined}>
-                        <td>{item.sourceItemNumber || '—'}</td>
                         <td>
                           <strong>{item.name}</strong>
                           {item.notes.length > 0 ? <span>{item.notes.join(' · ')}</span> : null}
