@@ -4,6 +4,8 @@ import {
   AuthenticatedInventoryShell,
   useInventoryAccessRole,
 } from '#/components/authenticated-inventory-shell'
+import { ImportHistoryPanel } from '#/features/import-review/import-history-panel'
+import { ReconcilePanel } from '#/features/import-review/reconcile-panel'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import {
   formatCurrency,
@@ -21,7 +23,7 @@ type ReviewFilter = 'review' | 'included' | 'excluded' | 'all'
 const PAGE_SIZE = 50
 
 function ImportReviewPage() {
-  const { canImportExport } = useInventoryAccessRole()
+  const { canImportExport, canEdit } = useInventoryAccessRole()
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(null)
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
@@ -32,6 +34,9 @@ function ImportReviewPage() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [workspace, setWorkspace] = useState<'new' | 'history' | 'mappings'>(
+    canImportExport ? 'new' : 'history',
+  )
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
 
@@ -64,6 +69,11 @@ function ImportReviewPage() {
   useEffect(() => {
     setPage(1)
   }, [filter, query])
+
+  useEffect(() => {
+    if (!canImportExport && workspace === 'new') setWorkspace('history')
+    if (!canEdit && workspace === 'mappings') setWorkspace('history')
+  }, [canEdit, canImportExport, workspace])
 
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null
 
@@ -146,10 +156,7 @@ function ImportReviewPage() {
   }
 
   return (
-    <AuthenticatedInventoryShell
-      currentPath="/import-review"
-      requiredCapability="import-export"
-    >
+    <AuthenticatedInventoryShell currentPath="/import-review">
       <section className="inventory-content inventory-import-review-page">
         <header className="inventory-page-heading">
           <div>
@@ -159,212 +166,251 @@ function ImportReviewPage() {
               Upload an Aloha export, review only what needs attention, then save it to the shared catalog.
             </p>
           </div>
-          <a className="inventory-secondary-link" href="/toast-template-import">
-            Import Toast workbook
-          </a>
+          {workspace === 'new' && canImportExport ? (
+            <a className="inventory-secondary-link" href="/toast-template-import">
+              Import Toast workbook
+            </a>
+          ) : null}
         </header>
 
-        <section className="inventory-import-drop-card">
-          <div>
-            <strong>Aloha CSV</strong>
-            <p>Choose the menu-price export from Aloha. Nothing is saved until you approve the import.</p>
-          </div>
+        <nav className="inventory-import-workspace-tabs" aria-label="Import and review workspace">
           {canImportExport ? (
-            <label className="inventory-upload-control">
-              <span>{importFile ? 'Choose another CSV' : 'Choose Aloha CSV'}</span>
-              <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
-            </label>
+            <button
+              type="button"
+              className={workspace === 'new' ? 'is-active' : ''}
+              onClick={() => setWorkspace('new')}
+            >
+              New import
+            </button>
           ) : null}
-        </section>
+          <button
+            type="button"
+            className={workspace === 'history' ? 'is-active' : ''}
+            onClick={() => setWorkspace('history')}
+          >
+            History
+          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              className={workspace === 'mappings' ? 'is-active' : ''}
+              onClick={() => setWorkspace('mappings')}
+            >
+              Mapping review
+            </button>
+          ) : null}
+        </nav>
 
-        {error ? <p className="inventory-error inventory-import-message">{error}</p> : null}
-
-        {importFile ? (
+        {workspace === 'new' ? (
           <>
-            <section className="inventory-import-review-summary">
-              <div>
-                <span>File</span>
-                <strong>{importFile.sourceName}</strong>
-              </div>
-              <div>
-                <span>Items</span>
-                <strong>{summary.normalizedItems.toLocaleString()}</strong>
-              </div>
-              <div>
-                <span>Needs review</span>
-                <strong>{summary.reviewItems.toLocaleString()}</strong>
-              </div>
-              <div>
-                <span>Will import</span>
-                <strong>{summary.exportItems.toLocaleString()}</strong>
-              </div>
-            </section>
-
-            <section className="inventory-card inventory-import-review-card">
-              <div className="inventory-import-review-actions">
-                <div className="inventory-filter-group" aria-label="Review filters">
-                  <ReviewFilterButton
-                    active={filter === 'review'}
-                    label="Needs review"
-                    count={summary.reviewItems}
-                    onClick={() => setFilter('review')}
-                  />
-                  <ReviewFilterButton
-                    active={filter === 'included'}
-                    label="Included"
-                    count={summary.exportItems}
-                    onClick={() => setFilter('included')}
-                  />
-                  <ReviewFilterButton
-                    active={filter === 'excluded'}
-                    label="Excluded"
-                    count={summary.excludedItems}
-                    onClick={() => setFilter('excluded')}
-                  />
-                  <ReviewFilterButton
-                    active={filter === 'all'}
-                    label="All"
-                    count={items.length}
-                    onClick={() => setFilter('all')}
-                  />
-                </div>
-
-                <label className="inventory-search-control inventory-import-review-search">
-                  <span>Search</span>
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Name, Aloha #, category…"
-                  />
-                </label>
-              </div>
-
-              {filteredItems.length === 0 ? (
-                <p className="inventory-empty-state">
-                  {filter === 'review'
-                    ? 'Nothing in this import currently needs review.'
-                    : 'No items match these filters.'}
-                </p>
-              ) : (
-                <div className="inventory-table-wrap">
-                  <table className="inventory-table inventory-import-review-table">
-                    <thead>
-                      <tr>
-                        <th>Item</th>
-                        <th>Aloha category</th>
-                        <th>Toast category</th>
-                        <th>Price</th>
-                        <th>Happy hour</th>
-                        <th>Import</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pageItems.map((item) => (
-                        <tr key={item.id}>
-                          <td>
-                            <strong>{item.name}</strong>
-                            {item.sourceItemNumber ? <span>#{item.sourceItemNumber}</span> : null}
-                            {item.notes.length ? <span>{item.notes.join(' · ')}</span> : null}
-                          </td>
-                          <td>{item.category || 'Uncategorized'}</td>
-                          <td>{item.toastCategory}</td>
-                          <td>{formatCurrency(item.basePriceCents)}</td>
-                          <td>{item.happyHourPriceCents === null ? '—' : formatCurrency(item.happyHourPriceCents)}</td>
-                          <td>
+                    <section className="inventory-import-drop-card">
+                      <div>
+                        <strong>Aloha CSV</strong>
+                        <p>Choose the menu-price export from Aloha. Nothing is saved until you approve the import.</p>
+                      </div>
+                      {canImportExport ? (
+                        <label className="inventory-upload-control">
+                          <span>{importFile ? 'Choose another CSV' : 'Choose Aloha CSV'}</span>
+                          <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
+                        </label>
+                      ) : null}
+                    </section>
+            
+                    {error ? <p className="inventory-error inventory-import-message">{error}</p> : null}
+            
+                    {importFile ? (
+                      <>
+                        <section className="inventory-import-review-summary">
+                          <div>
+                            <span>File</span>
+                            <strong>{importFile.sourceName}</strong>
+                          </div>
+                          <div>
+                            <span>Items</span>
+                            <strong>{summary.normalizedItems.toLocaleString()}</strong>
+                          </div>
+                          <div>
+                            <span>Needs review</span>
+                            <strong>{summary.reviewItems.toLocaleString()}</strong>
+                          </div>
+                          <div>
+                            <span>Will import</span>
+                            <strong>{summary.exportItems.toLocaleString()}</strong>
+                          </div>
+                        </section>
+            
+                        <section className="inventory-card inventory-import-review-card">
+                          <div className="inventory-import-review-actions">
+                            <div className="inventory-filter-group" aria-label="Review filters">
+                              <ReviewFilterButton
+                                active={filter === 'review'}
+                                label="Needs review"
+                                count={summary.reviewItems}
+                                onClick={() => setFilter('review')}
+                              />
+                              <ReviewFilterButton
+                                active={filter === 'included'}
+                                label="Included"
+                                count={summary.exportItems}
+                                onClick={() => setFilter('included')}
+                              />
+                              <ReviewFilterButton
+                                active={filter === 'excluded'}
+                                label="Excluded"
+                                count={summary.excludedItems}
+                                onClick={() => setFilter('excluded')}
+                              />
+                              <ReviewFilterButton
+                                active={filter === 'all'}
+                                label="All"
+                                count={items.length}
+                                onClick={() => setFilter('all')}
+                              />
+                            </div>
+            
+                            <label className="inventory-search-control inventory-import-review-search">
+                              <span>Search</span>
+                              <input
+                                type="search"
+                                value={query}
+                                onChange={(event) => setQuery(event.target.value)}
+                                placeholder="Name, Aloha #, category…"
+                              />
+                            </label>
+                          </div>
+            
+                          {filteredItems.length === 0 ? (
+                            <p className="inventory-empty-state">
+                              {filter === 'review'
+                                ? 'Nothing in this import currently needs review.'
+                                : 'No items match these filters.'}
+                            </p>
+                          ) : (
+                            <div className="inventory-table-wrap">
+                              <table className="inventory-table inventory-import-review-table">
+                                <thead>
+                                  <tr>
+                                    <th>Item</th>
+                                    <th>Aloha category</th>
+                                    <th>Toast category</th>
+                                    <th>Price</th>
+                                    <th>Happy hour</th>
+                                    <th>Import</th>
+                                    <th />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pageItems.map((item) => (
+                                    <tr key={item.id}>
+                                      <td>
+                                        <strong>{item.name}</strong>
+                                        {item.sourceItemNumber ? <span>#{item.sourceItemNumber}</span> : null}
+                                        {item.notes.length ? <span>{item.notes.join(' · ')}</span> : null}
+                                      </td>
+                                      <td>{item.category || 'Uncategorized'}</td>
+                                      <td>{item.toastCategory}</td>
+                                      <td>{formatCurrency(item.basePriceCents)}</td>
+                                      <td>{item.happyHourPriceCents === null ? '—' : formatCurrency(item.happyHourPriceCents)}</td>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className={item.exportIncluded ? 'inventory-import-toggle is-on' : 'inventory-import-toggle'}
+                                          onClick={() =>
+                                            updateItem(item.id, { exportIncluded: !item.exportIncluded })
+                                          }
+                                        >
+                                          {item.exportIncluded ? 'Included' : 'Excluded'}
+                                        </button>
+                                      </td>
+                                      <td className="inventory-catalog-action-cell">
+                                        <button
+                                          type="button"
+                                          className="inventory-row-action"
+                                          onClick={() => setSelectedItemId(item.id)}
+                                        >
+                                          Edit
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+            
+                          {filteredItems.length > PAGE_SIZE ? (
+                            <div className="inventory-import-review-pagination">
+                              <span>
+                                Showing {(pageStart + 1).toLocaleString()}–{pageEnd.toLocaleString()} of {filteredItems.length.toLocaleString()}
+                              </span>
+                              <div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                                  disabled={clampedPage <= 1}
+                                >
+                                  Previous
+                                </button>
+                                <span>Page {clampedPage.toLocaleString()} of {pageCount.toLocaleString()}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+                                  disabled={clampedPage >= pageCount}
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+            
+                          <div className="inventory-import-review-footer">
+                            <div>
+                              {saveMessage ? (
+                                <p className={saveState === 'error' ? 'inventory-error' : 'inventory-save-success'}>
+                                  {saveMessage}
+                                </p>
+                              ) : (
+                                <p>
+                                  Saving creates or updates the source mappings for {activeOrganization?.name ?? 'the selected organization'}.
+                                </p>
+                              )}
+                            </div>
                             <button
                               type="button"
-                              className={item.exportIncluded ? 'inventory-import-toggle is-on' : 'inventory-import-toggle'}
-                              onClick={() =>
-                                updateItem(item.id, { exportIncluded: !item.exportIncluded })
+                              className="inventory-primary-button"
+                              disabled={
+                                saveState === 'saving' ||
+                                !activeOrganization?.id ||
+                                items.length === 0
                               }
+                              onClick={() => void saveImport()}
                             >
-                              {item.exportIncluded ? 'Included' : 'Excluded'}
+                              {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save to Inventory'}
                             </button>
-                          </td>
-                          <td className="inventory-catalog-action-cell">
-                            <button
-                              type="button"
-                              className="inventory-row-action"
-                              onClick={() => setSelectedItemId(item.id)}
-                            >
-                              Edit
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {filteredItems.length > PAGE_SIZE ? (
-                <div className="inventory-import-review-pagination">
-                  <span>
-                    Showing {(pageStart + 1).toLocaleString()}–{pageEnd.toLocaleString()} of {filteredItems.length.toLocaleString()}
-                  </span>
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setPage((current) => Math.max(1, current - 1))}
-                      disabled={clampedPage <= 1}
-                    >
-                      Previous
-                    </button>
-                    <span>Page {clampedPage.toLocaleString()} of {pageCount.toLocaleString()}</span>
-                    <button
-                      type="button"
-                      onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-                      disabled={clampedPage >= pageCount}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="inventory-import-review-footer">
-                <div>
-                  {saveMessage ? (
-                    <p className={saveState === 'error' ? 'inventory-error' : 'inventory-save-success'}>
-                      {saveMessage}
-                    </p>
-                  ) : (
-                    <p>
-                      Saving creates or updates the source mappings for {activeOrganization?.name ?? 'the selected organization'}.
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="inventory-primary-button"
-                  disabled={
-                    saveState === 'saving' ||
-                    !activeOrganization?.id ||
-                    items.length === 0
-                  }
-                  onClick={() => void saveImport()}
-                >
-                  {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save to Inventory'}
-                </button>
-              </div>
-            </section>
+                          </div>
+                        </section>
+                      </>
+                    ) : (
+                      <section className="inventory-empty-workflow">
+                        <strong>No import loaded</strong>
+                        <p>Choose an Aloha CSV above, or use Toast workbook import.</p>
+                      </section>
+                    )}
+            
+                    {selectedItem ? (
+                      <ImportItemDrawer
+                        item={selectedItem}
+                        onChange={updateItem}
+                        onClose={() => setSelectedItemId(null)}
+                      />
+                    ) : null}
+            
           </>
+        ) : workspace === 'history' ? (
+          <ImportHistoryPanel />
         ) : (
-          <section className="inventory-empty-workflow">
-            <strong>No import loaded</strong>
-            <p>Choose an Aloha CSV above, or use Toast workbook import.</p>
-          </section>
+          <ReconcilePanel />
         )}
-
-        {selectedItem ? (
-          <ImportItemDrawer
-            item={selectedItem}
-            onChange={updateItem}
-            onClose={() => setSelectedItemId(null)}
-          />
-        ) : null}
       </section>
     </AuthenticatedInventoryShell>
   )
