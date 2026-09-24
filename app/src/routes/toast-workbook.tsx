@@ -238,59 +238,60 @@ function ToastWorkbook() {
 
   return (
       <section className="inventory-content">
-        <header className="inventory-hero">
-          <p className="inventory-kicker">Toast workbook</p>
-          <h1>Populate Toast template</h1>
-          <p>
-            Populate a fresh copy of the bundled, unaltered Toast Menu Template using the
-            selected organization's persistent Inventory catalog. Review CSV and raw Aloha
-            uploads remain available as manual fallbacks.
-          </p>
+        <header className="inventory-page-heading">
+          <div>
+            <p className="inventory-kicker">Export to Toast</p>
+            <h1>Export to Toast</h1>
+            <p>
+              Build a fresh Toast workbook from the selected organization's current Inventory catalog.
+            </p>
+          </div>
         </header>
 
         <section className="inventory-card inventory-import-card">
           <div>
-            <p className="inventory-kicker">Step 1</p>
-            <h2>Reviewed menu state</h2>
-            <p>
-              The persistent Inventory catalog is loaded automatically for the selected
-              organization. You can still upload <strong>toast-export-review.csv</strong> or a
-              raw Aloha CSV as a temporary manual override for this workbook session.
-            </p>
+            <p className="inventory-kicker">Catalog source</p>
+            <h2>{activeOrganization?.name ?? 'Selected organization'}</h2>
             {catalogLoading ? (
-              <p>Loading persistent Inventory catalog…</p>
+              <p>Loading Inventory catalog…</p>
             ) : reviewSource === 'catalog' ? (
-              <p>
-                Using the persistent Inventory catalog for {activeOrganization?.name ?? 'the selected organization'}.
-              </p>
+              <p>The current Inventory catalog is ready for export.</p>
             ) : reviewSource === 'saved' ? (
               <p>
                 Using saved reviewed state{reviewSavedAt ? ` from ${new Date(reviewSavedAt).toLocaleString()}` : ''}.
               </p>
             ) : reviewSource === 'review-csv' ? (
-              <p>Using restored reviewed rows from toast-export-review.csv.</p>
+              <p>Using an advanced review CSV override for this export session.</p>
             ) : reviewSource === 'uploaded' ? (
-              <p>Using the raw Aloha CSV uploaded on this workbook page.</p>
+              <p>Using an advanced source-file override for this export session.</p>
             ) : (
-              <p>No reviewed state found yet. Upload toast-export-review.csv or go to Menu Items to review the Aloha CSV.</p>
+              <p>No Inventory catalog rows are available for export yet.</p>
             )}
-          </div>
-          <div className="inventory-upload-stack">
-            <label className="inventory-upload-control">
-              <span>Choose toast-export-review.csv</span>
-              <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
-            </label>
-            <label className="inventory-upload-control">
-              <span>Choose raw Aloha CSV</span>
-              <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
-            </label>
           </div>
           {alohaError ? <p className="inventory-error">{alohaError}</p> : null}
         </section>
 
+        <details className="inventory-card inventory-export-advanced">
+          <summary>Advanced source override</summary>
+          <p>
+            Normally this page exports directly from Inventory. Use these only when testing or
+            restoring an older review session.
+          </p>
+          <div className="inventory-upload-stack">
+            <label className="inventory-upload-control">
+              <span>Choose review CSV</span>
+              <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
+            </label>
+            <label className="inventory-upload-control">
+              <span>Choose source CSV</span>
+              <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
+            </label>
+          </div>
+        </details>
+
         {items.length > 0 ? (
           <>
-            <section className="inventory-summary-grid" aria-label="Aloha import summary">
+            <section className="inventory-summary-grid" aria-label="Toast export summary">
               <SummaryCard label="Source rows" value={summary.rawRows} />
               <SummaryCard label="Normalized items" value={summary.normalizedItems} />
               <SummaryCard label="Exporting" value={summary.exportItems} />
@@ -328,8 +329,8 @@ function ToastWorkbook() {
 
         <section className="inventory-card inventory-import-card">
           <div>
-            <p className="inventory-kicker">Step 2</p>
-            <h2>Toast source template</h2>
+            <p className="inventory-kicker">Workbook template</p>
+            <h2>Fresh Toast template</h2>
             <p>
               Inventory automatically loads the repository's pristine Toast Menu Template.
               Export generation writes menu values into its existing cells without renaming
@@ -345,8 +346,8 @@ function ToastWorkbook() {
         <section className="inventory-card inventory-export-panel">
           <div className="inventory-table-heading">
             <div>
-              <p className="inventory-kicker">Step 3</p>
-              <h2>Download populated workbook</h2>
+              <p className="inventory-kicker">Ready to export</p>
+              <h2>Download Toast workbook</h2>
             </div>
             <p>Writes Beer and Liquor tab values.</p>
           </div>
