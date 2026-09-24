@@ -7,9 +7,6 @@ import tailwindcss from '@tailwindcss/vite'
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
-  optimizeDeps: {
-    exclude: ['@niteowl/ui', '@niteowl/app-config'],
-  },
   server: {
     allowedHosts: [
       'inventory.mccarthysirishpub.com',
