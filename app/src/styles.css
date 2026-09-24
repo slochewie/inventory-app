@@ -1091,6 +1091,42 @@ select {
   font-weight: 800;
 }
 
+.inventory-import-workspace-tabs {
+  display: flex;
+  width: min(100%, 96rem);
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.inventory-import-workspace-tabs button {
+  cursor: pointer;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #6b7280;
+  padding: 0.7rem 0.85rem;
+  font-weight: 800;
+}
+
+.inventory-import-workspace-tabs button:hover {
+  color: #111827;
+}
+
+.inventory-import-workspace-tabs button.is-active {
+  border-bottom-color: #111827;
+  color: #111827;
+}
+
+.inventory-import-workspace {
+  width: min(100%, 96rem);
+}
+
+.inventory-import-workspace > .inventory-summary-grid,
+.inventory-import-workspace > .inventory-card {
+  width: 100%;
+}
+
 .inventory-import-drop-card {
   display: flex;
   width: min(100%, 96rem);
