@@ -61,6 +61,7 @@ function Home() {
     "idle" | "saving" | "saved" | "error"
   >("idle")
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [itemSaveError, setItemSaveError] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const toastExportFiles = useMemo(() => buildToastExportFiles(items), [items])
@@ -252,6 +253,61 @@ function Home() {
     setItems((currentItems) => currentItems.map((item) => (
       item.id === itemId ? { ...item, ...patch } : item
     )))
+
+    if (
+      importFile?.meta?.source !== 'inventory-catalog' ||
+      !activeOrganization?.id
+    ) {
+      return
+    }
+
+    const currentItem = items.find((item) => item.id === itemId)
+    if (!currentItem) return
+
+    const payload: Parameters<typeof updateInventoryOrganizationVariant>[0] = {
+      organizationId: activeOrganization.id,
+      variantId: itemId,
+    }
+
+    if (Object.hasOwn(patch, 'exportIncluded')) {
+      payload.enabled = true
+      payload.exportToToast = patch.exportIncluded
+    }
+
+    if (Object.hasOwn(patch, 'basePriceCents')) {
+      payload.priceOverrideCents = patch.basePriceCents ?? null
+    }
+
+    if (Object.hasOwn(patch, 'happyHourPriceCents')) {
+      payload.happyHourPriceCents = patch.happyHourPriceCents ?? null
+    }
+
+    if (Object.hasOwn(patch, 'name')) {
+      payload.toastNameOverride =
+        patch.name && patch.name !== currentItem.name
+          ? patch.name
+          : null
+    }
+
+    if (Object.hasOwn(patch, 'toastCategory')) {
+      payload.toastCategoryOverride = patch.toastCategory ?? null
+    }
+
+    if (Object.hasOwn(patch, 'toastDestination')) {
+      payload.toastDestinationOverride = patch.toastDestination ?? null
+    }
+
+    if (Object.keys(payload).length <= 2) return
+
+    setItemSaveError(null)
+
+    void updateInventoryOrganizationVariant(payload).catch((error) => {
+      setItemSaveError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save the Inventory item.',
+      )
+    })
   }
 
   function updateFilteredItems(patch: Partial<NormalizedMenuItem>) {
@@ -413,6 +469,7 @@ function Home() {
 
           {catalogError ? <p className="inventory-error">{catalogError}</p> : null}
           {importError ? <p className="inventory-error">{importError}</p> : null}
+          {itemSaveError ? <p className="inventory-error">{itemSaveError}</p> : null}
         </section>
 
         {importFile ? (
