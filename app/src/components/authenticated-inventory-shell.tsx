@@ -102,7 +102,7 @@ function AuthenticatedInventoryShellInner({
   const [switchingToken, setSwitchingToken] = useState<string | null>(null)
   const {
     open: sidebarOpen,
-    toggleSidebar,
+    setOpen: setSidebarOpen,
     hydrated: sidebarHydrated,
   } = useNiteOwlSidebar()
   const accountMenuRef = useRef<HTMLDetailsElement>(null)
@@ -309,7 +309,7 @@ function AuthenticatedInventoryShellInner({
       <InventorySidebar
         currentPath={currentPath}
         open={sidebarOpen}
-        onToggle={toggleSidebar}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
         canImportExport={canImportExport}
         canEdit={canEdit}
         canManageAssignments={canManageAssignments}
@@ -320,7 +320,7 @@ function AuthenticatedInventoryShellInner({
           <button
             type="button"
             className="inventory-header-sidebar-trigger"
-            onClick={toggleSidebar}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
