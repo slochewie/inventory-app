@@ -672,7 +672,7 @@ function Home() {
 
                 <div className="inventory-filter-panel">
                   <label className="inventory-search-control">
-                    <span>{isPersistentCatalog ? 'Variant' : 'Aloha category'}</span>
+                    <span>{isPersistentCatalog ? 'Type' : 'Aloha category'}</span>
                     <select value={categoryFilter} onChange={handleCategoryChange}>
                       <option value={ALL_CATEGORIES}>All categories ({items.length.toLocaleString()})</option>
                       {categoryOptions.map((option) => (
@@ -1185,6 +1185,10 @@ function getReviewFilterKey(
 ) {
   if (!persistentCatalog) return getCategoryKey(item.category)
 
+  if (item.variantKind === 'standard') {
+    return `category:${getCategoryKey(item.category)}`
+  }
+
   return `variant:${getVariantDisplayLabel(item)}`
 }
 
@@ -1193,7 +1197,16 @@ function getReviewFilterLabel(
   persistentCatalog: boolean,
 ) {
   if (!persistentCatalog) return getCategoryLabel(key)
-  return key.startsWith('variant:') ? key.slice('variant:'.length) : key
+
+  if (key.startsWith('variant:')) {
+    return key.slice('variant:'.length)
+  }
+
+  if (key.startsWith('category:')) {
+    return getCategoryLabel(key.slice('category:'.length))
+  }
+
+  return key
 }
 
 function getCategoryKey(category?: string) {
