@@ -534,11 +534,6 @@ function writeCellValue(sheetDoc: Document, column: number, rowNumber: number, v
   setCellValue(sheetDoc, cell, value)
 }
 
-function writeCellValueWithStyleSource(sheetDoc: Document, column: number, rowNumber: number, value: string | number, styleSourceColumn: number) {
-  const cell = getOrCreateCellWithStyleSource(sheetDoc, column, rowNumber, styleSourceColumn)
-  setCellValue(sheetDoc, cell, value)
-}
-
 function setCellValue(sheetDoc: Document, cell: Element, value: string | number) {
   removeChildren(cell, ['v', 'is'])
 
@@ -580,22 +575,6 @@ function getOrCreateCell(sheetDoc: Document, column: number, rowNumber: number, 
   if (styleId) cell.setAttribute('s', styleId)
 
   insertCellSorted(row, cell, column)
-  return cell
-}
-
-function getOrCreateCellWithStyleSource(sheetDoc: Document, column: number, rowNumber: number, styleSourceColumn: number) {
-  const row = getOrCreateRow(sheetDoc, rowNumber)
-  const reference = `${numberToColumnLetters(column)}${rowNumber}`
-  const existing = findCellInRow(row, reference)
-  if (existing) {
-    copyStyleFromSource(sheetDoc, existing, styleSourceColumn, rowNumber)
-    return existing
-  }
-
-  const cell = sheetDoc.createElementNS(SPREADSHEET_NS, 'c')
-  cell.setAttribute('r', reference)
-  copyStyleFromSource(sheetDoc, cell, styleSourceColumn, rowNumber)
-  insertCellSorted(row, cell)
   return cell
 }
 
