@@ -30,27 +30,87 @@ export function AuthenticatedInventoryShell({
   const [accessState, setAccessState] = useState<
     "idle" | "checking" | "allowed" | "denied" | "error"
   >("idle")
+  const [allowedOrganizationIds, setAllowedOrganizationIds] = useState<Set<string> | null>(null)
+
+  const visibleOrganizations = (organizations ?? []).filter((organization) =>
+    allowedOrganizationIds?.has(organization.id) ?? false,
+  )
+
+  useEffect(() => {
+    if (!session || areOrganizationsPending) {
+      setAllowedOrganizationIds(null)
+      return
+    }
+
+    const controller = new AbortController()
+
+    void Promise.all(
+      (organizations ?? []).map(async (organization) => {
+        try {
+          const access = await getInventoryAccess(
+            organization.id,
+            controller.signal,
+          )
+
+          return access.allowed ? organization.id : null
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            throw error
+          }
+
+          return null
+        }
+      }),
+    )
+      .then((organizationIds) => {
+        if (controller.signal.aborted) return
+
+        setAllowedOrganizationIds(
+          new Set(
+            organizationIds.filter(
+              (organizationId): organizationId is string =>
+                organizationId !== null,
+            ),
+          ),
+        )
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setAllowedOrganizationIds(new Set())
+      })
+
+    return () => controller.abort()
+  }, [areOrganizationsPending, organizations, session])
 
   useEffect(() => {
     if (
       !session ||
       areOrganizationsPending ||
       isActiveOrganizationPending ||
-      activeOrganization ||
-      organizations?.length !== 1
+      allowedOrganizationIds === null
     ) {
       return
     }
 
+    const activeIsAllowed =
+      !!activeOrganization &&
+      allowedOrganizationIds.has(activeOrganization.id)
+
+    if (activeIsAllowed) return
+
+    const nextOrganization = visibleOrganizations[0]
+    if (!nextOrganization) return
+
     void authClient.organization.setActive({
-      organizationId: organizations[0].id,
+      organizationId: nextOrganization.id,
     })
   }, [
     activeOrganization,
+    allowedOrganizationIds,
     areOrganizationsPending,
     isActiveOrganizationPending,
-    organizations,
     session,
+    visibleOrganizations,
   ])
 
   useEffect(() => {
@@ -107,35 +167,64 @@ export function AuthenticatedInventoryShell({
           <div className="inventory-auth-header-actions">
             <OrganizationSelector
               variant="compact"
-              organizations={organizations ?? []}
-              value={activeOrganization?.id}
-              loading={areOrganizationsPending || isActiveOrganizationPending}
+              organizations={visibleOrganizations}
+              value={
+                activeOrganization &&
+                allowedOrganizationIds?.has(activeOrganization.id)
+                  ? activeOrganization.id
+                  : undefined
+              }
+              loading={
+                areOrganizationsPending ||
+                isActiveOrganizationPending ||
+                allowedOrganizationIds === null
+              }
               className="inventory-auth-organization-selector"
               onValueChange={(organizationId) => {
                 void authClient.organization.setActive({ organizationId })
               }}
             />
 
-            <a
-              className="inventory-auth-account"
-              href={`${authBaseURL}/settings/account`}
-              title={displayName}
-              aria-label={`Open account settings for ${displayName}`}
-            >
-              {initials}
-            </a>
+            <details className="inventory-account-menu">
+              <summary
+                className="inventory-auth-account"
+                title={displayName}
+                aria-label={`Open account menu for ${displayName}`}
+              >
+                {session.user.image ? (
+                  <img src={session.user.image} alt="" />
+                ) : (
+                  initials
+                )}
+              </summary>
 
-            <button
-              className="inventory-auth-signout"
-              type="button"
-              onClick={() => {
-                void authClient.signOut().then(() => {
-                  window.location.assign(`${authBaseURL}/auth/sign-in`)
-                })
-              }}
-            >
-              Sign out
-            </button>
+              <div className="inventory-account-menu-content">
+                <div className="inventory-account-menu-user">
+                  <strong>{displayName}</strong>
+                  <span>{session.user.email}</span>
+                </div>
+
+                <div className="inventory-account-menu-separator" />
+
+                <a href={`${authBaseURL}/settings/account`}>Account</a>
+                <a href={`${authBaseURL}/settings/security`}>Security</a>
+                <a href={`${authBaseURL}/settings/organizations`}>Organizations</a>
+                <a href={`${authBaseURL}/settings`}>Settings</a>
+
+                <div className="inventory-account-menu-separator" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    void authClient.signOut().then(() => {
+                      window.location.assign(`${authBaseURL}/auth/sign-in`)
+                    })
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            </details>
           </div>
         </header>
 
