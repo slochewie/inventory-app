@@ -90,6 +90,7 @@ export function AuthenticatedInventoryShell({
   const {
     open: sidebarOpen,
     toggle: toggleSidebar,
+    hydrated: sidebarHydrated,
   } = useNiteOwlSidebarState()
   const accountMenuRef = useRef<HTMLDetailsElement>(null)
 
@@ -251,7 +252,7 @@ export function AuthenticatedInventoryShell({
     }
   }, [])
 
-  if (isSessionPending || !session) {
+  if (!sidebarHydrated || isSessionPending || !session) {
     return (
       <main className="inventory-auth-loading">
         <p>Checking Inventory access…</p>
