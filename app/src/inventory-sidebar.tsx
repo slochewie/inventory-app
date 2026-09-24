@@ -4,6 +4,7 @@ import {
   getDefaultAppUrls,
   getDeploymentBrand,
 } from '@niteowl/app-config'
+import { AppSidebarIdentity } from '@niteowl/ui'
 import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 
 export function InventorySidebar({
@@ -51,24 +52,12 @@ export function InventorySidebar({
       aria-label="Application navigation"
     >
       <div className="inventory-sidebar-brand-row">
-        <a className="inventory-brand" href="/" title={app.label}>
-        <span className="inventory-brand-icon" aria-hidden="true">
-          <NiteOwlNavigationIcon icon={app.icon} />
-        </span>
-        <span>
-          <span className="inventory-brand-eyebrow">{brand}</span>
-          <span className="inventory-brand-title">{app.label}</span>
-        </span>
-        </a>
-        <button
-          type="button"
-          className="inventory-sidebar-toggle"
-          onClick={onToggle}
-          aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
-          title={open ? "Collapse sidebar" : "Expand sidebar"}
-        >
-          <span aria-hidden="true">{open ? "‹" : "›"}</span>
-        </button>
+        <AppSidebarIdentity
+          href="/"
+          brand={brand}
+          appName={app.label}
+          onToggle={onToggle}
+        />
       </div>
 
       <nav className="inventory-nav">
