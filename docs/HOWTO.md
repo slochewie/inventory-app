@@ -137,17 +137,21 @@ The page can obtain reviewed menu state in three ways, in this preference order:
 
 The raw Aloha option starts from unedited normalized data, so use the review CSV when you want to preserve prior edits.
 
-## 8. Download a Toast Menu Template
+## 8. Use the bundled Toast Menu Template
 
-In Toast's Menu Bulk Import workflow, make/download a local `.xlsx` copy of the Toast Menu Template that you want this app to populate.
+The repository contains an untouched Toast Menu Template at:
 
-Do not upload a Google Sheets URL to the Inventory app. The current workbook page accepts an actual `.xlsx` file.
+```text
+toast/menu/Toast-Menu-Template-Your-Restaurant-Name.xlsx
+```
 
-## 9. Upload the Toast template
+The Inventory app mounts this source read-only and automatically loads it on `/toast-workbook`. Operators do not upload or select a template file.
 
-On `/toast-workbook`, choose the Toast `.xlsx` file.
+Each export starts from a fresh copy of that pristine workbook. The application writes menu values into existing cells only; it does not rename headers or alter the workbook structure.
 
-The application inspects the workbook and identifies the supported Beer-tab structure before writing data.
+## 9. Inspect the detected template
+
+The application inspects the bundled workbook and identifies the supported Beer-tab structure before writing data.
 
 Current workbook population covers:
 
@@ -158,9 +162,9 @@ The UI reports counts for staged Beer and Liquor export items.
 
 ## 10. Generate the populated workbook
 
-Choose **Download populated workbook**.
+Choose **Download populated XLSX** for direct review or **Download ZIP for Toast** to package that same populated workbook for sending to the Toast representative.
 
-The generated filename uses the source workbook name with a `-populated.xlsx` suffix.
+Generated filenames use the imported store/organization name when available plus a Pacific-time timestamp.
 
 Before importing anything into Toast, open the resulting workbook and inspect at minimum:
 
