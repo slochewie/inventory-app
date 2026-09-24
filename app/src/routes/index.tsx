@@ -713,6 +713,26 @@ function EditItemPanel({
   )
 }
 
+function createSavedImportFile(items: NormalizedMenuItem[], savedAt: string): ParsedMenuImport {
+  const firstItem = items[0]
+
+  return {
+    sourceKind: firstItem?.sourceKind ?? 'toast-template-sheet',
+    sourceName: 'Saved reviewed menu items',
+    rows: [],
+    warnings: [`Loaded reviewed state saved ${new Date(savedAt).toLocaleString()}`],
+    meta: {
+      store: firstItem?.rawRows?.[0]?.Store || firstItem?.rawRows?.[0]?.store || 'Saved review session',
+      savedAt,
+    },
+  }
+}
+
+function getSourceTypeLabel(sourceKind: ParsedMenuImport['sourceKind']) {
+  if (sourceKind === 'aloha-csv') return 'Aloha CSV'
+  return 'Toast template workbook'
+}
+
 function formatCentsInput(cents: number | null) {
   if (cents === null) return ''
 
