@@ -25,9 +25,11 @@ See [docs/HOWTO.md](docs/HOWTO.md) for the operator and development workflow.
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Import, normalize, review, edit, and export Aloha menu data |
-| `/toast-workbook` | Load reviewed menu state and populate a Toast Menu Template workbook |
+| `/` | Main Inventory route; this will become the authenticated/database-backed experience |
+| `/toast-workbook` | Main Toast workbook route; this will become authenticated/database-backed |
 | `/toast-template-import` | Import a populated Toast Menu Template workbook into reviewed menu state |
+| `/wip` | Frozen unauthenticated snapshot of the working Menu Items workflow for temporary manager access |
+| `/wip/toast-workbook` | Frozen unauthenticated snapshot of the working Toast workbook workflow |
 
 ## Repository layout
 
@@ -121,6 +123,12 @@ Run its tests with:
 ```bash
 bash ./bash-scripts/test-all.sh
 ```
+
+## Frozen WIP routes
+
+The `/wip` and `/wip/toast-workbook` routes are intentionally unauthenticated snapshots of the working browser workflow. They exist temporarily for location managers while the primary `/` and `/toast-workbook` routes are migrated to Better Auth and persistent Inventory database storage.
+
+Do not add Better Auth or database requirements to the WIP routes.
 
 ## Status
 
