@@ -1,12 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { type ChangeEvent, useMemo, useState } from 'react'
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { InventorySidebar } from '#/inventory-sidebar'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
 import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
 import { buildPopulatedToastTemplateWorkbookWithLiquorAsync } from '#/features/menu-import/toast-template-liquor-workbook'
 import {
-  downloadPopulatedToastWorkbook,
+  buildToastWorkbookFilename,
+  buildToastWorkbookZip,
+  downloadToastWorkbookFile,
   inspectToastTemplateWorkbook,
   type ToastTemplateWorkbookInfo,
 } from '#/features/menu-import/toast-template-workbook'
@@ -17,6 +19,9 @@ import {
 } from '#/features/menu-import/types'
 
 export const Route = createFileRoute('/toast-workbook')({ component: ToastWorkbook })
+
+const TOAST_TEMPLATE_FILE_NAME = 'Toast-Menu-Template-Your-Restaurant-Name.xlsx'
+const TOAST_TEMPLATE_URL = `/toast/menu/${TOAST_TEMPLATE_FILE_NAME}`
 
 type WorkbookState = {
   fileName: string
@@ -38,6 +43,48 @@ function ToastWorkbook() {
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const beerExportItemCount = items.filter((item) => item.exportIncluded && item.toastCategory === 'Beer').length
   const liquorExportItemCount = items.filter((item) => item.exportIncluded && isLiquorItem(item)).length
+  const organizationName = importFile?.meta?.store?.trim() || 'Organization'
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadToastTemplate() {
+      setWorkbookError(null)
+
+      try {
+        const response = await fetch(TOAST_TEMPLATE_URL)
+        if (!response.ok) {
+          throw new Error(`Unable to load the bundled Toast template (${response.status})`)
+        }
+
+        const arrayBuffer = await response.arrayBuffer()
+        const info = inspectToastTemplateWorkbook(arrayBuffer, TOAST_TEMPLATE_FILE_NAME)
+
+        if (!cancelled) {
+          setWorkbook({
+            fileName: TOAST_TEMPLATE_FILE_NAME,
+            arrayBuffer,
+            info,
+          })
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setWorkbook(null)
+          setWorkbookError(
+            error instanceof Error
+              ? error.message
+              : 'Unable to load the bundled Toast template workbook',
+          )
+        }
+      }
+    }
+
+    void loadToastTemplate()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleAlohaCsvChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -90,36 +137,37 @@ function ToastWorkbook() {
     }
   }
 
-  async function handleWorkbookChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
+  async function buildPopulatedWorkbook() {
+    if (!workbook) throw new Error('Toast source template is not loaded')
 
-    setWorkbookError(null)
-    setDownloadError(null)
-
-    try {
-      const arrayBuffer = await file.arrayBuffer()
-      const info = inspectToastTemplateWorkbook(arrayBuffer, file.name)
-      setWorkbook({ fileName: file.name, arrayBuffer, info })
-    } catch (error) {
-      setWorkbook(null)
-      setWorkbookError(error instanceof Error ? error.message : 'Unable to inspect the selected Toast template workbook')
-    }
+    return buildPopulatedToastTemplateWorkbookWithLiquorAsync({
+      templateArrayBuffer: workbook.arrayBuffer.slice(0),
+      items,
+    })
   }
 
   async function handleDownloadWorkbook() {
-    if (!workbook) return
-
     setDownloadError(null)
 
     try {
-      const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
-        templateArrayBuffer: workbook.arrayBuffer,
-        items,
-      })
-      downloadPopulatedToastWorkbook(workbook.fileName, populatedWorkbook)
+      const populatedWorkbook = await buildPopulatedWorkbook()
+      const filename = buildToastWorkbookFilename(organizationName)
+      downloadToastWorkbookFile(filename, populatedWorkbook)
     } catch (error) {
       setDownloadError(error instanceof Error ? error.message : 'Unable to populate the Toast workbook')
+    }
+  }
+
+  async function handleDownloadWorkbookZip() {
+    setDownloadError(null)
+
+    try {
+      const populatedWorkbook = await buildPopulatedWorkbook()
+      const workbookFilename = buildToastWorkbookFilename(organizationName)
+      const zip = await buildToastWorkbookZip(workbookFilename, populatedWorkbook)
+      downloadToastWorkbookFile(workbookFilename.replace(/\.xlsx$/i, '.zip'), zip)
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : 'Unable to package the Toast workbook')
     }
   }
 
@@ -132,8 +180,8 @@ function ToastWorkbook() {
           <p className="inventory-kicker">Toast workbook</p>
           <h1>Populate Toast template</h1>
           <p>
-            Upload a downloaded Toast Menu Template workbook. This page uses reviewed menu rows
-            from the main Inventory page or a saved toast-export-review.csv file.
+            Populate a fresh copy of the bundled, unaltered Toast Menu Template using reviewed
+            menu rows from the main Inventory page or a saved toast-export-review.csv file.
           </p>
         </header>
 
@@ -204,16 +252,14 @@ function ToastWorkbook() {
         <section className="inventory-card inventory-import-card">
           <div>
             <p className="inventory-kicker">Step 2</p>
-            <h2>Toast template workbook</h2>
+            <h2>Toast source template</h2>
             <p>
-              Use a downloaded .xlsx copy of the Toast Menu Template. The workbook writer now
-              fills the Beer and Liquor tabs from reviewed export-included rows.
+              Inventory automatically loads the repository's pristine Toast Menu Template.
+              Export generation writes menu values into its existing cells without renaming
+              headers or changing the workbook structure.
             </p>
+            <p><strong>{TOAST_TEMPLATE_FILE_NAME}</strong></p>
           </div>
-          <label className="inventory-upload-control">
-            <span>Choose Toast .xlsx</span>
-            <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleWorkbookChange} />
-          </label>
           {workbookError ? <p className="inventory-error">{workbookError}</p> : null}
         </section>
 
@@ -229,19 +275,30 @@ function ToastWorkbook() {
           </div>
 
           <p>
-            The populated workbook is generated from the current reviewed menu rows and the
-            uploaded Toast template workbook. Later passes can add Wine, Cocktails, NA Bev,
-            Menu Build, Modifier Build, and Liquor Mods tabs.
+            Each download starts from a fresh in-memory copy of the pristine source template.
+            The XLSX is ready for review, while the ZIP contains that same populated workbook
+            packaged for sending to the Toast representative.
           </p>
 
-          <button
-            className="inventory-template-download"
-            type="button"
-            disabled={!workbook || items.length === 0}
-            onClick={handleDownloadWorkbook}
-          >
-            Download populated Toast workbook
-          </button>
+          <div className="inventory-upload-stack">
+            <button
+              className="inventory-template-download"
+              type="button"
+              disabled={!workbook || items.length === 0}
+              onClick={handleDownloadWorkbook}
+            >
+              Download populated XLSX
+            </button>
+
+            <button
+              className="inventory-template-download"
+              type="button"
+              disabled={!workbook || items.length === 0}
+              onClick={handleDownloadWorkbookZip}
+            >
+              Download ZIP for Toast
+            </button>
+          </div>
 
           {downloadError ? <p className="inventory-error">{downloadError}</p> : null}
         </section>
