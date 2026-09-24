@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
-import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
+import {
+  AuthenticatedInventoryShell,
+  useInventoryAccessRole,
+} from '#/components/authenticated-inventory-shell'
 import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
 import { authClient } from '#/lib/auth-client'
 import { listInventoryCatalog } from '#/lib/inventory-access'
@@ -33,6 +36,7 @@ type WorkbookState = {
 }
 
 function ToastWorkbook() {
+  const { canImportExport } = useInventoryAccessRole()
   const savedReviewSession = useMemo(() => loadReviewSession(), [])
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(savedReviewSession?.importFile ?? null)
@@ -136,6 +140,8 @@ function ToastWorkbook() {
   }, [])
 
   async function handleAlohaCsvChange(event: ChangeEvent<HTMLInputElement>) {
+    if (!canImportExport) return
+
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -162,6 +168,8 @@ function ToastWorkbook() {
   }
 
   async function handleReviewCsvChange(event: ChangeEvent<HTMLInputElement>) {
+    if (!canImportExport) return
+
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -196,6 +204,8 @@ function ToastWorkbook() {
   }
 
   async function handleDownloadWorkbook() {
+    if (!canImportExport) return
+
     setDownloadError(null)
 
     try {
@@ -208,6 +218,8 @@ function ToastWorkbook() {
   }
 
   async function handleDownloadWorkbookZip() {
+    if (!canImportExport) return
+
     setDownloadError(null)
 
     try {
@@ -260,16 +272,20 @@ function ToastWorkbook() {
               <p>No reviewed state found yet. Upload toast-export-review.csv or go to Menu Items to review the Aloha CSV.</p>
             )}
           </div>
-          <div className="inventory-upload-stack">
-            <label className="inventory-upload-control">
-              <span>Choose toast-export-review.csv</span>
-              <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
-            </label>
-            <label className="inventory-upload-control">
-              <span>Choose raw Aloha CSV</span>
-              <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
-            </label>
-          </div>
+          {canImportExport ? (
+            <div className="inventory-upload-stack">
+              <label className="inventory-upload-control">
+                <span>Choose toast-export-review.csv</span>
+                <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
+              </label>
+              <label className="inventory-upload-control">
+                <span>Choose raw Aloha CSV</span>
+                <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
+              </label>
+            </div>
+          ) : (
+            <p className="inventory-readonly-note">Viewer access is read-only.</p>
+          )}
           {alohaError ? <p className="inventory-error">{alohaError}</p> : null}
         </section>
 
@@ -346,7 +362,7 @@ function ToastWorkbook() {
             <button
               className="inventory-template-download"
               type="button"
-              disabled={!workbook || items.length === 0}
+              disabled={!canImportExport || !workbook || items.length === 0}
               onClick={handleDownloadWorkbook}
             >
               Download populated XLSX
@@ -355,7 +371,7 @@ function ToastWorkbook() {
             <button
               className="inventory-template-download"
               type="button"
-              disabled={!workbook || items.length === 0}
+              disabled={!canImportExport || !workbook || items.length === 0}
               onClick={handleDownloadWorkbookZip}
             >
               Download ZIP for Toast
