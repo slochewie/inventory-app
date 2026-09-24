@@ -214,6 +214,24 @@ select {
   min-width: 0;
 }
 
+.inventory-auth-state {
+  max-width: 44rem;
+  margin: clamp(2rem, 8vw, 5rem) auto;
+  padding: 0 clamp(1rem, 3vw, 2rem);
+  color: #4b5563;
+}
+
+.inventory-auth-state h1 {
+  margin: 0 0 0.75rem;
+  color: #111827;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+}
+
+.inventory-auth-state p {
+  margin: 0;
+  line-height: 1.6;
+}
+
 .inventory-auth-loading {
   display: grid;
   min-height: 100vh;
