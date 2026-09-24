@@ -5,6 +5,7 @@ import { AuthenticatedInventoryShell } from '#/components/authenticated-inventor
 import { authClient } from '#/lib/auth-client'
 import {
   listInventoryCatalog,
+  persistInventoryImport,
   type InventoryCatalogRow,
 } from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
@@ -56,6 +57,10 @@ function Home() {
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [catalogOrganizationId, setCatalogOrganizationId] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle")
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const toastExportFiles = useMemo(() => buildToastExportFiles(items), [items])
@@ -297,6 +302,54 @@ function Home() {
     setPage(1)
   }
 
+
+  async function handleSaveToInventory() {
+    if (!activeOrganization?.id || !importFile || items.length === 0) return
+
+    setSaveState("saving")
+    setSaveMessage(null)
+
+    try {
+      const result = await persistInventoryImport({
+        organizationId: activeOrganization.id,
+        sourceType:
+          importFile.sourceKind === "aloha-csv"
+            ? "aloha-csv"
+            : "toast-template",
+        sourceName: importFile.sourceName,
+        items: items.map((item) => ({
+          id: item.id,
+          sourceItemNumber: item.sourceItemNumber,
+          name: item.name,
+          category: item.category,
+          toastCategory: item.toastCategory,
+          toastDestination: item.toastDestination,
+          basePriceCents: item.basePriceCents,
+          happyHourPriceCents: item.happyHourPriceCents,
+          status: item.status,
+          exportIncluded: item.exportIncluded,
+        })),
+      })
+
+      setSaveState("saved")
+      setSaveMessage(
+        "Saved " +
+          result.importedItems.toLocaleString() +
+          " items and " +
+          result.importedVariants.toLocaleString() +
+          " variants to the persistent Inventory catalog.",
+      )
+      setCatalogOrganizationId(null)
+    } catch (error) {
+      setSaveState("error")
+      setSaveMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to save the Inventory import.",
+      )
+    }
+  }
+
   return (
     <AuthenticatedInventoryShell currentPath="/">
       <section className="inventory-content">
@@ -350,7 +403,32 @@ function Home() {
             </section>
 
             <section className="inventory-card inventory-source-card">
-              <h2>{importFile.sourceName}</h2>
+              <div className="inventory-table-heading">
+                <div>
+                  <p className="inventory-kicker">Current review</p>
+                  <h2>{importFile.sourceName}</h2>
+                </div>
+
+                <button
+                  className="inventory-template-download"
+                  type="button"
+                  disabled={
+                    saveState === "saving" ||
+                    items.length === 0 ||
+                    !activeOrganization?.id
+                  }
+                  onClick={handleSaveToInventory}
+                >
+                  {saveState === "saving" ? "Saving…" : "Save to Inventory"}
+                </button>
+              </div>
+
+              {saveMessage ? (
+                <p className={saveState === "error" ? "inventory-error" : undefined}>
+                  {saveMessage}
+                </p>
+              ) : null}
+
               <dl>
                 <div>
                   <dt>Source type</dt>
