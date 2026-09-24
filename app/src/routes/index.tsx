@@ -70,12 +70,15 @@ function Home() {
   const [itemSaveError, setItemSaveError] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
+  const isPersistentCatalog = importFile?.meta?.source === 'inventory-catalog'
   const toastExportFiles = useMemo(() => buildToastExportFiles(items), [items])
   const beerPreviewItems = useMemo(() => (
     categoryFilter === ALL_CATEGORIES
       ? []
-      : items.filter((item) => getCategoryKey(item.category) === categoryFilter)
-  ), [categoryFilter, items])
+      : items.filter((item) =>
+          getReviewFilterKey(item, isPersistentCatalog) === categoryFilter,
+        )
+  ), [categoryFilter, isPersistentCatalog, items])
   const beerTabRows = useMemo(() => buildBeerTabPreviewRows(beerPreviewItems), [beerPreviewItems])
   const filterOptions = useMemo<FilterOption[]>(() => ([
     { id: 'included', label: 'Exporting', count: summary.exportItems },
@@ -92,20 +95,29 @@ function Home() {
     const counts = new Map<string, number>()
 
     items.forEach((item) => {
-      const category = getCategoryKey(item.category)
-      counts.set(category, (counts.get(category) ?? 0) + 1)
+      const key = getReviewFilterKey(item, isPersistentCatalog)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
     })
 
     return [...counts.entries()]
-      .sort(([left], [right]) => getCategoryLabel(left).localeCompare(getCategoryLabel(right)))
-      .map(([value, count]) => ({ value, label: getCategoryLabel(value), count }))
-  }, [items])
+      .sort(([left], [right]) =>
+        getReviewFilterLabel(left, isPersistentCatalog)
+          .localeCompare(getReviewFilterLabel(right, isPersistentCatalog)),
+      )
+      .map(([value, count]) => ({
+        value,
+        label: getReviewFilterLabel(value, isPersistentCatalog),
+        count,
+      }))
+  }, [isPersistentCatalog, items])
 
   const selectedCategoryItems = useMemo(() => (
     categoryFilter === ALL_CATEGORIES
       ? []
-      : items.filter((item) => getCategoryKey(item.category) === categoryFilter)
-  ), [categoryFilter, items])
+      : items.filter((item) =>
+          getReviewFilterKey(item, isPersistentCatalog) === categoryFilter,
+        )
+  ), [categoryFilter, isPersistentCatalog, items])
 
   const selectedCategoryToastCategory = selectedCategoryItems[0]?.toastCategory ?? ''
 
@@ -202,7 +214,10 @@ function Home() {
       if (filter === 'happy-hour' && item.happyHourPriceCents === null) return false
       if (filter === 'ignored' && item.status !== 'ignored') return false
 
-      if (categoryFilter !== ALL_CATEGORIES && getCategoryKey(item.category) !== categoryFilter) {
+      if (
+        categoryFilter !== ALL_CATEGORIES &&
+        getReviewFilterKey(item, isPersistentCatalog) !== categoryFilter
+      ) {
         return false
       }
 
@@ -215,7 +230,7 @@ function Home() {
         item.notes.join(' '),
       ].some((value) => value?.toLowerCase().includes(normalizedQuery))
     })
-  }, [categoryFilter, filter, items, query])
+  }, [categoryFilter, filter, isPersistentCatalog, items, query])
 
   const filteredItemIds = useMemo(() => new Set(filteredItems.map((item) => item.id)), [filteredItems])
   const filteredItemGroups = useMemo(() => groupMenuItems(filteredItems), [filteredItems])
@@ -400,7 +415,9 @@ function Home() {
     if (categoryFilter === ALL_CATEGORIES) return
 
     const itemIds = items
-      .filter((item) => getCategoryKey(item.category) === categoryFilter)
+      .filter((item) =>
+        getReviewFilterKey(item, isPersistentCatalog) === categoryFilter,
+      )
       .map((item) => item.id)
     const itemIdSet = new Set(itemIds)
 
@@ -655,7 +672,7 @@ function Home() {
 
                 <div className="inventory-filter-panel">
                   <label className="inventory-search-control">
-                    <span>Aloha category</span>
+                    <span>{isPersistentCatalog ? 'Variant' : 'Aloha category'}</span>
                     <select value={categoryFilter} onChange={handleCategoryChange}>
                       <option value={ALL_CATEGORIES}>All categories ({items.length.toLocaleString()})</option>
                       {categoryOptions.map((option) => (
@@ -678,7 +695,7 @@ function Home() {
                 </div>
               </div>
 
-              {canEdit && categoryFilter !== ALL_CATEGORIES ? (
+              {canEdit && !isPersistentCatalog && categoryFilter !== ALL_CATEGORIES ? (
                 <section className="inventory-category-rule-panel">
                   <div>
                     <p className="inventory-kicker">Toast category rule</p>
@@ -733,7 +750,7 @@ function Home() {
                   <thead>
                     <tr>
                       <th>Name</th>
-                      <th>Aloha category</th>
+                      <th>{isPersistentCatalog ? 'Master category' : 'Aloha category'}</th>
                       <th>Toast category</th>
                       <th>Base price</th>
                       <th>Happy hour</th>
@@ -1160,6 +1177,23 @@ function parseCurrencyInput(value: string) {
   if (!Number.isFinite(parsed)) return null
 
   return Math.round(parsed * 100)
+}
+
+function getReviewFilterKey(
+  item: NormalizedMenuItem,
+  persistentCatalog: boolean,
+) {
+  if (!persistentCatalog) return getCategoryKey(item.category)
+
+  return `variant:${getVariantDisplayLabel(item)}`
+}
+
+function getReviewFilterLabel(
+  key: string,
+  persistentCatalog: boolean,
+) {
+  if (!persistentCatalog) return getCategoryLabel(key)
+  return key.startsWith('variant:') ? key.slice('variant:'.length) : key
 }
 
 function getCategoryKey(category?: string) {
