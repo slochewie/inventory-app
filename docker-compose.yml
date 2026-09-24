@@ -21,6 +21,7 @@ services:
       - "3350:3000"
     volumes:
       - './app:/app'
+      - './toast:/app/public/toast:ro'
       - '../niteowl-ui:/app/packages/niteowl-ui'
       - '../niteowl-app-config:/app/packages/niteowl-app-config'
     env_file:
