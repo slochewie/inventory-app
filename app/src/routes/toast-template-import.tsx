@@ -103,8 +103,8 @@ function ToastTemplateImport() {
           <h1>Import populated Toast workbook</h1>
           <p>
             Upload an already populated Toast Menu Template .xlsx. The importer reads common
-            Toast tabs, normalizes rows into the same reviewed item model, and saves that
-            reviewed state for the Menu Items and Toast Workbook pages.
+            Toast tabs, normalizes rows into the Inventory item model, and can save the result
+            into the selected organization's persistent Inventory catalog.
           </p>
         </header>
 
