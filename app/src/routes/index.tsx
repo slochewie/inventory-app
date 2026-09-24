@@ -310,28 +310,91 @@ function Home() {
     })
   }
 
+  function persistBulkItemPatch(
+    itemIds: string[],
+    patch: Partial<NormalizedMenuItem>,
+  ) {
+    if (
+      importFile?.meta?.source !== 'inventory-catalog' ||
+      !activeOrganization?.id ||
+      itemIds.length === 0
+    ) {
+      return
+    }
+
+    const payload: Parameters<typeof updateInventoryOrganizationVariants>[0] = {
+      organizationId: activeOrganization.id,
+      variantIds: itemIds,
+    }
+
+    if (Object.hasOwn(patch, 'exportIncluded')) {
+      payload.enabled = true
+      payload.exportToToast = patch.exportIncluded
+    }
+
+    if (Object.hasOwn(patch, 'basePriceCents')) {
+      payload.priceOverrideCents = patch.basePriceCents ?? null
+    }
+
+    if (Object.hasOwn(patch, 'happyHourPriceCents')) {
+      payload.happyHourPriceCents = patch.happyHourPriceCents ?? null
+    }
+
+    if (Object.hasOwn(patch, 'toastCategory')) {
+      payload.toastCategoryOverride = patch.toastCategory ?? null
+    }
+
+    if (Object.hasOwn(patch, 'toastDestination')) {
+      payload.toastDestinationOverride = patch.toastDestination ?? null
+    }
+
+    if (Object.keys(payload).length <= 2) return
+
+    setItemSaveError(null)
+
+    void updateInventoryOrganizationVariants(payload).catch((error) => {
+      setItemSaveError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save Inventory item changes.',
+      )
+    })
+  }
+
   function updateFilteredItems(patch: Partial<NormalizedMenuItem>) {
+    const itemIds = filteredItems.map((item) => item.id)
+
     setItems((currentItems) => currentItems.map((item) => (
       filteredItemIds.has(item.id) ? { ...item, ...patch } : item
     )))
     setSelectedItemId(null)
+    persistBulkItemPatch(itemIds, patch)
   }
 
   function updatePageItems(patch: Partial<NormalizedMenuItem>) {
-    const pageItemIds = new Set(pageItems.map((item) => item.id))
+    const itemIds = pageItems.map((item) => item.id)
+    const pageItemIds = new Set(itemIds)
+
     setItems((currentItems) => currentItems.map((item) => (
       pageItemIds.has(item.id) ? { ...item, ...patch } : item
     )))
     setSelectedItemId(null)
+    persistBulkItemPatch(itemIds, patch)
   }
 
   function updateSelectedCategoryItems(patch: Partial<NormalizedMenuItem>) {
     if (categoryFilter === ALL_CATEGORIES) return
 
+    const itemIds = items
+      .filter((item) => getCategoryKey(item.category) === categoryFilter)
+      .map((item) => item.id)
+    const itemIdSet = new Set(itemIds)
+
     setItems((currentItems) => currentItems.map((item) => (
-      getCategoryKey(item.category) === categoryFilter ? { ...item, ...patch } : item
+      itemIdSet.has(item.id) ? { ...item, ...patch } : item
     )))
     setSelectedItemId(null)
+    persistBulkItemPatch(itemIds, patch)
   }
 
   function handleApplyToastCategory() {
