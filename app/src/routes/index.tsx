@@ -27,7 +27,7 @@ type CatalogGroup = {
 }
 
 function CatalogPage() {
-  const { canEdit, canImportExport } = useInventoryAccessRole()
+  const { canEdit, canImportExport, canManageAssignments } = useInventoryAccessRole()
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
   const [query, setQuery] = useState('')
@@ -360,6 +360,7 @@ function CatalogPage() {
           <CatalogDrawer
             group={selectedGroup}
             canEdit={canEdit}
+            canMerge={canManageAssignments}
             allGroups={groups}
             savingVariantId={savingVariantId}
             merging={mergingItemId === selectedGroup.id}
@@ -376,6 +377,7 @@ function CatalogPage() {
 function CatalogDrawer({
   group,
   canEdit,
+  canMerge,
   allGroups,
   savingVariantId,
   merging,
@@ -385,6 +387,7 @@ function CatalogDrawer({
 }: {
   group: CatalogGroup
   canEdit: boolean
+  canMerge: boolean
   allGroups: CatalogGroup[]
   savingVariantId: string | null
   merging: boolean
@@ -531,7 +534,7 @@ function CatalogDrawer({
         </div>
       </section>
 
-      {canEdit ? (
+      {canMerge ? (
         <section className="inventory-drawer-section inventory-merge-section">
           <div className="inventory-drawer-section-heading">
             <div>
