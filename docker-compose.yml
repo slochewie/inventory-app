@@ -5,16 +5,16 @@ services:
       context: .
       dockerfile: Dockerfile
     working_dir: /app
-    command:
-      - sleep
-      - infinity
 #    command:
-#      - npm
-#      - run
-#      - dev
-#      - --
-#      - --host
-#      - 0.0.0.0
+#      - sleep
+#      - infinity
+    command:
+      - npm
+      - run
+      - dev
+      - --
+      - --host
+      - 0.0.0.0
     stdin_open: true
     tty: true
     ports:
