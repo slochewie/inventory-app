@@ -126,6 +126,29 @@ type OrganizationVariantUpdateResponse = {
   error?: string
 }
 
+
+export type InventorySourceMapping = {
+  id: string
+  sourceType: "aloha-csv" | "toast-template" | string
+  sourceKey: string
+  sourceItemId: string | null
+  sourceName: string
+  normalizedSourceName: string
+  inventoryItemId: string | null
+  inventoryItemVariantId: string | null
+  itemName: string | null
+  variantName: string | null
+  variantKind: string | null
+  variantSizeOz: number | null
+  variantPackageType: string | null
+  updatedAt: string
+}
+
+type SourceMappingsResponse = {
+  mappings?: InventorySourceMapping[]
+  error?: string
+}
+
 function authEndpoint(path: string) {
   return `${authBaseURL.replace(/\/$/, "")}${path}`
 }
@@ -367,6 +390,64 @@ export async function updateInventoryAssignment(input: {
       typeof result.error === "string"
         ? result.error
         : "Unable to update Inventory assignment.",
+    )
+  }
+
+  return result.updated === true
+}
+
+
+export async function listInventorySourceMappings(
+  organizationId: string,
+  signal?: AbortSignal,
+) {
+  const url = new URL(authEndpoint("/api/auth/inventory/source-mappings"))
+  url.searchParams.set("organizationId", organizationId)
+
+  const response = await fetch(url, {
+    credentials: "include",
+    signal,
+  })
+  const result = (await response.json()) as SourceMappingsResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to load Inventory source mappings.",
+    )
+  }
+
+  return Array.isArray(result.mappings) ? result.mappings : []
+}
+
+export async function updateInventorySourceMapping(input: {
+  organizationId: string
+  sourceType: string
+  sourceKey: string
+  variantId: string
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/source-mapping"),
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  )
+  const result = (await response.json()) as {
+    updated?: boolean
+    error?: string
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to update Inventory source mapping.",
     )
   }
 
