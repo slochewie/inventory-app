@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useMemo, useState } from 'react'
-import { InventorySidebar } from '#/inventory-sidebar'
+import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
+import { authClient } from '#/lib/auth-client'
+import { persistInventoryImport } from '#/lib/inventory-access'
 import { saveReviewSession } from '#/features/menu-import/review-session'
 import { buildToastExportFiles, downloadCsv } from '#/features/menu-import/toast-export'
 import { parseToastTemplateWorkbook } from '#/features/menu-import/toast-template-import'
@@ -13,9 +15,12 @@ import {
 export const Route = createFileRoute('/toast-template-import')({ component: ToastTemplateImport })
 
 function ToastTemplateImport() {
+  const { data: activeOrganization } = authClient.useActiveOrganization()
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(null)
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
   const [importError, setImportError] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const exportReviewFile = useMemo(() => (
@@ -27,6 +32,49 @@ function ToastTemplateImport() {
     return [...counts.entries()].sort(([left], [right]) => left.localeCompare(right))
   }, [items])
 
+  async function handleSaveToInventory() {
+    if (!activeOrganization?.id || !importFile || items.length === 0) return
+
+    setSaveState('saving')
+    setSaveMessage(null)
+
+    try {
+      const result = await persistInventoryImport({
+        organizationId: activeOrganization.id,
+        sourceType: 'toast-template',
+        sourceName: importFile.sourceName,
+        items: items.map((item) => ({
+          id: item.id,
+          sourceItemNumber: item.sourceItemNumber,
+          name: item.name,
+          category: item.category,
+          toastCategory: item.toastCategory,
+          toastDestination: item.toastDestination,
+          basePriceCents: item.basePriceCents,
+          happyHourPriceCents: item.happyHourPriceCents,
+          status: item.status,
+          exportIncluded: item.exportIncluded,
+        })),
+      })
+
+      setSaveState('saved')
+      setSaveMessage(
+        'Saved ' +
+          result.importedItems.toLocaleString() +
+          ' items and ' +
+          result.importedVariants.toLocaleString() +
+          ' variants to the persistent Inventory catalog.',
+      )
+    } catch (error) {
+      setSaveState('error')
+      setSaveMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save the Toast workbook import.',
+      )
+    }
+  }
+
   async function handleWorkbookChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -37,6 +85,8 @@ function ToastTemplateImport() {
       const parsed = parseToastTemplateWorkbook(await file.arrayBuffer(), file.name)
       setImportFile(parsed.importFile)
       setItems(parsed.items)
+      setSaveState('idle')
+      setSaveMessage(null)
       saveReviewSession(parsed.importFile, parsed.items)
     } catch (error) {
       setImportFile(null)
@@ -46,9 +96,7 @@ function ToastTemplateImport() {
   }
 
   return (
-    <main className="inventory-shell">
-      <InventorySidebar currentPath="/toast-template-import" />
-
+    <AuthenticatedInventoryShell currentPath="/toast-template-import">
       <section className="inventory-content">
         <header className="inventory-hero">
           <p className="inventory-kicker">Toast template import</p>
@@ -93,7 +141,32 @@ function ToastTemplateImport() {
             </section>
 
             <section className="inventory-card inventory-source-card">
-              <h2>{importFile.sourceName}</h2>
+              <div className="inventory-table-heading">
+                <div>
+                  <p className="inventory-kicker">Parsed workbook</p>
+                  <h2>{importFile.sourceName}</h2>
+                </div>
+
+                <button
+                  className="inventory-template-download"
+                  type="button"
+                  disabled={
+                    saveState === 'saving' ||
+                    items.length === 0 ||
+                    !activeOrganization?.id
+                  }
+                  onClick={handleSaveToInventory}
+                >
+                  {saveState === 'saving' ? 'Saving…' : 'Save to Inventory'}
+                </button>
+              </div>
+
+              {saveMessage ? (
+                <p className={saveState === 'error' ? 'inventory-error' : undefined}>
+                  {saveMessage}
+                </p>
+              ) : null}
+
               <dl>
                 <div>
                   <dt>Source type</dt>
@@ -105,7 +178,11 @@ function ToastTemplateImport() {
                 </div>
                 <div>
                   <dt>Saved state</dt>
-                  <dd>Saved for Menu Items and Toast Workbook</dd>
+                  <dd>
+                    {saveState === 'saved'
+                      ? 'Saved to persistent Inventory'
+                      : 'Ready to save to persistent Inventory'}
+                  </dd>
                 </div>
               </dl>
               {importFile.warnings.length > 0 ? (
@@ -157,7 +234,7 @@ function ToastTemplateImport() {
           </>
         ) : null}
       </section>
-    </main>
+    </AuthenticatedInventoryShell>
   )
 }
 
