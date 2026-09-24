@@ -6,7 +6,13 @@ import {
 } from '@niteowl/app-config'
 import { NiteOwlNavigationIcon } from '@niteowl/ui/navigation'
 
-export function InventorySidebar({ currentPath }: { currentPath: string }) {
+export function InventorySidebar({
+  currentPath,
+  canManageAssignments = false,
+}: {
+  currentPath: string
+  canManageAssignments?: boolean
+}) {
   const app = appDefinitionsById.inventory
   const hostname = getHostname()
   const brand = getDeploymentBrand(hostname)
@@ -14,6 +20,10 @@ export function InventorySidebar({ currentPath }: { currentPath: string }) {
     currentApp: 'inventory',
     currentPath,
     urls: getDefaultAppUrls(hostname),
+    canAccess: ({ key }) =>
+      key === 'inventory:manage-assignments'
+        ? canManageAssignments
+        : true,
   })
 
   return (
