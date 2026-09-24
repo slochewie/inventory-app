@@ -119,11 +119,10 @@ export function downloadPopulatedToastWorkbook(filename: string, blob: Blob) {
 }
 
 function populateBeerSheet(workbookPackage: WorkbookPackage, items: NormalizedMenuItem[]) {
-  const initialMapping = getBeerTemplateMapping(workbookPackage)
-  const sheetXml = getTextFile(workbookPackage.files, initialMapping.sheetPath)
+  const mapping = getBeerTemplateMapping(workbookPackage)
+  const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
   const sheetDoc = parseXml(sheetXml)
   const beerRows = buildWorkbookBeerRows(items)
-  const mapping = configurePackagedBeerSlots(sheetDoc, initialMapping, beerRows)
   const writtenRowCount = writeBeerRowsToSheet(sheetDoc, mapping, beerRows)
 
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
@@ -204,39 +203,18 @@ function titleWorkbookBeerName(value: string) {
     .replace(/\bNa\b/g, 'NA')
 }
 
-function configurePackagedBeerSlots(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]): BeerTemplateMapping {
-  const needsCan24oz = beerRows.some((row) => row.can24ozPrice !== null)
-  const hasCan24ozSlot = mapping.packagedGroups.some((slot) => slot.kind === 'can24oz')
-  const hasBottleRows = beerRows.some((row) => row.bottlePrice !== null)
-
-  if (!needsCan24oz || hasCan24ozSlot || hasBottleRows) return mapping
-
-  const bottleIndex = mapping.packagedGroups.findIndex((slot) => slot.kind === 'bottle')
-  if (bottleIndex < 0) return mapping
-
-  const bottleSlot = mapping.packagedGroups[bottleIndex]
-  writeCellValueWithStyleSource(sheetDoc, bottleSlot.nameCol, mapping.headerRow, '24oz Can', bottleSlot.nameCol)
-
-  const packagedGroups = [...mapping.packagedGroups]
-  packagedGroups[bottleIndex] = {
-    ...bottleSlot,
-    label: '24oz Can',
-    kind: 'can24oz',
-  }
-
-  return {
-    ...mapping,
-    packagedGroups,
-    warnings: mapping.warnings.filter((warning) => !/24oz can/i.test(warning)),
-  }
-}
-
 function writeBeerRowsToSheet(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]) {
   const draftRows = beerRows.filter(hasDraftBeerPrice)
   const canRows = beerRows.filter((row) => row.canPrice !== null)
-  const can24ozRows = beerRows.filter((row) => row.can24ozPrice !== null)
-  const bottleRows = beerRows.filter((row) => row.bottlePrice !== null)
-  const writtenRowCount = Math.max(draftRows.length, canRows.length, can24ozRows.length, bottleRows.length)
+  const bottleSlotRows = [
+    ...beerRows
+      .filter((row) => row.can24ozPrice !== null)
+      .map((row) => ({ row, kind: 'can24oz' as const })),
+    ...beerRows
+      .filter((row) => row.bottlePrice !== null)
+      .map((row) => ({ row, kind: 'bottle' as const })),
+  ]
+  const writtenRowCount = Math.max(draftRows.length, canRows.length, bottleSlotRows.length)
   const clearToRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount + DATA_ROW_BUFFER)
   const targetColumns = getBeerTargetColumns(mapping)
 
@@ -250,12 +228,8 @@ function writeBeerRowsToSheet(sheetDoc: Document, mapping: BeerTemplateMapping, 
     writeCanBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
   })
 
-  can24ozRows.forEach((beerRow, index) => {
-    writeCan24ozBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
-  })
-
-  bottleRows.forEach((beerRow, index) => {
-    writeBottleBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
+  bottleSlotRows.forEach(({ row, kind }, index) => {
+    writeBottleSlotBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, row, kind)
   })
 
   return writtenRowCount
@@ -293,44 +267,42 @@ function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNu
   if (canSlot.happyHourCol) writeCellValue(sheetDoc, canSlot.happyHourCol, rowNumber, centsToDollars(beerRow.canHappyHour), mapping.dataStartRow)
 }
 
-function writeCan24ozBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
-  const can24ozSlot = findPackagedSlot(mapping, 'can24oz')
-  if (!can24ozSlot || beerRow.can24ozPrice === null) return
-
-  writeCellValue(sheetDoc, can24ozSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
-  if (can24ozSlot.priceCol) writeCellValue(sheetDoc, can24ozSlot.priceCol, rowNumber, centsToDollars(beerRow.can24ozPrice), mapping.dataStartRow)
-  if (can24ozSlot.happyHourCol) writeCellValue(sheetDoc, can24ozSlot.happyHourCol, rowNumber, centsToDollars(beerRow.can24ozHappyHour), mapping.dataStartRow)
-}
-
-function writeBottleBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
+function writeBottleSlotBeerRow(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  rowNumber: number,
+  beerRow: BeerTabPreviewRow,
+  kind: 'can24oz' | 'bottle',
+) {
   const bottleSlot = findPackagedSlot(mapping, 'bottle')
-  if (!bottleSlot || beerRow.bottlePrice === null) return
+  const price = kind === 'can24oz' ? beerRow.can24ozPrice : beerRow.bottlePrice
+  const happyHour = kind === 'can24oz' ? beerRow.can24ozHappyHour : beerRow.bottleHappyHour
+  if (!bottleSlot || price === null) return
 
   writeCellValue(sheetDoc, bottleSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
-  if (bottleSlot.priceCol) writeCellValue(sheetDoc, bottleSlot.priceCol, rowNumber, centsToDollars(beerRow.bottlePrice), mapping.dataStartRow)
-  if (bottleSlot.happyHourCol) writeCellValue(sheetDoc, bottleSlot.happyHourCol, rowNumber, centsToDollars(beerRow.bottleHappyHour), mapping.dataStartRow)
+  if (bottleSlot.priceCol) writeCellValue(sheetDoc, bottleSlot.priceCol, rowNumber, centsToDollars(price), mapping.dataStartRow)
+  if (bottleSlot.happyHourCol) writeCellValue(sheetDoc, bottleSlot.happyHourCol, rowNumber, centsToDollars(happyHour), mapping.dataStartRow)
 }
 
 function findDraftSlot(mapping: BeerTemplateMapping, sourceSizeOz: 10 | 16) {
-  const exact = mapping.draftSizes.find((slot) => slot.sizeOz === sourceSizeOz)
+  if (sourceSizeOz === 10) {
+    const eightOunceSlot = mapping.draftSizes.find((slot) => slot.sizeOz === 8)
+    if (eightOunceSlot) return eightOunceSlot
+
+    return [...mapping.draftSizes]
+      .filter((slot) => slot.sizeOz !== null)
+      .sort((left, right) => Number(left.sizeOz) - Number(right.sizeOz))[0] ?? null
+  }
+
+  const exact = mapping.draftSizes.find((slot) => slot.sizeOz === 16)
   if (exact) return exact
 
-  if (sourceSizeOz === 16) {
-    const pintLike = mapping.draftSizes.find((slot) => slot.sizeOz !== null && slot.sizeOz >= 14 && slot.sizeOz <= 20)
-    if (pintLike) return pintLike
-  }
-
-  if (sourceSizeOz === 10) {
-    const smallest = [...mapping.draftSizes]
-      .filter((slot) => slot.sizeOz !== null)
-      .sort((left, right) => Number(left.sizeOz) - Number(right.sizeOz))[0]
-    if (smallest) return smallest
-  }
-
-  return null
+  return mapping.draftSizes.find(
+    (slot) => slot.sizeOz !== null && slot.sizeOz >= 14 && slot.sizeOz <= 20,
+  ) ?? null
 }
 
-function findPackagedSlot(mapping: BeerTemplateMapping, kind: 'can' | 'can24oz' | 'bottle') {
+function findPackagedSlot(mapping: BeerTemplateMapping, kind: 'can' | 'bottle') {
   return mapping.packagedGroups.find((slot) => slot.kind === kind) ?? null
 }
 
@@ -367,8 +339,8 @@ function getBeerTemplateMapping(workbookPackage: WorkbookPackage): BeerTemplateM
   if (draftNameCol === null) warnings.push('Beer tab has no Draft Beer column')
   if (draftSizes.length === 0) warnings.push('Beer tab has no draft size columns')
   if (canColumn === null) warnings.push('Beer tab has no Can column')
-  if (!packagedGroups.some((slot) => slot.kind === 'can24oz')) {
-    warnings.push('Beer tab has no 24oz can columns yet; Bottle will be renamed to 24oz Can when the uploaded Aloha export contains 24oz cans and no bottle beers')
+  if (!packagedGroups.some((slot) => slot.kind === 'bottle')) {
+    warnings.push('Beer tab has no Bottle column; 24oz cans cannot be written to the fixed Toast template')
   }
 
   return {
