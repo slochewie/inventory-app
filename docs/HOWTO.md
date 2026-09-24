@@ -68,29 +68,21 @@ The current normalized beer model supports:
 
 | Destination | Workbook result |
 | --- | --- |
-| Draft Beer 10oz | Draft name + 10oz price/Happy Hour columns |
-| Draft Beer 16oz | Draft name + 16oz price/Happy Hour columns |
-| Can | Standard packaged-can slot |
-| 24oz Can | Separate 24oz packaged-can slot |
-| Bottle | Bottle slot |
+| Draft Beer 10oz | Existing Toast 8oz draft slot |
+| Draft Beer 16oz | Existing Toast 16oz draft slot |
+| Can | Existing Can slot |
+| 24oz Can | Existing Bottle slot |
+| Bottle | Existing Bottle slot |
 
 Standard cans and 24oz cans are separate source items.
 
-For example, a 12oz/standard can and a 24oz can are not combined merely because their cleaned beer names match. Each source item is written into its own packaged-beer list.
+For example, a 12oz/standard can and a 24oz can are not combined merely because their cleaned beer names match. Each source item remains independent even though 24oz cans and bottles share Toast's fixed Bottle section.
 
-### Current 24oz-can fallback
+### Fixed Toast workbook structure
 
-Some Toast templates have a Bottle slot but no dedicated 24oz-can slot.
+The workbook writer does not rename Toast headers or add custom columns. It writes menu data into the existing template cells only.
 
-The current workbook behavior is:
-
-- when at least one 24oz-can item exists,
-- when there is no existing 24oz-can slot,
-- and when no bottle-beer rows need the Bottle slot,
-
-the Bottle header is renamed to **24oz Can** and that slot is used for 24oz cans.
-
-If bottle beers also exist, the application leaves the Bottle slot intact.
+Organization-specific serving and package sizes remain inventory data. When a real size differs from the fixed Toast header, call that out in the Notes tab for the Toast representative instead of changing the workbook structure.
 
 ## 5. Save the reviewed state
 
@@ -173,13 +165,14 @@ The generated filename uses the source workbook name with a `-populated.xlsx` su
 Before importing anything into Toast, open the resulting workbook and inspect at minimum:
 
 - beer names,
-- draft sizes,
+- 10oz draft values in Toast's existing 8oz slot,
+- 16oz draft values in Toast's existing 16oz slot,
 - standard-can names/prices,
-- 24oz-can names/prices,
+- 24oz-can names/prices in the existing Bottle section,
 - bottle names/prices when applicable,
 - Happy Hour values,
 - liquor rows,
-- any template headers that were repurposed.
+- Toast headers remain unchanged.
 
 The generated workbook is an import artifact, not a replacement for a final human review.
 
@@ -272,7 +265,7 @@ Then run `docker compose up -d` again.
 
 Check the item's Toast destination first. It must classify as **24oz Can**.
 
-Also inspect whether the uploaded Toast template has a dedicated 24oz slot and whether the reviewed menu includes bottle beers. The automatic Bottle → 24oz Can conversion only occurs when bottles do not need that slot.
+The exporter intentionally writes 24oz cans into the existing Toast **Bottle** section. It does not rename that header. If the location also carries bottles, both types appear as separate rows in that fixed section and the actual package sizes should be clarified in the Notes tab.
 
 ### Changes disappear on the Toast workbook page
 
