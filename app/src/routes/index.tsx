@@ -351,6 +351,8 @@ function CatalogDrawer({
     }
   }, [])
 
+  const carriedCount = group.items.filter((item) => item.exportIncluded).length
+
   return (
     <dialog
       ref={dialogRef}
@@ -368,56 +370,82 @@ function CatalogDrawer({
         <div>
           <p className="inventory-kicker">{group.category}</p>
           <h2 id="inventory-catalog-drawer-title">{group.name}</h2>
+          <p>
+            {group.items.length} format{group.items.length === 1 ? '' : 's'} · {carriedCount} available here
+          </p>
         </div>
         <button type="button" onClick={onClose}>Close</button>
       </div>
 
-      <div className="inventory-catalog-variants">
-        {group.items.map((item) => {
-          const saving = savingVariantId === item.id
+      <section className="inventory-drawer-section">
+        <div className="inventory-drawer-section-heading">
+          <div>
+            <p className="inventory-kicker">Availability & pricing</p>
+            <h3>Formats</h3>
+          </div>
+          {!canEdit ? <span className="inventory-readonly-pill">Read only</span> : null}
+        </div>
 
-          return (
-            <article key={item.id} className="inventory-catalog-variant-card">
-              <div className="inventory-catalog-variant-heading">
-                <div>
-                  <strong>{item.variantLabel || 'Standard'}</strong>
-                  {item.toastDestination ? <span>{item.toastDestination}</span> : null}
+        <div className="inventory-catalog-variants">
+          {group.items.map((item) => {
+            const saving = savingVariantId === item.id
+
+            return (
+              <article key={item.id} className="inventory-catalog-variant-card">
+                <div className="inventory-catalog-variant-heading">
+                  <div>
+                    <strong>{item.variantLabel || 'Standard'}</strong>
+                    <span>
+                      {item.toastDestination || 'No Toast destination'}
+                    </span>
+                  </div>
+                  <label className="inventory-inline-toggle">
+                    <input
+                      type="checkbox"
+                      checked={item.exportIncluded}
+                      disabled={!canEdit || saving}
+                      onChange={(event) =>
+                        void onUpdate(item, { exportIncluded: event.target.checked })
+                      }
+                    />
+                    <span>{item.exportIncluded ? 'Available here' : 'Not carried here'}</span>
+                  </label>
                 </div>
-                <label className="inventory-inline-toggle">
-                  <input
-                    type="checkbox"
-                    checked={item.exportIncluded}
+
+                <div className="inventory-catalog-price-grid">
+                  <MoneyField
+                    label="Price"
+                    value={item.basePriceCents}
                     disabled={!canEdit || saving}
-                    onChange={(event) =>
-                      void onUpdate(item, { exportIncluded: event.target.checked })
+                    onCommit={(value) => void onUpdate(item, { basePriceCents: value })}
+                  />
+                  <MoneyField
+                    label="Happy hour"
+                    value={item.happyHourPriceCents}
+                    disabled={!canEdit || saving}
+                    onCommit={(value) =>
+                      void onUpdate(item, { happyHourPriceCents: value })
                     }
                   />
-                  <span>Available here</span>
-                </label>
-              </div>
+                </div>
 
-              <div className="inventory-catalog-price-grid">
-                <MoneyField
-                  label="Price"
-                  value={item.basePriceCents}
-                  disabled={!canEdit || saving}
-                  onCommit={(value) => void onUpdate(item, { basePriceCents: value })}
-                />
-                <MoneyField
-                  label="Happy hour"
-                  value={item.happyHourPriceCents}
-                  disabled={!canEdit || saving}
-                  onCommit={(value) =>
-                    void onUpdate(item, { happyHourPriceCents: value })
-                  }
-                />
-              </div>
+                <div className="inventory-variant-meta">
+                  <span>{item.toastCategory}</span>
+                  {saving ? <span className="inventory-save-note">Saving…</span> : null}
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      </section>
 
-              {saving ? <p className="inventory-save-note">Saving…</p> : null}
-            </article>
-          )
-        })}
-      </div>
+      <section className="inventory-drawer-section inventory-drawer-help">
+        <p className="inventory-kicker">How this works</p>
+        <p>
+          Availability, price, and Happy Hour values are specific to the selected organization.
+          The master item remains shared across organizations.
+        </p>
+      </section>
     </dialog>
   )
 }
