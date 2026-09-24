@@ -94,12 +94,16 @@ export function AuthenticatedInventoryShell({
     }
   }>>([])
   const [switchingToken, setSwitchingToken] = useState<string | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(getSidebarDefaultOpen)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const accountMenuRef = useRef<HTMLDetailsElement>(null)
 
   const visibleOrganizations = (organizations ?? []).filter((organization) =>
     allowedOrganizationIds?.has(organization.id) ?? false,
   )
+
+  useEffect(() => {
+    setSidebarOpen(getSidebarDefaultOpen())
+  }, [])
 
   useEffect(() => {
     if (!session || areOrganizationsPending) {
