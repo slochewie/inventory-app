@@ -405,16 +405,19 @@ function Home() {
                       <th>Toast category</th>
                       <th>Base price</th>
                       <th>Happy hour</th>
-                      <th>Export</th>
-                      <th>Status</th>
-                      <th aria-label="Actions" />
+                      <th className="inventory-review-actions-heading">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageItems.map((item) => (
                       <tr key={item.id} className={selectedItemId === item.id ? 'is-selected' : undefined}>
                         <td>
-                          <strong>{item.name}</strong>
+                          <div className="inventory-item-name-line">
+                            <strong>{item.name}</strong>
+                            <span className={`inventory-status inventory-status-${item.status}`}>
+                              {item.status}
+                            </span>
+                          </div>
                           {item.notes.length > 0 ? <span>{item.notes.join(' · ')}</span> : null}
                         </td>
                         <td>{item.category || 'Uncategorized'}</td>
@@ -425,28 +428,23 @@ function Home() {
                             ? '—'
                             : `${formatCurrency(item.happyHourPriceCents)}${item.happyHourWindow ? ` · ${item.happyHourWindow}` : ''}`}
                         </td>
-                        <td>
-                          <button
-                            className={item.exportIncluded ? 'inventory-export-toggle is-included' : 'inventory-export-toggle'}
-                            type="button"
-                            onClick={() => updateItem(item.id, { exportIncluded: !item.exportIncluded })}
-                          >
-                            {item.exportIncluded ? 'Export' : 'No export'}
-                          </button>
-                        </td>
-                        <td>
-                          <span className={`inventory-status inventory-status-${item.status}`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            className="inventory-row-action"
-                            type="button"
-                            onClick={() => setSelectedItemId(item.id)}
-                          >
-                            Edit
-                          </button>
+                        <td className="inventory-review-actions">
+                          <div className="inventory-review-action-buttons">
+                            <button
+                              className={item.exportIncluded ? 'inventory-export-toggle is-included' : 'inventory-export-toggle'}
+                              type="button"
+                              onClick={() => updateItem(item.id, { exportIncluded: !item.exportIncluded })}
+                            >
+                              {item.exportIncluded ? 'Export' : 'No export'}
+                            </button>
+                            <button
+                              className="inventory-row-action"
+                              type="button"
+                              onClick={() => setSelectedItemId(item.id)}
+                            >
+                              Edit
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
