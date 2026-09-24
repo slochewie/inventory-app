@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { type ChangeEvent, useMemo, useState } from 'react'
-import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
+import {
+  AuthenticatedInventoryShell,
+  useInventoryAccessRole,
+} from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import { persistInventoryImport } from '#/lib/inventory-access'
 import { saveReviewSession } from '#/features/menu-import/review-session'
@@ -15,6 +18,7 @@ import {
 export const Route = createFileRoute('/toast-template-import')({ component: ToastTemplateImport })
 
 function ToastTemplateImport() {
+  const { canImportExport } = useInventoryAccessRole()
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(null)
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
@@ -33,7 +37,7 @@ function ToastTemplateImport() {
   }, [items])
 
   async function handleSaveToInventory() {
-    if (!activeOrganization?.id || !importFile || items.length === 0) return
+    if (!canImportExport || !activeOrganization?.id || !importFile || items.length === 0) return
 
     setSaveState('saving')
     setSaveMessage(null)
@@ -76,6 +80,8 @@ function ToastTemplateImport() {
   }
 
   async function handleWorkbookChange(event: ChangeEvent<HTMLInputElement>) {
+    if (!canImportExport) return
+
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -119,14 +125,18 @@ function ToastTemplateImport() {
             </p>
           </div>
 
-          <label className="inventory-upload-control">
-            <span>Choose Toast .xlsx</span>
-            <input
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              onChange={handleWorkbookChange}
-            />
-          </label>
+          {canImportExport ? (
+            <label className="inventory-upload-control">
+              <span>Choose Toast .xlsx</span>
+              <input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={handleWorkbookChange}
+              />
+            </label>
+          ) : (
+            <p className="inventory-readonly-note">Viewer access is read-only.</p>
+          )}
 
           {importError ? <p className="inventory-error">{importError}</p> : null}
         </section>
@@ -151,6 +161,7 @@ function ToastTemplateImport() {
                   className="inventory-template-download"
                   type="button"
                   disabled={
+                    !canImportExport ||
                     saveState === 'saving' ||
                     items.length === 0 ||
                     !activeOrganization?.id
@@ -209,7 +220,7 @@ function ToastTemplateImport() {
               <button
                 className="inventory-template-download"
                 type="button"
-                disabled={!exportReviewFile || exportReviewFile.rowCount === 0}
+                disabled={!canImportExport || !exportReviewFile || exportReviewFile.rowCount === 0}
                 onClick={() => exportReviewFile ? downloadCsv(exportReviewFile.filename, exportReviewFile.rows) : undefined}
               >
                 Download toast-export-review.csv
