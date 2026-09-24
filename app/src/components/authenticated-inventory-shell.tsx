@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { useEffect, useRef, useState } from "react"
+import { createContext, useContext, useEffect, useRef, useState } from "react"
 import { NiteOwlUserAvatar, OrganizationSelector } from "@niteowl/ui"
 import {
   ArrowRightLeftIcon,
@@ -13,6 +13,27 @@ import { InventorySidebar } from "#/inventory-sidebar"
 import { authBaseURL, authClient } from "#/lib/auth-client"
 import { getInventoryAccess } from "#/lib/inventory-access"
 
+
+type InventoryRole = "viewer" | "staff" | "manager" | "admin"
+
+type InventoryAccessContextValue = {
+  role: InventoryRole
+  canImportExport: boolean
+  canEdit: boolean
+  canManageAssignments: boolean
+}
+
+const InventoryAccessContext = createContext<InventoryAccessContextValue | null>(null)
+
+export function useInventoryAccessRole() {
+  const context = useContext(InventoryAccessContext)
+
+  if (!context) {
+    throw new Error("useInventoryAccessRole must be used inside AuthenticatedInventoryShell")
+  }
+
+  return context
+}
 
 export function AuthenticatedInventoryShell({
   currentPath,
@@ -29,9 +50,7 @@ export function AuthenticatedInventoryShell({
   const [accessState, setAccessState] = useState<
     "idle" | "checking" | "allowed" | "denied" | "error"
   >("idle")
-  const [inventoryRole, setInventoryRole] = useState<
-    "viewer" | "staff" | "manager" | "admin" | null
-  >(null)
+  const [inventoryRole, setInventoryRole] = useState<InventoryRole | null>(null)
   const [allowedOrganizationIds, setAllowedOrganizationIds] = useState<Set<string> | null>(null)
   const [deviceSessions, setDeviceSessions] = useState<Array<{
     session: { token: string }
@@ -361,8 +380,17 @@ export function AuthenticatedInventoryShell({
         </header>
 
         <div className="inventory-authenticated-content">
-          {accessState === "allowed" ? (
-            children
+          {accessState === "allowed" && inventoryRole ? (
+            <InventoryAccessContext.Provider
+              value={{
+                role: inventoryRole,
+                canImportExport: inventoryRole !== "viewer",
+                canEdit: inventoryRole === "manager" || inventoryRole === "admin",
+                canManageAssignments: inventoryRole === "admin",
+              }}
+            >
+              {children}
+            </InventoryAccessContext.Provider>
           ) : accessState === "denied" ? (
             <section className="inventory-auth-state">
               <h1>Inventory access required</h1>
