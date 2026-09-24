@@ -341,3 +341,34 @@ export async function updateInventoryOrganizationVariants(input: {
 
   return typeof result.updated === "number" ? result.updated : 0
 }
+
+
+export async function updateInventoryAssignment(input: {
+  organizationId: string
+  userId: string
+  enabled?: boolean
+  role?: InventoryRole
+}) {
+  const response = await fetch(authEndpoint("/api/auth/inventory/assignment"), {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+  const result = (await response.json()) as {
+    updated?: boolean
+    error?: string
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to update Inventory assignment.",
+    )
+  }
+
+  return result.updated === true
+}
