@@ -29,6 +29,9 @@ export function AuthenticatedInventoryShell({
   const [accessState, setAccessState] = useState<
     "idle" | "checking" | "allowed" | "denied" | "error"
   >("idle")
+  const [inventoryRole, setInventoryRole] = useState<
+    "viewer" | "staff" | "manager" | "admin" | null
+  >(null)
   const [allowedOrganizationIds, setAllowedOrganizationIds] = useState<Set<string> | null>(null)
   const [deviceSessions, setDeviceSessions] = useState<Array<{
     session: { token: string }
@@ -153,6 +156,7 @@ export function AuthenticatedInventoryShell({
   useEffect(() => {
     if (!session || !activeOrganization?.id) {
       setAccessState("idle")
+      setInventoryRole(null)
       return
     }
 
@@ -161,10 +165,12 @@ export function AuthenticatedInventoryShell({
 
     void getInventoryAccess(activeOrganization.id, controller.signal)
       .then((result) => {
+        setInventoryRole(result.role)
         setAccessState(result.allowed ? "allowed" : "denied")
       })
       .catch((error) => {
         if (error instanceof DOMException && error.name === "AbortError") return
+        setInventoryRole(null)
         setAccessState("error")
       })
 
@@ -232,7 +238,10 @@ export function AuthenticatedInventoryShell({
 
   return (
     <main className="inventory-shell">
-      <InventorySidebar currentPath={currentPath} />
+      <InventorySidebar
+        currentPath={currentPath}
+        canManageAssignments={inventoryRole === "admin"}
+      />
 
       <section className="inventory-authenticated-main">
         <header className="inventory-auth-header">
