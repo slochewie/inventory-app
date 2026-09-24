@@ -19,7 +19,7 @@ import {
   type ParsedMenuImport,
 } from '#/features/menu-import/types'
 
-export const Route = createFileRoute('/wip/toast-workbook')({ component: ToastWorkbook })
+export const Route = createFileRoute('/wip_/toast-workbook')({ component: ToastWorkbook })
 
 const TOAST_TEMPLATE_FILE_NAME = 'Toast-Menu-Template-Your-Restaurant-Name.xlsx'
 const TOAST_TEMPLATE_URL = `/toast/menu/${TOAST_TEMPLATE_FILE_NAME}`
