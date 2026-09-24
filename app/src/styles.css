@@ -1050,6 +1050,21 @@ select {
   font-weight: 700;
 }
 
+
+.inventory-variant-toggles {
+  display: grid;
+  justify-items: end;
+  gap: 0.4rem;
+}
+
+.inventory-variant-toggles .inventory-inline-toggle {
+  width: max-content;
+}
+
+.inventory-variant-toggles .inventory-inline-toggle:has(input:disabled) {
+  opacity: 0.55;
+}
+
 .inventory-catalog-price-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
