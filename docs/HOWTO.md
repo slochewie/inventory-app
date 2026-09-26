@@ -181,6 +181,15 @@ Managers and Admins can edit organization-specific variant state such as:
 - price override,
 - Happy Hour price.
 
+They can also manage organization-level **Happy Hour** settings from the Catalog page:
+
+- enable/disable Happy Hour,
+- select the days of the week it applies,
+- set one start time,
+- set one end time.
+
+Changes use explicit **Update** / **Cancel** controls and persist through the Inventory organization-config API.
+
 The shared master item name remains separate from an organization's name override.
 
 ## 8. Merge duplicate master items
@@ -252,9 +261,27 @@ The ZIP contains the same populated workbook packaged for delivery to the Toast 
 
 Generated filenames use the store/organization name when available and include a Pacific-time timestamp.
 
+For browser compatibility, the generated XLSX/ZIP is staged briefly on the Inventory server and then downloaded through a same-origin attachment response. This preserves the intended filename on iOS browsers, including Firefox on iOS, and tolerates the extra preview request some iOS download flows make before the final save.
+
 The current writer populates Beer and Liquor tabs.
 
-## 12. Understand Beer variants and Toast's fixed workbook
+## 12. Happy Hour schedule in the Toast Notes tab
+
+When Happy Hour is enabled for the selected organization, the exporter writes the organization schedule into the Toast workbook's **Notes** tab.
+
+Current behavior:
+
+- Monday through Sunday can be selected independently.
+- The same organization start/end time is used for each selected day.
+- Selected days are written into **Time Range 1**.
+- Unselected days are left blank.
+- **Time Range 2** is intentionally left blank.
+- If Happy Hour is disabled, both ranges are left blank.
+- Workbook validation checks that the Notes schedule matches the organization settings before download.
+
+The Export to Toast page also displays the selected days and time window so the schedule can be reviewed before generating the workbook.
+
+## 13. Understand Beer variants and Toast's fixed workbook
 
 Inventory stores the actual product/serving format as variant data.
 
@@ -284,7 +311,7 @@ If a location carries both 24oz cans and bottles, both remain separate Inventory
 
 Do not modify Toast's fixed template headers to make the source workbook match the venue's package sizes. Explain size differences to the Toast representative where needed.
 
-## 13. Canonical categories
+## 14. Canonical categories
 
 The persistent Catalog carries canonical category information shared with Toast export.
 
