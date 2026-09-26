@@ -65,7 +65,9 @@ export function parseToastExportReviewCsv(text: string, sourceName: string): {
     if (row.every((value) => value.trim() === '')) return
 
     const rawRow = Object.fromEntries(headers.map((header, index) => [header, row[index] ?? '']))
-    const sourceKind = getCell(row, headerIndex, 'Source Kind') || 'aloha-csv'
+    const sourceKind = parseSourceKind(
+      getCell(row, headerIndex, 'Source Kind'),
+    )
     const sourceItemNumber = blankToUndefined(getCell(row, headerIndex, 'Source Item #'))
     const itemName = getCell(row, headerIndex, 'Item Name')
     const sourceCategory = blankToUndefined(
@@ -87,7 +89,7 @@ export function parseToastExportReviewCsv(text: string, sourceName: string): {
     rawRows.push(rawRow)
     items.push({
       id: `toast-review-${sourceItemNumber || rowIndex + 1}-${slugify(itemName)}-${rowIndex}`,
-      sourceKind: sourceKind === 'aloha-csv' ? 'aloha-csv' : 'aloha-csv',
+      sourceKind,
       sourceItemNumber,
       name: itemName,
       category: sourceCategory,
@@ -199,6 +201,12 @@ function parseMoney(value: string) {
 
   const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? Math.round(parsed * 100) : null
+}
+
+function parseSourceKind(value: string): NormalizedMenuItem['sourceKind'] {
+  return value.trim() === 'toast-template-sheet'
+    ? 'toast-template-sheet'
+    : 'aloha-csv'
 }
 
 function parseStatus(value: string): NormalizedMenuItem['status'] {
