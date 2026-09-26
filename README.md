@@ -257,6 +257,21 @@ Run its tests with:
 bash ./bash-scripts/test-all.sh
 ```
 
+## Toast workbook staging review
+
+The authenticated **Export to Toast** page can stage an existing Toast XLSX for normalization without writing anything to the persistent Inventory catalog.
+
+The staging importer:
+
+- reads only visible source tabs: **Beer**, **Liquor**, **Cocktails**, **Retail**, and **Menu Build** for warnings;
+- ignores hidden/generated Toast helper tabs such as **Compiled Bev**, **Beverage Import**, **Size Pricing**, **MOC**, and similar calculation sheets;
+- stores staged normalized rows only in the browser review session;
+- marks suspicious rows as **Review** and excludes them from generated exports until corrected;
+- never calls the persistent Inventory import endpoint;
+- allows a fresh Toast workbook to be generated from the staged rows against the repository's pristine Toast template.
+
+A later explicit commit-to-Inventory workflow is required before staged data may create or update master catalog records.
+
 ## Frozen WIP routes
 
 `/wip` and `/wip/toast-workbook` are intentionally unauthenticated frozen snapshots of the earlier browser workflow.

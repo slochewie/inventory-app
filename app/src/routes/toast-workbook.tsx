@@ -15,6 +15,7 @@ import {
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
 import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
+import { parseToastWorkbookForReview } from '#/features/menu-import/toast-workbook-import'
 import {
   buildPopulatedToastTemplateWorkbookWithLiquorAsync,
   validatePopulatedToastTemplateWorkbookWithLiquor,
@@ -63,7 +64,7 @@ function ToastWorkbook() {
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(savedReviewSession?.importFile ?? null)
   const [items, setItems] = useState<NormalizedMenuItem[]>(savedReviewSession?.items ?? [])
   const [reviewSource, setReviewSource] = useState<
-    'catalog' | 'saved' | 'review-csv' | 'uploaded' | null
+    'catalog' | 'saved' | 'review-csv' | 'uploaded' | 'toast-workbook' | null
   >(savedReviewSession?.items.length ? 'saved' : null)
   const [reviewSavedAt, setReviewSavedAt] = useState(savedReviewSession?.savedAt ?? null)
   const [catalogLoading, setCatalogLoading] = useState(false)
@@ -201,6 +202,81 @@ function ToastWorkbook() {
     }
   }
 
+  async function handleToastWorkbookChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setAlohaError(null)
+    setDownloadError(null)
+    setWorkbookValidation(null)
+
+    try {
+      const parsed = parseToastWorkbookForReview(
+        await file.arrayBuffer(),
+        file.name,
+      )
+
+      setImportFile(parsed.importFile)
+      setItems(parsed.items)
+      setReviewSource('toast-workbook')
+      setReviewSavedAt(null)
+      saveReviewSession(parsed.importFile, parsed.items)
+    } catch (error) {
+      setAlohaError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to stage the selected Toast workbook',
+      )
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  function updateStagedItem(
+    itemId: string,
+    patch: Partial<NormalizedMenuItem>,
+  ) {
+    setItems((current) => {
+      const next = current.map((item) => {
+        if (item.id !== itemId) return item
+
+        const updated = { ...item, ...patch }
+        const ready =
+          updated.name.trim() !== '' &&
+          !/^\[Review /i.test(updated.name) &&
+          updated.basePriceCents !== null
+
+        return {
+          ...updated,
+          status: ready ? 'ready' : 'review',
+          exportToToast: ready && updated.exportToToast !== false,
+          exportIncluded: ready && updated.exportIncluded !== false,
+        } satisfies NormalizedMenuItem
+      })
+
+      saveReviewSession(importFile, next)
+      return next
+    })
+  }
+
+  function toggleStagedItemIncluded(itemId: string, included: boolean) {
+    setItems((current) => {
+      const next = current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              exportToToast: included,
+              exportIncluded: included,
+            }
+          : item,
+      )
+      saveReviewSession(importFile, next)
+      return next
+    })
+  }
+
   async function handleReviewCsvChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -336,6 +412,11 @@ function ToastWorkbook() {
               <p>
                 Using saved reviewed state{reviewSavedAt ? ` from ${new Date(reviewSavedAt).toLocaleString()}` : ''}.
               </p>
+            ) : reviewSource === 'toast-workbook' ? (
+              <p>
+                <strong>Staged Toast workbook — not saved to Inventory.</strong>{' '}
+                Review and normalize this source before any future master import.
+              </p>
             ) : reviewSource === 'review-csv' ? (
               <p>Using an advanced review CSV override for this export session.</p>
             ) : reviewSource === 'uploaded' ? (
@@ -354,6 +435,14 @@ function ToastWorkbook() {
             restoring an older review session.
           </p>
           <div className="inventory-upload-stack">
+            <label className="inventory-upload-control">
+              <span>Stage Toast workbook for review</span>
+              <input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={handleToastWorkbookChange}
+              />
+            </label>
             <label className="inventory-upload-control">
               <span>Choose review CSV</span>
               <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
@@ -383,11 +472,13 @@ function ToastWorkbook() {
                   <dd>
                     {reviewSource === 'catalog'
                       ? 'Persistent Inventory catalog'
-                      : reviewSource === 'review-csv'
-                        ? 'Toast export review CSV'
-                        : reviewSource === 'saved'
-                          ? 'Reviewed Inventory state'
-                          : 'Aloha CSV'}
+                      : reviewSource === 'toast-workbook'
+                        ? 'Staged Toast workbook — browser only'
+                        : reviewSource === 'review-csv'
+                          ? 'Toast export review CSV'
+                          : reviewSource === 'saved'
+                            ? 'Reviewed Inventory state'
+                            : 'Aloha CSV'}
                   </dd>
                 </div>
                 <div>
@@ -404,6 +495,143 @@ function ToastWorkbook() {
                 </div>
               </dl>
             </section>
+
+            {reviewSource === 'toast-workbook' ? (
+              <section className="inventory-card inventory-import-card">
+                <div className="inventory-table-heading">
+                  <div>
+                    <p className="inventory-kicker">Staging review</p>
+                    <h2>Normalized workbook rows</h2>
+                    <p>
+                      Browser-only staging. Editing these rows does not create or
+                      update master Inventory records.
+                    </p>
+                  </div>
+                  <p>
+                    {summary.reviewItems.toLocaleString()} need review
+                  </p>
+                </div>
+
+                {importFile?.warnings.length ? (
+                  <details className="inventory-export-preview" open>
+                    <summary>
+                      <span>Workbook warnings</span>
+                      <strong>{importFile.warnings.length.toLocaleString()}</strong>
+                    </summary>
+                    <ul className="inventory-warning-list">
+                      {importFile.warnings.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
+
+                <div className="inventory-table-wrap">
+                  <table className="inventory-table">
+                    <thead>
+                      <tr>
+                        <th>Include</th>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th>Destination</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={item.exportIncluded}
+                              disabled={item.basePriceCents === null}
+                              onChange={(event) =>
+                                toggleStagedItemIncluded(
+                                  item.id,
+                                  event.target.checked,
+                                )
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={item.name}
+                              onChange={(event) =>
+                                updateStagedItem(item.id, {
+                                  name: event.target.value,
+                                })
+                              }
+                            />
+                            {item.notes.length ? (
+                              <small>{item.notes.join(' ')}</small>
+                            ) : null}
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={item.toastCategory}
+                              onChange={(event) =>
+                                updateStagedItem(item.id, {
+                                  category: event.target.value,
+                                  toastCategory: event.target.value,
+                                })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={item.toastDestination}
+                              onChange={(event) =>
+                                updateStagedItem(item.id, {
+                                  toastDestination: event.target.value,
+                                })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={
+                                item.basePriceCents === null
+                                  ? ''
+                                  : (item.basePriceCents / 100).toFixed(2)
+                              }
+                              onChange={(event) => {
+                                const value = event.target.value.trim()
+                                const dollars = Number(value)
+                                updateStagedItem(item.id, {
+                                  basePriceCents:
+                                    value &&
+                                    Number.isFinite(dollars) &&
+                                    dollars > 0
+                                      ? Math.round(dollars * 100)
+                                      : null,
+                                })
+                              }}
+                            />
+                          </td>
+                          <td>
+                            <span
+                              className={
+                                item.status === 'review'
+                                  ? 'inventory-carry-status'
+                                  : 'inventory-carry-status is-on'
+                              }
+                            >
+                              {item.status === 'review' ? 'Review' : 'Ready'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
           </>
         ) : null}
 
