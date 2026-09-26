@@ -65,7 +65,13 @@ function ToastWorkbook() {
   const [items, setItems] = useState<NormalizedMenuItem[]>(savedReviewSession?.items ?? [])
   const [reviewSource, setReviewSource] = useState<
     'catalog' | 'saved' | 'review-csv' | 'uploaded' | 'toast-workbook' | null
-  >(savedReviewSession?.items.length ? 'saved' : null)
+  >(
+    savedReviewSession?.items.length
+      ? savedReviewSession.importFile?.meta?.source === 'toast-workbook-staging'
+        ? 'toast-workbook'
+        : 'saved'
+      : null,
+  )
   const [reviewSavedAt, setReviewSavedAt] = useState(savedReviewSession?.savedAt ?? null)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [organizationConfig, setOrganizationConfig] =
@@ -101,6 +107,15 @@ function ToastWorkbook() {
     ])
       .then(([catalog, config]) => {
         setOrganizationConfig(config)
+
+        if (
+          savedReviewSession?.items.length &&
+          savedReviewSession.importFile?.meta?.source ===
+            'toast-workbook-staging'
+        ) {
+          return
+        }
+
         if (catalog.items.length === 0) return
 
         const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
@@ -133,7 +148,11 @@ function ToastWorkbook() {
       })
 
     return () => controller.abort()
-  }, [activeOrganization?.id, activeOrganization?.name])
+  }, [
+    activeOrganization?.id,
+    activeOrganization?.name,
+    savedReviewSession,
+  ])
 
   useEffect(() => {
     let cancelled = false
@@ -217,12 +236,20 @@ function ToastWorkbook() {
         await file.arrayBuffer(),
         file.name,
       )
+      const stagedImportFile: ParsedMenuImport = {
+        ...parsed.importFile,
+        meta: {
+          ...parsed.importFile.meta,
+          store: activeOrganization?.name ?? 'Organization',
+          organizationId: activeOrganization?.id ?? '',
+        },
+      }
 
-      setImportFile(parsed.importFile)
+      setImportFile(stagedImportFile)
       setItems(parsed.items)
       setReviewSource('toast-workbook')
       setReviewSavedAt(null)
-      saveReviewSession(parsed.importFile, parsed.items)
+      saveReviewSession(stagedImportFile, parsed.items)
     } catch (error) {
       setAlohaError(
         error instanceof Error
