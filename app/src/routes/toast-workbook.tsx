@@ -302,7 +302,7 @@ function ToastWorkbook() {
 
         {items.length > 0 ? (
           <>
-            <section className="inventory-summary-grid" aria-label="Toast export summary">
+            <section className="inventory-summary-grid inventory-toast-summary-grid" aria-label="Toast export summary">
               <SummaryCard label="Source rows" value={summary.rawRows} />
               <SummaryCard label="Normalized items" value={summary.normalizedItems} />
               <SummaryCard label="Exporting" value={summary.exportItems} />
@@ -358,13 +358,13 @@ function ToastWorkbook() {
 
         {workbook ? <WorkbookInspectionCard workbook={workbook} /> : null}
 
-        <section className="inventory-card inventory-export-panel">
+        <section className="inventory-card inventory-export-panel inventory-toast-export-panel">
           <div className="inventory-table-heading">
             <div>
               <p className="inventory-kicker">Ready to export</p>
               <h2>Download Toast workbook</h2>
             </div>
-            <p>
+            <p className="inventory-export-context">
               Writes Beer and Liquor tab values
               {organizationConfig?.happyHourEnabled
                 ? ` with Happy Hour pricing for ${formatHappyHourWindow(organizationConfig)}.`
@@ -456,7 +456,7 @@ function WorkbookInspectionCard({ workbook }: { workbook: WorkbookState }) {
           </div>
           <div>
             <dt>Packaged groups</dt>
-            <dd>{beer.packagedGroups.length ? beer.packagedGroups.join(', ') : 'None detected'}</dd>
+            <dd>{formatDetectedGroups(beer.packagedGroups)}</dd>
           </div>
         </dl>
       ) : null}
@@ -482,6 +482,19 @@ function WorkbookInspectionCard({ workbook }: { workbook: WorkbookState }) {
       </details>
     </section>
   )
+}
+
+function formatDetectedGroups(groups: string[]) {
+  if (groups.length === 0) return 'None detected'
+
+  const counts = new Map<string, number>()
+  groups.forEach((group) => {
+    counts.set(group, (counts.get(group) ?? 0) + 1)
+  })
+
+  return [...counts.entries()]
+    .map(([group, count]) => count > 1 ? `${group} ×${count}` : group)
+    .join(', ')
 }
 
 function SummaryCard({ label, value }: { label: string; value: number }) {
