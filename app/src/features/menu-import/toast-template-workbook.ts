@@ -78,6 +78,13 @@ type OptionalPackagedSlotOptions = {
   slotIndex: number
 }
 
+type OptionalPackagedBeerSlotDefinition = OptionalPackagedSlotOptions & {
+  description: string
+  rows: BeerTabPreviewRow[]
+  getPrice: (row: BeerTabPreviewRow) => number | null
+  getHappyHour: (row: BeerTabPreviewRow) => number | null
+}
+
 const DEFAULT_TALL_BOY_CAN_OPTIONS: TallBoyCanOptions = {
   enabled: false,
   label: 'Tall Boy Can',
@@ -186,9 +193,11 @@ export function validatePopulatedBeerWorkbook({
 
   const draftRows = beerRows.filter((row) => hasConfiguredDraftBeerPrice(row, draftSlotMappings))
   const canRows = beerRows.filter((row) => row.canPrice !== null)
-  const tallBoyRows = tallBoyCan.enabled
-    ? beerRows.filter((row) => row.can24ozPrice !== null)
-    : []
+  const optionalPackagedSlots = buildOptionalPackagedBeerSlotDefinitions(
+    beerRows,
+    tallBoyCan,
+  )
+  const tallBoyRows = optionalPackagedSlots[0]?.rows ?? []
   const bottleRows = [
     ...(!tallBoyCan.enabled
       ? beerRows
@@ -318,21 +327,19 @@ export function validatePopulatedBeerWorkbook({
     })
   }
 
-  validateOptionalPackagedSlot({
-    issues,
-    sheetDoc,
-    sharedStrings: workbookPackage.sharedStrings,
-    mapping,
-    options: {
-      enabled: tallBoyCan.enabled,
-      label: tallBoyCan.label,
-      slotIndex: 0,
-    },
-    rows: tallBoyRows,
-    getName: (row) => row.beerName,
-    getPrice: (row) => row.can24ozPrice,
-    getHappyHour: (row) => row.can24ozHappyHour,
-    description: 'Tall Boy Can',
+  optionalPackagedSlots.forEach((definition) => {
+    validateOptionalPackagedSlot({
+      issues,
+      sheetDoc,
+      sharedStrings: workbookPackage.sharedStrings,
+      mapping,
+      options: definition,
+      rows: definition.rows,
+      getName: (row) => row.beerName,
+      getPrice: definition.getPrice,
+      getHappyHour: definition.getHappyHour,
+      description: definition.description,
+    })
   })
 
   const bottleSlot = findPackagedSlot(mapping, 'bottle')
@@ -570,9 +577,11 @@ function writeBeerRowsToSheet(
     hasConfiguredDraftBeerPrice(row, draftSlotMappings),
   )
   const canRows = beerRows.filter((row) => row.canPrice !== null)
-  const tallBoyRows = tallBoyCan.enabled
-    ? beerRows.filter((row) => row.can24ozPrice !== null)
-    : []
+  const optionalPackagedSlots = buildOptionalPackagedBeerSlotDefinitions(
+    beerRows,
+    tallBoyCan,
+  )
+  const tallBoyRows = optionalPackagedSlots[0]?.rows ?? []
   const bottleSlotRows = [
     ...(!tallBoyCan.enabled
       ? beerRows
@@ -608,18 +617,16 @@ function writeBeerRowsToSheet(
     writeCanBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
   })
 
-  writeOptionalPackagedSlotRows({
-    sheetDoc,
-    mapping,
-    options: {
-      enabled: tallBoyCan.enabled,
-      label: tallBoyCan.label,
-      slotIndex: 0,
-    },
-    rows: tallBoyRows,
-    getName: (row) => row.beerName,
-    getPrice: (row) => row.can24ozPrice,
-    getHappyHour: (row) => row.can24ozHappyHour,
+  optionalPackagedSlots.forEach((definition) => {
+    writeOptionalPackagedSlotRows({
+      sheetDoc,
+      mapping,
+      options: definition,
+      rows: definition.rows,
+      getName: (row) => row.beerName,
+      getPrice: definition.getPrice,
+      getHappyHour: definition.getHappyHour,
+    })
   })
 
   bottleSlotRows.forEach(({ row, kind }, index) => {
@@ -699,6 +706,25 @@ function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNu
   writeCellValue(sheetDoc, canSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
   if (canSlot.priceCol) writeCellValue(sheetDoc, canSlot.priceCol, rowNumber, centsToDollars(beerRow.canPrice), mapping.dataStartRow)
   if (canSlot.happyHourCol) writeCellValue(sheetDoc, canSlot.happyHourCol, rowNumber, centsToDollars(beerRow.canHappyHour), mapping.dataStartRow)
+}
+
+function buildOptionalPackagedBeerSlotDefinitions(
+  beerRows: BeerTabPreviewRow[],
+  tallBoyCan: TallBoyCanOptions,
+): OptionalPackagedBeerSlotDefinition[] {
+  return [
+    {
+      enabled: tallBoyCan.enabled,
+      label: tallBoyCan.label,
+      slotIndex: 0,
+      description: 'Tall Boy Can',
+      rows: tallBoyCan.enabled
+        ? beerRows.filter((row) => row.can24ozPrice !== null)
+        : [],
+      getPrice: (row) => row.can24ozPrice,
+      getHappyHour: (row) => row.can24ozHappyHour,
+    },
+  ]
 }
 
 function writeOptionalPackagedSlotRows<T>({
@@ -939,7 +965,7 @@ function getBeerTemplateMapping(workbookPackage: WorkbookPackage): BeerTemplateM
   if (draftSizes.length === 0) warnings.push('Beer tab has no draft size columns')
   if (canColumn === null) warnings.push('Beer tab has no Can column')
   if (!packagedGroups.some((slot) => slot.kind === 'bottle')) {
-    warnings.push('Beer tab has no Bottle column; 24oz cans cannot be written to the fixed Toast template')
+    warnings.push('Beer tab has no Bottle column; bottle items cannot be written to the Toast template')
   }
 
   return {
