@@ -768,6 +768,44 @@ select {
   white-space: nowrap;
 }
 
+
+.inventory-happy-hour-days {
+  grid-column: 1 / -1;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.inventory-happy-hour-days legend {
+  margin-bottom: 0.45rem;
+  color: #6b7280;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.inventory-happy-hour-day-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.inventory-happy-hour-day-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  padding: 0.35rem 0.6rem;
+  color: #374151;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.inventory-happy-hour-day-options input {
+  margin: 0;
+}
+
 .inventory-happy-hour-actions {
   display: flex;
   gap: 0.6rem;
