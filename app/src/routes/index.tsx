@@ -517,146 +517,159 @@ function CatalogPage() {
         </header>
 
         {canEdit ? (
-          <section className="inventory-happy-hour-card">
-            <div className="inventory-happy-hour-copy">
-              <p className="inventory-kicker">Organization settings</p>
-              <h2>Happy Hour</h2>
-              <p>
-                Set when {activeOrganization?.name ?? 'this organization'} uses Happy Hour pricing.
-              </p>
-            </div>
-
-            <label className="inventory-inline-toggle inventory-happy-hour-toggle">
-              <input
-                type="checkbox"
-                checked={happyHourDraftEnabled}
-                disabled={savingHappyHour}
-                onChange={(event) => setHappyHourDraftEnabled(event.target.checked)}
-              />
-              <span>{happyHourDraftEnabled ? 'Enabled' : 'Disabled'}</span>
-            </label>
-
-            <label className="inventory-search-control">
-              <span>Start</span>
-              <input
-                type="time"
-                value={happyHourDraftStart}
-                disabled={!happyHourDraftEnabled || savingHappyHour}
-                onChange={(event) => setHappyHourDraftStart(event.target.value)}
-              />
-            </label>
-
-            <label className="inventory-search-control">
-              <span>End</span>
-              <input
-                type="time"
-                value={happyHourDraftEnd}
-                disabled={!happyHourDraftEnabled || savingHappyHour}
-                onChange={(event) => setHappyHourDraftEnd(event.target.value)}
-              />
-            </label>
-
-            <fieldset
-              className="inventory-happy-hour-days"
-              disabled={!happyHourDraftEnabled || savingHappyHour}
-            >
-              <legend>Days</legend>
-              <div className="inventory-happy-hour-day-options">
-                {HAPPY_HOUR_DAY_OPTIONS.map((option) => (
-                  <label key={option.value}>
-                    <input
-                      type="checkbox"
-                      checked={happyHourDraftDays.includes(option.value)}
-                      onChange={(event) => {
-                        setHappyHourDraftDays((current) =>
-                          event.target.checked
-                            ? ALL_HAPPY_HOUR_DAYS.filter(
-                                (day) =>
-                                  day === option.value ||
-                                  current.includes(day),
-                              )
-                            : current.filter((day) => day !== option.value),
-                        )
-                      }}
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
+          <details className="inventory-organization-settings">
+            <summary>
+              <div>
+                <p className="inventory-kicker">Organization settings</p>
+                <strong>Happy Hour & draft sizes</strong>
+                <span>
+                  Settings for {activeOrganization?.name ?? 'this organization'}.
+                </span>
               </div>
-            </fieldset>
+              <span className="inventory-organization-settings-summary-action">
+                Edit settings
+              </span>
+            </summary>
 
-            <div className="inventory-happy-hour-actions">
-              <button
-                type="button"
-                className="inventory-secondary-button"
-                disabled={!happyHourHasChanges || savingHappyHour}
-                onClick={() => {
-                  setHappyHourDraftEnabled(happyHourEnabled)
-                  setHappyHourDraftStart(happyHourStart)
-                  setHappyHourDraftEnd(happyHourEnd)
-                  setHappyHourDraftDays(happyHourDays)
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="inventory-primary-button"
-                disabled={!happyHourHasChanges || savingHappyHour}
-                onClick={() => void saveHappyHourSettings()}
-              >
-                {savingHappyHour ? 'Saving…' : 'Update'}
-              </button>
-            </div>
-          </section>
-        ) : null}
+            <div className="inventory-organization-settings-content">
+              <section className="inventory-organization-settings-section inventory-happy-hour-settings">
+                <div className="inventory-happy-hour-copy">
+                  <h2>Happy Hour</h2>
+                  <p>
+                    Set when {activeOrganization?.name ?? 'this organization'} uses Happy Hour pricing.
+                  </p>
+                </div>
 
-        {canEdit ? (
-          <section className="inventory-draft-slots-card">
-            <div className="inventory-draft-slots-copy">
-              <p className="inventory-kicker">Organization settings</p>
-              <h2>Draft sizes</h2>
-              <p>
-                Map this location's actual draft sizes to Toast's fixed draft slots.
-              </p>
-            </div>
+                <label className="inventory-inline-toggle inventory-happy-hour-toggle">
+                  <input
+                    type="checkbox"
+                    checked={happyHourDraftEnabled}
+                    disabled={savingHappyHour}
+                    onChange={(event) => setHappyHourDraftEnabled(event.target.checked)}
+                  />
+                  <span>{happyHourDraftEnabled ? 'Enabled' : 'Disabled'}</span>
+                </label>
 
-            <div className="inventory-draft-slot-list">
-              <div className="inventory-draft-slot-header" aria-hidden="true">
-                <span>Toast slot</span>
-                <span>Used</span>
-                <span>Actual size</span>
-              </div>
-              <DraftSlotField toastLabel="8oz" value={draft8Edit} disabled={savingDraftSlots} onChange={setDraft8Edit} />
-              <DraftSlotField toastLabel="16oz" value={draft16Edit} disabled={savingDraftSlots} onChange={setDraft16Edit} />
-              <DraftSlotField toastLabel="24oz" value={draft24Edit} disabled={savingDraftSlots} onChange={setDraft24Edit} />
-              <DraftSlotField toastLabel="Pitcher" value={pitcherEdit} disabled={savingDraftSlots} onChange={setPitcherEdit} />
-            </div>
+                <label className="inventory-search-control">
+                  <span>Start</span>
+                  <input
+                    type="time"
+                    value={happyHourDraftStart}
+                    disabled={!happyHourDraftEnabled || savingHappyHour}
+                    onChange={(event) => setHappyHourDraftStart(event.target.value)}
+                  />
+                </label>
 
-            <div className="inventory-draft-slots-actions">
-              <button
-                type="button"
-                className="inventory-secondary-button"
-                disabled={!draftSlotsHaveChanges || savingDraftSlots}
-                onClick={() => {
-                  setDraft8Edit(draft8)
-                  setDraft16Edit(draft16)
-                  setDraft24Edit(draft24)
-                  setPitcherEdit(pitcher)
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="inventory-primary-button"
-                disabled={!draftSlotsHaveChanges || savingDraftSlots}
-                onClick={() => void saveDraftSlotSettings()}
-              >
-                {savingDraftSlots ? 'Saving…' : 'Update'}
-              </button>
+                <label className="inventory-search-control">
+                  <span>End</span>
+                  <input
+                    type="time"
+                    value={happyHourDraftEnd}
+                    disabled={!happyHourDraftEnabled || savingHappyHour}
+                    onChange={(event) => setHappyHourDraftEnd(event.target.value)}
+                  />
+                </label>
+
+                <fieldset
+                  className="inventory-happy-hour-days"
+                  disabled={!happyHourDraftEnabled || savingHappyHour}
+                >
+                  <legend>Days</legend>
+                  <div className="inventory-happy-hour-day-options">
+                    {HAPPY_HOUR_DAY_OPTIONS.map((option) => (
+                      <label key={option.value}>
+                        <input
+                          type="checkbox"
+                          checked={happyHourDraftDays.includes(option.value)}
+                          onChange={(event) => {
+                            setHappyHourDraftDays((current) =>
+                              event.target.checked
+                                ? ALL_HAPPY_HOUR_DAYS.filter(
+                                    (day) =>
+                                      day === option.value ||
+                                      current.includes(day),
+                                  )
+                                : current.filter((day) => day !== option.value),
+                            )
+                          }}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <div className="inventory-happy-hour-actions">
+                  <button
+                    type="button"
+                    className="inventory-secondary-button"
+                    disabled={!happyHourHasChanges || savingHappyHour}
+                    onClick={() => {
+                      setHappyHourDraftEnabled(happyHourEnabled)
+                      setHappyHourDraftStart(happyHourStart)
+                      setHappyHourDraftEnd(happyHourEnd)
+                      setHappyHourDraftDays(happyHourDays)
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="inventory-primary-button"
+                    disabled={!happyHourHasChanges || savingHappyHour}
+                    onClick={() => void saveHappyHourSettings()}
+                  >
+                    {savingHappyHour ? 'Saving…' : 'Update'}
+                  </button>
+                </div>
+              </section>
+
+              <section className="inventory-organization-settings-section inventory-draft-slots-settings">
+                <div className="inventory-draft-slots-copy">
+                  <h2>Draft sizes</h2>
+                  <p>
+                    Map this location's actual draft sizes to Toast's fixed draft slots.
+                  </p>
+                </div>
+
+                <div className="inventory-draft-slot-list">
+                  <div className="inventory-draft-slot-header" aria-hidden="true">
+                    <span>Toast slot</span>
+                    <span>Used</span>
+                    <span>Actual size</span>
+                  </div>
+                  <DraftSlotField toastLabel="8oz" value={draft8Edit} disabled={savingDraftSlots} onChange={setDraft8Edit} />
+                  <DraftSlotField toastLabel="16oz" value={draft16Edit} disabled={savingDraftSlots} onChange={setDraft16Edit} />
+                  <DraftSlotField toastLabel="24oz" value={draft24Edit} disabled={savingDraftSlots} onChange={setDraft24Edit} />
+                  <DraftSlotField toastLabel="Pitcher" value={pitcherEdit} disabled={savingDraftSlots} onChange={setPitcherEdit} />
+                </div>
+
+                <div className="inventory-draft-slots-actions">
+                  <button
+                    type="button"
+                    className="inventory-secondary-button"
+                    disabled={!draftSlotsHaveChanges || savingDraftSlots}
+                    onClick={() => {
+                      setDraft8Edit(draft8)
+                      setDraft16Edit(draft16)
+                      setDraft24Edit(draft24)
+                      setPitcherEdit(pitcher)
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="inventory-primary-button"
+                    disabled={!draftSlotsHaveChanges || savingDraftSlots}
+                    onClick={() => void saveDraftSlotSettings()}
+                  >
+                    {savingDraftSlots ? 'Saving…' : 'Update'}
+                  </button>
+                </div>
+              </section>
             </div>
-          </section>
+          </details>
         ) : null}
 
         <section className="inventory-catalog-toolbar" aria-label="Catalog filters">
