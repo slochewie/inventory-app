@@ -52,21 +52,31 @@ type LiquorTemplateMapping = {
 export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   templateArrayBuffer,
   items,
+  happyHourEnabled = true,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
+  happyHourEnabled?: boolean
 }) {
-  const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({ templateArrayBuffer, items })
+  const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({
+    templateArrayBuffer,
+    items,
+    happyHourEnabled,
+  })
   const beerWorkbookBuffer = await beerPopulatedWorkbook.arrayBuffer()
   const workbookPackage = readWorkbookPackage(beerWorkbookBuffer)
 
-  populateLiquorSheet(workbookPackage, items)
+  populateLiquorSheet(workbookPackage, items, happyHourEnabled)
 
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
 
-function populateLiquorSheet(workbookPackage: WorkbookPackage, items: NormalizedMenuItem[]) {
-  const liquorRows = getLiquorRows(items)
+function populateLiquorSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+) {
+  const liquorRows = getLiquorRows(items, happyHourEnabled)
   if (liquorRows.length === 0) return
 
   const mapping = getLiquorTemplateMapping(workbookPackage)
@@ -88,8 +98,12 @@ function populateLiquorSheet(workbookPackage: WorkbookPackage, items: Normalized
   workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
 }
 
-function getLiquorRows(items: NormalizedMenuItem[]): LiquorRow[] {
-  const liquorFile = buildToastExportFiles(items).find((file) => file.id === 'liquor')
+function getLiquorRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+): LiquorRow[] {
+  const liquorFile = buildToastExportFiles(items, { happyHourEnabled })
+    .find((file) => file.id === 'liquor')
   if (!liquorFile) return []
 
   return liquorFile.rows.slice(1).flatMap((row) => {
