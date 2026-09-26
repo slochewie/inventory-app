@@ -75,6 +75,10 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourStart = null,
   happyHourEnd = null,
   happyHourDays = DEFAULT_HAPPY_HOUR_DAYS,
+  happyHourRange2Enabled = false,
+  happyHourRange2Start = null,
+  happyHourRange2End = null,
+  happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -82,6 +86,10 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourStart?: string | null
   happyHourEnd?: string | null
   happyHourDays?: readonly string[]
+  happyHourRange2Enabled?: boolean
+  happyHourRange2Start?: string | null
+  happyHourRange2End?: string | null
+  happyHourRange2Days?: readonly string[]
 }) {
   const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({
     templateArrayBuffer,
@@ -98,6 +106,10 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
     happyHourStart,
     happyHourEnd,
     happyHourDays,
+    happyHourRange2Enabled,
+    happyHourRange2Start,
+    happyHourRange2End,
+    happyHourRange2Days,
   )
 
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
@@ -110,6 +122,10 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourStart = null,
   happyHourEnd = null,
   happyHourDays = DEFAULT_HAPPY_HOUR_DAYS,
+  happyHourRange2Enabled = false,
+  happyHourRange2Start = null,
+  happyHourRange2End = null,
+  happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -117,6 +133,10 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourStart?: string | null
   happyHourEnd?: string | null
   happyHourDays?: readonly string[]
+  happyHourRange2Enabled?: boolean
+  happyHourRange2Start?: string | null
+  happyHourRange2End?: string | null
+  happyHourRange2Days?: readonly string[]
 }) {
   const beer = validatePopulatedBeerWorkbook({
     workbookArrayBuffer,
@@ -150,6 +170,10 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     happyHourStart,
     happyHourEnd,
     happyHourDays,
+    happyHourRange2Enabled,
+    happyHourRange2Start,
+    happyHourRange2End,
+    happyHourRange2Days,
   )
   issues.push(...happyHourNotes.issues)
 
@@ -172,6 +196,10 @@ function populateHappyHourNotesSheet(
   start: string | null,
   end: string | null,
   days: readonly string[],
+  range2Enabled: boolean,
+  range2Start: string | null,
+  range2End: string | null,
+  range2Days: readonly string[],
 ) {
   const notesSheet = getWorkbookSheets(workbookPackage)
     .find((sheet) => sheet.name.toLowerCase() === 'notes')
@@ -205,6 +233,25 @@ function populateHappyHourNotesSheet(
       writeCellValue(sheetDoc, 8, rowNumber, endTime.time, rowNumber)
       writeCellValue(sheetDoc, 9, rowNumber, endTime.meridiem, rowNumber)
     })
+
+    if (range2Enabled) {
+      if (!range2Start || !range2End) {
+        throw new Error('Happy Hour Time Range 2 is enabled but its start/end time is missing')
+      }
+
+      const range2StartTime = splitHappyHourTime(range2Start)
+      const range2EndTime = splitHappyHourTime(range2End)
+      const selectedRange2Days = normalizeHappyHourDays(range2Days)
+
+      HAPPY_HOUR_NOTE_ROWS.forEach(({ day, rowNumber }) => {
+        if (!selectedRange2Days.has(day)) return
+
+        writeCellValue(sheetDoc, 11, rowNumber, range2StartTime.time, rowNumber)
+        writeCellValue(sheetDoc, 12, rowNumber, range2StartTime.meridiem, rowNumber)
+        writeCellValue(sheetDoc, 14, rowNumber, range2EndTime.time, rowNumber)
+        writeCellValue(sheetDoc, 15, rowNumber, range2EndTime.meridiem, rowNumber)
+      })
+    }
   }
 
   workbookPackage.files[notesSheet.path] = strToU8(serializeXml(sheetDoc))
@@ -216,6 +263,10 @@ function validateHappyHourNotesSheet(
   start: string | null,
   end: string | null,
   days: readonly string[],
+  range2Enabled: boolean,
+  range2Start: string | null,
+  range2End: string | null,
+  range2Days: readonly string[],
 ) {
   const notesSheet = getWorkbookSheets(workbookPackage)
     .find((sheet) => sheet.name.toLowerCase() === 'notes')
@@ -229,6 +280,15 @@ function validateHappyHourNotesSheet(
   const expectedEnd = enabled && end ? splitHappyHourTime(end) : null
 
   const selectedDays = normalizeHappyHourDays(days)
+  const expectedRange2Start =
+    enabled && range2Enabled && range2Start
+      ? splitHappyHourTime(range2Start)
+      : null
+  const expectedRange2End =
+    enabled && range2Enabled && range2End
+      ? splitHappyHourTime(range2End)
+      : null
+  const selectedRange2Days = normalizeHappyHourDays(range2Days)
 
   HAPPY_HOUR_NOTE_ROWS.forEach(({ day, rowNumber }) => {
     const dayEnabled =
@@ -261,13 +321,34 @@ function validateHappyHourNotesSheet(
       }
     })
 
-    ;[11, 12, 14, 15].forEach((column) => {
+    const range2DayEnabled =
+      enabled &&
+      range2Enabled &&
+      selectedRange2Days.has(day) &&
+      expectedRange2Start !== null &&
+      expectedRange2End !== null
+
+    const expectedRange2 = range2DayEnabled
+      ? [
+          [11, expectedRange2Start.time],
+          [12, expectedRange2Start.meridiem],
+          [14, expectedRange2End.time],
+          [15, expectedRange2End.meridiem],
+        ] as const
+      : [
+          [11, ''],
+          [12, ''],
+          [14, ''],
+          [15, ''],
+        ] as const
+
+    expectedRange2.forEach(([column, value]) => {
       const cell = findCell(sheetDoc, column, rowNumber)
       const actual = cell
         ? getCellDisplayValue(cell, workbookPackage.sharedStrings)
         : ''
-      if (actual !== '') {
-        issues.push('Notes Happy Hour Time Range 2 should be blank')
+      if (actual !== value) {
+        issues.push('Notes Happy Hour Time Range 2 does not match organization settings')
       }
     })
   })
