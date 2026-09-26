@@ -65,6 +65,20 @@ type CatalogResponse = {
   error?: string
 }
 
+export type InventoryOrganizationConfig = {
+  enabled: boolean
+  happyHourEnabled: boolean
+  happyHourStart: string | null
+  happyHourEnd: string | null
+}
+
+type OrganizationConfigResponse = {
+  organizationId?: string
+  config?: InventoryOrganizationConfig
+  updated?: boolean
+  error?: string
+}
+
 
 export type InventoryImportItem = {
   id: string
@@ -200,6 +214,66 @@ export async function listInventoryAssignments(organizationId: string) {
   }
 
   return Array.isArray(result.assignments) ? result.assignments : []
+}
+
+
+export async function getInventoryOrganizationConfig(
+  organizationId: string,
+  signal?: AbortSignal,
+) {
+  const url = new URL(authEndpoint("/api/auth/inventory/organization-config"))
+  url.searchParams.set("organizationId", organizationId)
+
+  const response = await fetch(url, {
+    credentials: "include",
+    signal,
+  })
+  const result = (await response.json()) as OrganizationConfigResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to load Inventory organization settings.",
+    )
+  }
+
+  return result.config ?? {
+    enabled: true,
+    happyHourEnabled: false,
+    happyHourStart: null,
+    happyHourEnd: null,
+  }
+}
+
+export async function updateInventoryOrganizationConfig(input: {
+  organizationId: string
+  happyHourEnabled: boolean
+  happyHourStart: string | null
+  happyHourEnd: string | null
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/organization-config"),
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  )
+  const result = (await response.json()) as OrganizationConfigResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to update Inventory organization settings.",
+    )
+  }
+
+  return result.config ?? null
 }
 
 
