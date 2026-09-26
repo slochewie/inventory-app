@@ -1703,6 +1703,34 @@ select {
   max-width: 58rem;
 }
 
+.inventory-workbook-validation {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.75rem 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.7rem;
+  background: #f8fafc;
+  padding: 0.65rem 0.8rem;
+  color: #4b5563;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.inventory-workbook-validation strong {
+  color: #111827;
+}
+
+.inventory-workbook-validation.is-valid {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.inventory-workbook-validation.is-valid strong {
+  color: #166534;
+}
+
+
 .inventory-toast-export-panel .inventory-upload-stack {
   display: flex;
   flex-wrap: wrap;
