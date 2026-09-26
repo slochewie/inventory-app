@@ -272,7 +272,18 @@ export async function getInventoryOrganizationConfig(
     )
   }
 
-  return result.config ?? {
+  if (result.config) {
+    const legacyLabel = result.config.tallBoyCanLabel?.trim()
+    return {
+      ...result.config,
+      tallBoyCanLabel:
+        !result.config.tallBoyCanEnabled && legacyLabel === "Tall Boy Can"
+          ? "Optional Beer Category 1"
+          : legacyLabel || "Optional Beer Category 1",
+    }
+  }
+
+  return {
     enabled: true,
     happyHourEnabled: false,
     happyHourStart: null,
