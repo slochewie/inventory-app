@@ -15,7 +15,10 @@ export type BeerTabPreviewRow = {
   reviewNotes: string[]
 }
 
-export function buildBeerTabPreviewRows(items: NormalizedMenuItem[]): BeerTabPreviewRow[] {
+export function buildBeerTabPreviewRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled = true,
+): BeerTabPreviewRow[] {
   const rows = new Map<string, BeerTabPreviewRow>()
 
   items
@@ -24,7 +27,7 @@ export function buildBeerTabPreviewRows(items: NormalizedMenuItem[]): BeerTabPre
       const beerName = getBeerName(item.name, item.toastDestination)
       const row = rows.get(beerName) ?? createBeerTabPreviewRow(beerName)
 
-      applyBeerSlot(row, item)
+      applyBeerSlot(row, item, happyHourEnabled)
       rows.set(beerName, row)
     })
 
@@ -48,36 +51,40 @@ function createBeerTabPreviewRow(beerName: string): BeerTabPreviewRow {
   }
 }
 
-function applyBeerSlot(row: BeerTabPreviewRow, item: NormalizedMenuItem) {
+function applyBeerSlot(
+  row: BeerTabPreviewRow,
+  item: NormalizedMenuItem,
+  happyHourEnabled: boolean,
+) {
   const destination = item.toastDestination.toLowerCase()
 
   if (destination.includes('draft beer 10oz')) {
     row.draft10ozPrice = item.basePriceCents
-    row.draft10ozHappyHour = item.happyHourPriceCents
+    row.draft10ozHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
     return
   }
 
   if (destination.includes('draft beer 16oz')) {
     row.draft16ozPrice = item.basePriceCents
-    row.draft16ozHappyHour = item.happyHourPriceCents
+    row.draft16ozHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
     return
   }
 
   if (destination.includes('24oz can')) {
     row.can24ozPrice = item.basePriceCents
-    row.can24ozHappyHour = item.happyHourPriceCents
+    row.can24ozHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
     return
   }
 
   if (destination.includes('bottle')) {
     row.bottlePrice = item.basePriceCents
-    row.bottleHappyHour = item.happyHourPriceCents
+    row.bottleHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
     return
   }
 
   if (destination.includes('can')) {
     row.canPrice = item.basePriceCents
-    row.canHappyHour = item.happyHourPriceCents
+    row.canHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
     return
   }
 
