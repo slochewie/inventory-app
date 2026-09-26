@@ -74,6 +74,36 @@ export type HappyHourDay =
   | "sat"
   | "sun"
 
+export type OptionalBeerCategorySlot = 1 | 2 | 3 | 4 | 5
+
+export type OptionalBeerCategoryConfig = {
+  slot: OptionalBeerCategorySlot
+  key: `optional-beer-${OptionalBeerCategorySlot}`
+  enabled: boolean
+  label: string
+}
+
+export const OPTIONAL_BEER_CATEGORY_SLOTS: readonly OptionalBeerCategorySlot[] = [
+  1, 2, 3, 4, 5,
+]
+
+export function getOptionalBeerSlotKey(
+  slot: OptionalBeerCategorySlot,
+): OptionalBeerCategoryConfig["key"] {
+  return `optional-beer-${slot}`
+}
+
+export function getOptionalBeerCategories(
+  config: InventoryOrganizationConfig,
+): OptionalBeerCategoryConfig[] {
+  return OPTIONAL_BEER_CATEGORY_SLOTS.map((slot) => ({
+    slot,
+    key: getOptionalBeerSlotKey(slot),
+    enabled: config[`optionalBeerCategory${slot}Enabled`],
+    label: config[`optionalBeerCategory${slot}Label`],
+  }))
+}
+
 export const ALL_HAPPY_HOUR_DAYS: HappyHourDay[] = [
   "mon",
   "tue",
@@ -309,14 +339,14 @@ export async function updateInventoryOrganizationConfig(input: {
   pitcherActualSizeOz: number | null
   optionalBeerCategory1Enabled: boolean
   optionalBeerCategory1Label: string
-  optionalBeerCategory2Enabled?: boolean
-  optionalBeerCategory2Label?: string
-  optionalBeerCategory3Enabled?: boolean
-  optionalBeerCategory3Label?: string
-  optionalBeerCategory4Enabled?: boolean
-  optionalBeerCategory4Label?: string
-  optionalBeerCategory5Enabled?: boolean
-  optionalBeerCategory5Label?: string
+  optionalBeerCategory2Enabled: boolean
+  optionalBeerCategory2Label: string
+  optionalBeerCategory3Enabled: boolean
+  optionalBeerCategory3Label: string
+  optionalBeerCategory4Enabled: boolean
+  optionalBeerCategory4Label: string
+  optionalBeerCategory5Enabled: boolean
+  optionalBeerCategory5Label: string
 }) {
   const response = await fetch(
     authEndpoint("/api/auth/inventory/organization-config"),
@@ -512,6 +542,7 @@ export async function updateInventoryOrganizationVariant(input: {
   toastNameOverride?: string | null
   toastCategoryOverride?: string | null
   toastDestinationOverride?: string | null
+  toastSlot?: string | null
 }) {
   const response = await fetch(
     authEndpoint("/api/auth/inventory/organization-variant"),

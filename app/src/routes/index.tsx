@@ -10,12 +10,15 @@ import { authClient } from '#/lib/auth-client'
 import {
   ALL_HAPPY_HOUR_DAYS,
   getInventoryOrganizationConfig,
+  getOptionalBeerCategories,
   listInventoryCatalog,
   mergeInventoryItems,
   updateInventoryItemCategory,
   updateInventoryOrganizationConfig,
   updateInventoryOrganizationVariant,
   type HappyHourDay,
+  type InventoryOrganizationConfig,
+  type OptionalBeerCategoryConfig,
 } from '#/lib/inventory-access'
 
 export const Route = createFileRoute('/')({ component: CatalogPage })
@@ -26,6 +29,8 @@ type DraftSlotState = {
   enabled: boolean
   actualSizeOz: string
 }
+
+type OptionalBeerCategoryState = OptionalBeerCategoryConfig
 
 const PAGE_SIZE = 50
 
@@ -103,11 +108,9 @@ function CatalogPage() {
   const [draft24Edit, setDraft24Edit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
   const [pitcherEdit, setPitcherEdit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
   const [savingDraftSlots, setSavingDraftSlots] = useState(false)
-  const [optionalBeerCategory1Enabled, setOptionalBeerCategory1Enabled] = useState(false)
-  const [optionalBeerCategory1Label, setOptionalBeerCategory1Label] = useState('Optional Beer Category 1')
-  const [optionalBeerCategory1EditEnabled, setOptionalBeerCategory1EditEnabled] = useState(false)
-  const [optionalBeerCategory1EditLabel, setOptionalBeerCategory1EditLabel] = useState('Optional Beer Category 1')
-  const [savingOptionalBeerCategory1, setSavingOptionalBeerCategory1] = useState(false)
+  const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryState[]>([])
+  const [optionalBeerCategoryEdits, setOptionalBeerCategoryEdits] = useState<OptionalBeerCategoryState[]>([])
+  const [savingOptionalBeerCategories, setSavingOptionalBeerCategories] = useState(false)
 
   useEffect(() => {
     if (!activeOrganization?.id) {
@@ -186,13 +189,11 @@ function CatalogPage() {
         setDraft24Edit(nextDraft24)
         setPitcherEdit(nextPitcher)
 
-        const nextOptionalBeerCategory1Enabled = organizationConfig.optionalBeerCategory1Enabled === true
-        const nextOptionalBeerCategory1Label =
-          organizationConfig.optionalBeerCategory1Label?.trim() || 'Optional Beer Category 1'
-        setOptionalBeerCategory1Enabled(nextOptionalBeerCategory1Enabled)
-        setOptionalBeerCategory1Label(nextOptionalBeerCategory1Label)
-        setOptionalBeerCategory1EditEnabled(nextOptionalBeerCategory1Enabled)
-        setOptionalBeerCategory1EditLabel(nextOptionalBeerCategory1Label)
+        const nextOptionalBeerCategories = getOptionalBeerCategories(organizationConfig)
+        setOptionalBeerCategories(nextOptionalBeerCategories)
+        setOptionalBeerCategoryEdits(
+          nextOptionalBeerCategories.map((category) => ({ ...category })),
+        )
       })
       .catch((caught) => {
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -380,8 +381,16 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
         pitcherEnabled: pitcher.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-        optionalBeerCategory1Enabled,
-        optionalBeerCategory1Label,
+        optionalBeerCategory1Enabled: optionalBeerCategories[0]?.enabled ?? false,
+        optionalBeerCategory1Label: optionalBeerCategories[0]?.label ?? 'Optional Beer Category 1',
+        optionalBeerCategory2Enabled: optionalBeerCategories[1]?.enabled ?? false,
+        optionalBeerCategory2Label: optionalBeerCategories[1]?.label ?? 'Optional Beer Category 2',
+        optionalBeerCategory3Enabled: optionalBeerCategories[2]?.enabled ?? false,
+        optionalBeerCategory3Label: optionalBeerCategories[2]?.label ?? 'Optional Beer Category 3',
+        optionalBeerCategory4Enabled: optionalBeerCategories[3]?.enabled ?? false,
+        optionalBeerCategory4Label: optionalBeerCategories[3]?.label ?? 'Optional Beer Category 4',
+        optionalBeerCategory5Enabled: optionalBeerCategories[4]?.enabled ?? false,
+        optionalBeerCategory5Label: optionalBeerCategories[4]?.label ?? 'Optional Beer Category 5',
       })
 
       const nextEnabled = config?.happyHourEnabled ?? happyHourDraftEnabled
@@ -484,8 +493,16 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24Edit.actualSizeOz),
         pitcherEnabled: pitcherEdit.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcherEdit.actualSizeOz),
-        optionalBeerCategory1Enabled,
-        optionalBeerCategory1Label,
+        optionalBeerCategory1Enabled: optionalBeerCategories[0]?.enabled ?? false,
+        optionalBeerCategory1Label: optionalBeerCategories[0]?.label ?? 'Optional Beer Category 1',
+        optionalBeerCategory2Enabled: optionalBeerCategories[1]?.enabled ?? false,
+        optionalBeerCategory2Label: optionalBeerCategories[1]?.label ?? 'Optional Beer Category 2',
+        optionalBeerCategory3Enabled: optionalBeerCategories[2]?.enabled ?? false,
+        optionalBeerCategory3Label: optionalBeerCategories[2]?.label ?? 'Optional Beer Category 3',
+        optionalBeerCategory4Enabled: optionalBeerCategories[3]?.enabled ?? false,
+        optionalBeerCategory4Label: optionalBeerCategories[3]?.label ?? 'Optional Beer Category 4',
+        optionalBeerCategory5Enabled: optionalBeerCategories[4]?.enabled ?? false,
+        optionalBeerCategory5Label: optionalBeerCategories[4]?.label ?? 'Optional Beer Category 5',
       })
 
       const nextDraft8 = {
@@ -524,30 +541,69 @@ function CatalogPage() {
     }
   }
 
-  const optionalBeerCategory1HasChanges =
-    optionalBeerCategory1EditEnabled !== optionalBeerCategory1Enabled ||
-    optionalBeerCategory1EditLabel.trim() !== optionalBeerCategory1Label
+  const optionalBeerCategoriesHaveChanges =
+    optionalBeerCategoryEdits.length !== optionalBeerCategories.length ||
+    optionalBeerCategoryEdits.some((draftCategory, index) => {
+      const savedCategory = optionalBeerCategories[index]
+      return (
+        !savedCategory ||
+        draftCategory.enabled !== savedCategory.enabled ||
+        draftCategory.label.trim() !== savedCategory.label
+      )
+    })
 
-  async function saveOptionalBeerCategory1Settings() {
+  function updateOptionalBeerCategoryDraft(
+    slot: OptionalBeerCategoryConfig['slot'],
+    patch: Partial<Pick<OptionalBeerCategoryConfig, 'enabled' | 'label'>>,
+  ) {
+    setOptionalBeerCategoryEdits((current) =>
+      current.map((category) =>
+        category.slot === slot ? { ...category, ...patch } : category,
+      ),
+    )
+  }
+
+  async function saveOptionalBeerCategorySettings() {
     if (
       !canEdit ||
       !activeOrganization?.id ||
-      !optionalBeerCategory1HasChanges ||
-      savingOptionalBeerCategory1
+      !optionalBeerCategoriesHaveChanges ||
+      savingOptionalBeerCategories
     ) {
       return
     }
 
-    const nextLabel = optionalBeerCategory1EditLabel.trim()
-    if (optionalBeerCategory1EditEnabled && !nextLabel) {
-      setError('Set a label for Optional Beer Category 1.')
+    const normalizedCategories = optionalBeerCategoryEdits.map((category) => ({
+      ...category,
+      label: category.label.trim() || `Optional Beer Category ${category.slot}`,
+    }))
+
+    const missingLabel = normalizedCategories.find(
+      (category) => category.enabled && !category.label.trim(),
+    )
+    if (missingLabel) {
+      setError(`Set a label for Optional Beer Category ${missingLabel.slot}.`)
       return
     }
 
-    setSavingOptionalBeerCategory1(true)
+    const disabledAssignedCategory = normalizedCategories.find(
+      (category) =>
+        !category.enabled &&
+        optionalBeerCategories.find((saved) => saved.slot === category.slot)?.enabled === true &&
+        items.some((item) => item.toastSlot === category.key),
+    )
+    if (disabledAssignedCategory) {
+      setError(
+        `Optional Beer Category ${disabledAssignedCategory.slot} is still assigned to catalog items. Reassign those items before disabling it.`,
+      )
+      return
+    }
+
+    setSavingOptionalBeerCategories(true)
     setError(null)
 
     try {
+      const [slot1, slot2, slot3, slot4, slot5] = normalizedCategories
       const config = await updateInventoryOrganizationConfig({
         organizationId: activeOrganization.id,
         happyHourEnabled,
@@ -566,28 +622,78 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
         pitcherEnabled: pitcher.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-        optionalBeerCategory1Enabled: optionalBeerCategory1EditEnabled,
-        optionalBeerCategory1Label: nextLabel || 'Optional Beer Category 1',
+        optionalBeerCategory1Enabled: slot1?.enabled ?? false,
+        optionalBeerCategory1Label: slot1?.label ?? 'Optional Beer Category 1',
+        optionalBeerCategory2Enabled: slot2?.enabled ?? false,
+        optionalBeerCategory2Label: slot2?.label ?? 'Optional Beer Category 2',
+        optionalBeerCategory3Enabled: slot3?.enabled ?? false,
+        optionalBeerCategory3Label: slot3?.label ?? 'Optional Beer Category 3',
+        optionalBeerCategory4Enabled: slot4?.enabled ?? false,
+        optionalBeerCategory4Label: slot4?.label ?? 'Optional Beer Category 4',
+        optionalBeerCategory5Enabled: slot5?.enabled ?? false,
+        optionalBeerCategory5Label: slot5?.label ?? 'Optional Beer Category 5',
       })
 
-      const savedEnabled = config?.optionalBeerCategory1Enabled ?? optionalBeerCategory1EditEnabled
-      const savedLabel =
-        config?.optionalBeerCategory1Label?.trim() ||
-        nextLabel ||
-        'Optional Beer Category 1'
+      const savedCategories = getOptionalBeerCategories(
+        config ?? ({
+          ...buildCurrentOrganizationConfig(),
+          optionalBeerCategory1Enabled: slot1?.enabled ?? false,
+          optionalBeerCategory1Label: slot1?.label ?? 'Optional Beer Category 1',
+          optionalBeerCategory2Enabled: slot2?.enabled ?? false,
+          optionalBeerCategory2Label: slot2?.label ?? 'Optional Beer Category 2',
+          optionalBeerCategory3Enabled: slot3?.enabled ?? false,
+          optionalBeerCategory3Label: slot3?.label ?? 'Optional Beer Category 3',
+          optionalBeerCategory4Enabled: slot4?.enabled ?? false,
+          optionalBeerCategory4Label: slot4?.label ?? 'Optional Beer Category 4',
+          optionalBeerCategory5Enabled: slot5?.enabled ?? false,
+          optionalBeerCategory5Label: slot5?.label ?? 'Optional Beer Category 5',
+        } satisfies InventoryOrganizationConfig),
+      )
 
-      setOptionalBeerCategory1Enabled(savedEnabled)
-      setOptionalBeerCategory1Label(savedLabel)
-      setOptionalBeerCategory1EditEnabled(savedEnabled)
-      setOptionalBeerCategory1EditLabel(savedLabel)
+      setOptionalBeerCategories(savedCategories)
+      setOptionalBeerCategoryEdits(savedCategories.map((category) => ({ ...category })))
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : 'Unable to save Optional Beer Category 1 settings.',
+          : 'Unable to save Optional Beer Category settings.',
       )
     } finally {
-      setSavingOptionalBeerCategory1(false)
+      setSavingOptionalBeerCategories(false)
+    }
+  }
+
+  function buildCurrentOrganizationConfig(): InventoryOrganizationConfig {
+    const [slot1, slot2, slot3, slot4, slot5] = optionalBeerCategories
+
+    return {
+      enabled: true,
+      happyHourEnabled,
+      happyHourStart: happyHourStart || null,
+      happyHourEnd: happyHourEnd || null,
+      happyHourDays,
+      happyHourRange2Enabled,
+      happyHourRange2Start: happyHourRange2Start || null,
+      happyHourRange2End: happyHourRange2End || null,
+      happyHourRange2Days,
+      draft8Enabled: draft8.enabled,
+      draft8ActualSizeOz: parseDraftSize(draft8.actualSizeOz),
+      draft16Enabled: draft16.enabled,
+      draft16ActualSizeOz: parseDraftSize(draft16.actualSizeOz),
+      draft24Enabled: draft24.enabled,
+      draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
+      pitcherEnabled: pitcher.enabled,
+      pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
+      optionalBeerCategory1Enabled: slot1?.enabled ?? false,
+      optionalBeerCategory1Label: slot1?.label ?? 'Optional Beer Category 1',
+      optionalBeerCategory2Enabled: slot2?.enabled ?? false,
+      optionalBeerCategory2Label: slot2?.label ?? 'Optional Beer Category 2',
+      optionalBeerCategory3Enabled: slot3?.enabled ?? false,
+      optionalBeerCategory3Label: slot3?.label ?? 'Optional Beer Category 3',
+      optionalBeerCategory4Enabled: slot4?.enabled ?? false,
+      optionalBeerCategory4Label: slot4?.label ?? 'Optional Beer Category 4',
+      optionalBeerCategory5Enabled: slot5?.enabled ?? false,
+      optionalBeerCategory5Label: slot5?.label ?? 'Optional Beer Category 5',
     }
   }
 
@@ -625,6 +731,10 @@ function CatalogPage() {
 
     if (Object.hasOwn(patch, 'happyHourPriceCents')) {
       payload.happyHourPriceCents = patch.happyHourPriceCents ?? null
+    }
+
+    if (Object.hasOwn(patch, 'toastSlot')) {
+      payload.toastSlot = patch.toastSlot ?? null
     }
 
     try {
@@ -909,52 +1019,70 @@ function CatalogPage() {
 
               <section className="inventory-organization-settings-section inventory-draft-slots-settings">
                 <div className="inventory-draft-slots-copy">
-                  <h2>Optional beer category 1</h2>
+                  <h2>Optional beer categories</h2>
                   <p>
-                    Enable Toast's first hidden Optional Beer Category and set the organization-specific label that should appear in the workbook.
+                    Enable any of Toast's five hidden Optional Beer Category slots and name each one for this organization.
                   </p>
                 </div>
 
-                <label className="inventory-inline-toggle">
-                  <input
-                    type="checkbox"
-                    checked={optionalBeerCategory1EditEnabled}
-                    disabled={savingOptionalBeerCategory1}
-                    onChange={(event) => setOptionalBeerCategory1EditEnabled(event.target.checked)}
-                  />
-                  <span>{optionalBeerCategory1EditEnabled ? 'Enabled' : 'Disabled'}</span>
-                </label>
+                <div className="inventory-draft-slots-grid">
+                  {optionalBeerCategoryEdits.map((category) => (
+                    <div key={category.key} className="inventory-draft-slot-field">
+                      <label className="inventory-inline-toggle">
+                        <input
+                          type="checkbox"
+                          checked={category.enabled}
+                          disabled={savingOptionalBeerCategories}
+                          onChange={(event) =>
+                            updateOptionalBeerCategoryDraft(category.slot, {
+                              enabled: event.target.checked,
+                            })
+                          }
+                        />
+                        <span>
+                          Optional Beer Category {category.slot} ·{' '}
+                          {category.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </label>
 
-                <label className="inventory-search-control">
-                  <span>Category label</span>
-                  <input
-                    type="text"
-                    value={optionalBeerCategory1EditLabel}
-                    disabled={!optionalBeerCategory1EditEnabled || savingOptionalBeerCategory1}
-                    onChange={(event) => setOptionalBeerCategory1EditLabel(event.target.value)}
-                    placeholder="Category name"
-                  />
-                </label>
+                      <label className="inventory-search-control">
+                        <span>Category label</span>
+                        <input
+                          type="text"
+                          value={category.label}
+                          disabled={!category.enabled || savingOptionalBeerCategories}
+                          onChange={(event) =>
+                            updateOptionalBeerCategoryDraft(category.slot, {
+                              label: event.target.value,
+                            })
+                          }
+                          placeholder={`Optional Beer Category ${category.slot}`}
+                        />
+                      </label>
+                    </div>
+                  ))}
+                </div>
 
                 <div className="inventory-draft-slots-actions">
                   <button
                     type="button"
                     className="inventory-secondary-button"
-                    disabled={!optionalBeerCategory1HasChanges || savingOptionalBeerCategory1}
-                    onClick={() => {
-                      setOptionalBeerCategory1EditEnabled(optionalBeerCategory1Enabled)
-                      setOptionalBeerCategory1EditLabel(optionalBeerCategory1Label)
-                    }}
+                    disabled={!optionalBeerCategoriesHaveChanges || savingOptionalBeerCategories}
+                    onClick={() =>
+                      setOptionalBeerCategoryEdits(
+                        optionalBeerCategories.map((category) => ({ ...category })),
+                      )
+                    }
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     className="inventory-primary-button"
-                    disabled={!optionalBeerCategory1HasChanges || savingOptionalBeerCategory1}
-                    onClick={() => void saveOptionalBeerCategory1Settings()}
+                    disabled={!optionalBeerCategoriesHaveChanges || savingOptionalBeerCategories}
+                    onClick={() => void saveOptionalBeerCategorySettings()}
                   >
-                    {savingOptionalBeerCategory1 ? 'Saving…' : 'Update'}
+                    {savingOptionalBeerCategories ? 'Saving…' : 'Update'}
                   </button>
                 </div>
               </section>
@@ -1103,6 +1231,7 @@ function CatalogPage() {
             canMerge={canManageAssignments}
             allGroups={groups}
             categoryOptions={categoryOptions}
+            optionalBeerCategories={optionalBeerCategories}
             savingVariantId={savingVariantId}
             merging={mergingItemId === selectedGroup.id}
             onClose={() => setSelectedGroupId(null)}
@@ -1122,6 +1251,7 @@ function CatalogDrawer({
   canMerge,
   allGroups,
   categoryOptions,
+  optionalBeerCategories,
   savingVariantId,
   merging,
   onClose,
@@ -1134,6 +1264,7 @@ function CatalogDrawer({
   canMerge: boolean
   allGroups: CatalogGroup[]
   categoryOptions: CatalogCategoryOption[]
+  optionalBeerCategories: OptionalBeerCategoryConfig[]
   savingVariantId: string | null
   merging: boolean
   onClose: () => void
@@ -1182,7 +1313,8 @@ function CatalogDrawer({
       draftItem.organizationEnabled !== original.organizationEnabled ||
       draftItem.exportToToast !== original.exportToToast ||
       draftItem.basePriceCents !== original.basePriceCents ||
-      draftItem.happyHourPriceCents !== original.happyHourPriceCents
+      draftItem.happyHourPriceCents !== original.happyHourPriceCents ||
+      draftItem.toastSlot !== original.toastSlot
     )
   })
 
@@ -1235,6 +1367,9 @@ function CatalogDrawer({
         }
         if (draftItem.happyHourPriceCents !== original.happyHourPriceCents) {
           patch.happyHourPriceCents = draftItem.happyHourPriceCents
+        }
+        if (draftItem.toastSlot !== original.toastSlot) {
+          patch.toastSlot = draftItem.toastSlot
         }
 
         if (Object.keys(patch).length > 0) {
@@ -1370,6 +1505,34 @@ function CatalogDrawer({
                   disabled={!canEdit || saving || updating}
                   onCommit={(value) => updateDraft(item.id, { name: value })}
                 />
+
+                {group.category === 'Beer' && item.variantKind !== 'draft' ? (
+                  <label className="inventory-search-control">
+                    <span>Toast beer slot</span>
+                    <select
+                      value={item.toastSlot ?? ''}
+                      disabled={!canEdit || saving || updating}
+                      onChange={(event) =>
+                        updateDraft(item.id, {
+                          toastSlot: event.target.value || null,
+                        })
+                      }
+                    >
+                      <option value="">Standard Toast placement</option>
+                      {optionalBeerCategories
+                        .filter(
+                          (category) =>
+                            category.enabled || category.key === item.toastSlot,
+                        )
+                        .map((category) => (
+                          <option key={category.key} value={category.key}>
+                            {category.label}
+                            {!category.enabled ? ' (disabled)' : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                ) : null}
 
                 <div className="inventory-catalog-price-grid">
                   <MoneyField
