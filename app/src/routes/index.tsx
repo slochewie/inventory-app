@@ -103,6 +103,11 @@ function CatalogPage() {
   const [draft24Edit, setDraft24Edit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
   const [pitcherEdit, setPitcherEdit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
   const [savingDraftSlots, setSavingDraftSlots] = useState(false)
+  const [tallBoyCanEnabled, setTallBoyCanEnabled] = useState(false)
+  const [tallBoyCanLabel, setTallBoyCanLabel] = useState('Tall Boy Can')
+  const [tallBoyCanEditEnabled, setTallBoyCanEditEnabled] = useState(false)
+  const [tallBoyCanEditLabel, setTallBoyCanEditLabel] = useState('Tall Boy Can')
+  const [savingTallBoyCan, setSavingTallBoyCan] = useState(false)
 
   useEffect(() => {
     if (!activeOrganization?.id) {
@@ -180,6 +185,14 @@ function CatalogPage() {
         setDraft16Edit(nextDraft16)
         setDraft24Edit(nextDraft24)
         setPitcherEdit(nextPitcher)
+
+        const nextTallBoyCanEnabled = organizationConfig.tallBoyCanEnabled === true
+        const nextTallBoyCanLabel =
+          organizationConfig.tallBoyCanLabel?.trim() || 'Tall Boy Can'
+        setTallBoyCanEnabled(nextTallBoyCanEnabled)
+        setTallBoyCanLabel(nextTallBoyCanLabel)
+        setTallBoyCanEditEnabled(nextTallBoyCanEnabled)
+        setTallBoyCanEditLabel(nextTallBoyCanLabel)
       })
       .catch((caught) => {
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -367,6 +380,8 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
         pitcherEnabled: pitcher.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
+        tallBoyCanEnabled,
+        tallBoyCanLabel,
       })
 
       const nextEnabled = config?.happyHourEnabled ?? happyHourDraftEnabled
@@ -469,6 +484,8 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24Edit.actualSizeOz),
         pitcherEnabled: pitcherEdit.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcherEdit.actualSizeOz),
+        tallBoyCanEnabled,
+        tallBoyCanLabel,
       })
 
       const nextDraft8 = {
@@ -504,6 +521,73 @@ function CatalogPage() {
       )
     } finally {
       setSavingDraftSlots(false)
+    }
+  }
+
+  const tallBoyCanHasChanges =
+    tallBoyCanEditEnabled !== tallBoyCanEnabled ||
+    tallBoyCanEditLabel.trim() !== tallBoyCanLabel
+
+  async function saveTallBoyCanSettings() {
+    if (
+      !canEdit ||
+      !activeOrganization?.id ||
+      !tallBoyCanHasChanges ||
+      savingTallBoyCan
+    ) {
+      return
+    }
+
+    const nextLabel = tallBoyCanEditLabel.trim()
+    if (tallBoyCanEditEnabled && !nextLabel) {
+      setError('Set a label for the Tall Boy Can beer category.')
+      return
+    }
+
+    setSavingTallBoyCan(true)
+    setError(null)
+
+    try {
+      const config = await updateInventoryOrganizationConfig({
+        organizationId: activeOrganization.id,
+        happyHourEnabled,
+        happyHourStart: happyHourStart || null,
+        happyHourEnd: happyHourEnd || null,
+        happyHourDays,
+        happyHourRange2Enabled,
+        happyHourRange2Start: happyHourRange2Start || null,
+        happyHourRange2End: happyHourRange2End || null,
+        happyHourRange2Days,
+        draft8Enabled: draft8.enabled,
+        draft8ActualSizeOz: parseDraftSize(draft8.actualSizeOz),
+        draft16Enabled: draft16.enabled,
+        draft16ActualSizeOz: parseDraftSize(draft16.actualSizeOz),
+        draft24Enabled: draft24.enabled,
+        draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
+        pitcherEnabled: pitcher.enabled,
+        pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
+        tallBoyCanEnabled: tallBoyCanEditEnabled,
+        tallBoyCanLabel: nextLabel || 'Tall Boy Can',
+      })
+
+      const savedEnabled = config?.tallBoyCanEnabled ?? tallBoyCanEditEnabled
+      const savedLabel =
+        config?.tallBoyCanLabel?.trim() ||
+        nextLabel ||
+        'Tall Boy Can'
+
+      setTallBoyCanEnabled(savedEnabled)
+      setTallBoyCanLabel(savedLabel)
+      setTallBoyCanEditEnabled(savedEnabled)
+      setTallBoyCanEditLabel(savedLabel)
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to save Tall Boy Can settings.',
+      )
+    } finally {
+      setSavingTallBoyCan(false)
     }
   }
 
@@ -819,6 +903,58 @@ function CatalogPage() {
                     onClick={() => void saveDraftSlotSettings()}
                   >
                     {savingDraftSlots ? 'Saving…' : 'Update'}
+                  </button>
+                </div>
+              </section>
+
+              <section className="inventory-organization-settings-section inventory-draft-slots-settings">
+                <div className="inventory-draft-slots-copy">
+                  <h2>Optional beer category</h2>
+                  <p>
+                    Use Toast's first hidden optional Beer category for oversized cans such as 24oz or 25oz tall boys.
+                  </p>
+                </div>
+
+                <label className="inventory-inline-toggle">
+                  <input
+                    type="checkbox"
+                    checked={tallBoyCanEditEnabled}
+                    disabled={savingTallBoyCan}
+                    onChange={(event) => setTallBoyCanEditEnabled(event.target.checked)}
+                  />
+                  <span>{tallBoyCanEditEnabled ? 'Enabled' : 'Disabled'}</span>
+                </label>
+
+                <label className="inventory-search-control">
+                  <span>Category label</span>
+                  <input
+                    type="text"
+                    value={tallBoyCanEditLabel}
+                    disabled={!tallBoyCanEditEnabled || savingTallBoyCan}
+                    onChange={(event) => setTallBoyCanEditLabel(event.target.value)}
+                    placeholder="Tall Boy Can"
+                  />
+                </label>
+
+                <div className="inventory-draft-slots-actions">
+                  <button
+                    type="button"
+                    className="inventory-secondary-button"
+                    disabled={!tallBoyCanHasChanges || savingTallBoyCan}
+                    onClick={() => {
+                      setTallBoyCanEditEnabled(tallBoyCanEnabled)
+                      setTallBoyCanEditLabel(tallBoyCanLabel)
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="inventory-primary-button"
+                    disabled={!tallBoyCanHasChanges || savingTallBoyCan}
+                    onClick={() => void saveTallBoyCanSettings()}
+                  >
+                    {savingTallBoyCan ? 'Saving…' : 'Update'}
                   </button>
                 </div>
               </section>
