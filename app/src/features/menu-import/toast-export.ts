@@ -118,7 +118,7 @@ export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportF
       filename: 'toast-liquor.csv',
       rows: [LIQUOR_EXPORT_HEADERS, ...liquorRows],
       rowCount: liquorRows.length,
-      note: 'Liquor staging uses Aloha source groups as Toast liquor types, maps BOURB WHISK to WHISKEY/BOURBON, and only gives happy hour to well liquors by default.',
+      note: 'Liquor staging uses the canonical Toast category for each Inventory item and only gives happy hour to well liquors by default.',
     },
     {
       id: 'audit',
@@ -153,8 +153,8 @@ function buildReviewRows(items: NormalizedMenuItem[]) {
       const exportCompare = Number(right.exportIncluded) - Number(left.exportIncluded)
       if (exportCompare !== 0) return exportCompare
 
-      const leftCategory = clean(left.category || 'Uncategorized')
-      const rightCategory = clean(right.category || 'Uncategorized')
+      const leftCategory = clean(left.toastCategory || 'Uncategorized')
+      const rightCategory = clean(right.toastCategory || 'Uncategorized')
       const categoryCompare = leftCategory.localeCompare(rightCategory)
       if (categoryCompare !== 0) return categoryCompare
 
@@ -257,10 +257,8 @@ function buildLiquorExportRows(items: NormalizedMenuItem[]) {
     const itemName = clean(item.name)
     if (!itemName || item.basePriceCents === null) return
 
-    const sourceLiquorType = clean(item.category).toUpperCase() === 'BOURB WHISK'
-      ? 'WHISKEY/BOURBON'
-      : clean(item.toastCategory || item.category).toUpperCase()
-    const liquorType = LIQUOR_TYPE_OVERRIDES.get(itemName.toLowerCase()) || sourceLiquorType
+    const canonicalLiquorType = normalizeLiquorCategory(item.toastCategory)
+    const liquorType = LIQUOR_TYPE_OVERRIDES.get(itemName.toLowerCase()) || canonicalLiquorType
     const row = {
       itemName,
       basePrice: moneyBlank(item.basePriceCents),
@@ -283,13 +281,29 @@ function buildLiquorExportRows(items: NormalizedMenuItem[]) {
 }
 
 function isLiquorItem(item: NormalizedMenuItem) {
-  const category = clean(item.category).toUpperCase()
-  const toastCategory = clean(item.toastCategory).toUpperCase()
+  return LIQUOR_CATEGORIES.has(normalizeLiquorCategory(item.toastCategory))
+}
 
-  if (category === 'WINE GLASS') return false
+const LIQUOR_CATEGORIES = new Set([
+  'BRANDY/COGNAC',
+  'GIN',
+  'LIQUEURS',
+  'RUM',
+  'SCOTCH',
+  'TEQUILA',
+  'VODKA',
+  'WHISKEY/BOURBON',
+])
 
-  return ['BOURB WHISK', 'BRANDY/COGNAC', 'GIN', 'LIQUEURS', 'RUM', 'SCOTCH', 'TEQUILA', 'VODKA', 'WHISKEY/BOURBON']
-    .includes(category || toastCategory)
+function normalizeLiquorCategory(value?: string) {
+  const category = clean(value).toUpperCase().replace(/&/g, '/')
+
+  if (category === 'BOURB WHISK') return 'WHISKEY/BOURBON'
+  if (category.includes('WHISKEY') || category.includes('BOURBON')) return 'WHISKEY/BOURBON'
+  if (category.includes('BRANDY') || category.includes('COGNAC')) return 'BRANDY/COGNAC'
+  if (category.includes('LIQUEUR') || category.includes('CORDIAL')) return 'LIQUEURS'
+
+  return category
 }
 
 function clean(value?: string) {
