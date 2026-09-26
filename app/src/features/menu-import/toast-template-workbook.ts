@@ -67,6 +67,16 @@ export type ToastDraftSlotMapping = {
   actualSizeOz: number
 }
 
+export type TallBoyCanOptions = {
+  enabled: boolean
+  label: string
+}
+
+const DEFAULT_TALL_BOY_CAN_OPTIONS: TallBoyCanOptions = {
+  enabled: false,
+  label: 'Tall Boy Can',
+}
+
 const LEGACY_DRAFT_SLOT_MAPPINGS: ToastDraftSlotMapping[] = [
   { toastSizeOz: 8, actualSizeOz: 10 },
   { toastSizeOz: 16, actualSizeOz: 16 },
@@ -108,14 +118,22 @@ export function buildPopulatedToastTemplateWorkbook({
   items,
   happyHourEnabled = true,
   draftSlotMappings = LEGACY_DRAFT_SLOT_MAPPINGS,
+  tallBoyCan = DEFAULT_TALL_BOY_CAN_OPTIONS,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
+  tallBoyCan?: TallBoyCanOptions
 }) {
   const workbookPackage = readWorkbookPackage(templateArrayBuffer)
-  populateBeerSheet(workbookPackage, items, happyHourEnabled, draftSlotMappings)
+  populateBeerSheet(
+    workbookPackage,
+    items,
+    happyHourEnabled,
+    draftSlotMappings,
+    tallBoyCan,
+  )
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
 
@@ -124,11 +142,13 @@ export function validatePopulatedBeerWorkbook({
   items,
   happyHourEnabled = true,
   draftSlotMappings = LEGACY_DRAFT_SLOT_MAPPINGS,
+  tallBoyCan = DEFAULT_TALL_BOY_CAN_OPTIONS,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
+  tallBoyCan?: TallBoyCanOptions
 }) {
   const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
   const mapping = getBeerTemplateMapping(workbookPackage)
@@ -160,10 +180,15 @@ export function validatePopulatedBeerWorkbook({
 
   const draftRows = beerRows.filter((row) => hasConfiguredDraftBeerPrice(row, draftSlotMappings))
   const canRows = beerRows.filter((row) => row.canPrice !== null)
+  const tallBoyRows = tallBoyCan.enabled
+    ? beerRows.filter((row) => row.can24ozPrice !== null)
+    : []
   const bottleRows = [
-    ...beerRows
-      .filter((row) => row.can24ozPrice !== null)
-      .map((row) => ({ row, kind: '24oz can' as const })),
+    ...(!tallBoyCan.enabled
+      ? beerRows
+          .filter((row) => row.can24ozPrice !== null)
+          .map((row) => ({ row, kind: '24oz can' as const }))
+      : []),
     ...beerRows
       .filter((row) => row.bottlePrice !== null)
       .map((row) => ({ row, kind: 'bottle' as const })),
@@ -287,6 +312,67 @@ export function validatePopulatedBeerWorkbook({
     })
   }
 
+  if (tallBoyCan.enabled) {
+    const tallBoySlot = findFirstOptionalPackagedSlot(mapping)
+
+    if (!tallBoySlot) {
+      issues.push('Toast Beer tab is missing the first Optional Beer Category slot')
+    } else {
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        tallBoySlot.nameCol,
+        mapping.headerRow,
+        tallBoyCan.label,
+        'Tall Boy Can category header',
+      )
+
+      tallBoyRows.forEach((row, index) => {
+        const rowNumber = mapping.dataStartRow + index
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          tallBoySlot.nameCol,
+          rowNumber,
+          row.beerName,
+          `${row.beerName} Tall Boy Can name`,
+        )
+        if (tallBoySlot.priceCol) {
+          validateCellValue(
+            issues,
+            sheetDoc,
+            workbookPackage.sharedStrings,
+            tallBoySlot.priceCol,
+            rowNumber,
+            centsToDollars(row.can24ozPrice),
+            `${row.beerName} Tall Boy Can price`,
+          )
+        }
+        if (tallBoySlot.happyHourCol) {
+          validateCellValue(
+            issues,
+            sheetDoc,
+            workbookPackage.sharedStrings,
+            tallBoySlot.happyHourCol,
+            rowNumber,
+            centsToDollars(row.can24ozHappyHour),
+            `${row.beerName} Tall Boy Can Happy Hour`,
+          )
+        }
+      })
+
+      validateColumnsVisible(
+        issues,
+        sheetDoc,
+        [tallBoySlot.nameCol, tallBoySlot.priceCol, tallBoySlot.happyHourCol]
+          .filter((column): column is number => column !== null),
+        'Tall Boy Can columns',
+      )
+    }
+  }
+
   const bottleSlot = findPackagedSlot(mapping, 'bottle')
   if (bottleSlot) {
     bottleRows.forEach(({ row, kind }, index) => {
@@ -335,6 +421,7 @@ export function validatePopulatedBeerWorkbook({
     draftRows: draftRows.length,
     canRows: canRows.length,
     bottleSlotRows: bottleRows.length,
+    tallBoyRows: tallBoyRows.length,
   }
 }
 
@@ -409,6 +496,7 @@ function populateBeerSheet(
   items: NormalizedMenuItem[],
   happyHourEnabled: boolean,
   draftSlotMappings: readonly ToastDraftSlotMapping[],
+  tallBoyCan: TallBoyCanOptions,
 ) {
   const mapping = getBeerTemplateMapping(workbookPackage)
   const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
@@ -419,9 +507,11 @@ function populateBeerSheet(
     mapping,
     beerRows,
     draftSlotMappings,
+    tallBoyCan,
   )
 
   writeDraftSizeHeaders(sheetDoc, mapping, draftSlotMappings)
+  configureTallBoyCanSlot(sheetDoc, mapping, tallBoyCan)
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
   workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
 }
@@ -513,20 +603,31 @@ function writeBeerRowsToSheet(
   mapping: BeerTemplateMapping,
   beerRows: BeerTabPreviewRow[],
   draftSlotMappings: readonly ToastDraftSlotMapping[],
+  tallBoyCan: TallBoyCanOptions,
 ) {
   const draftRows = beerRows.filter((row) =>
     hasConfiguredDraftBeerPrice(row, draftSlotMappings),
   )
   const canRows = beerRows.filter((row) => row.canPrice !== null)
+  const tallBoyRows = tallBoyCan.enabled
+    ? beerRows.filter((row) => row.can24ozPrice !== null)
+    : []
   const bottleSlotRows = [
-    ...beerRows
-      .filter((row) => row.can24ozPrice !== null)
-      .map((row) => ({ row, kind: 'can24oz' as const })),
+    ...(!tallBoyCan.enabled
+      ? beerRows
+          .filter((row) => row.can24ozPrice !== null)
+          .map((row) => ({ row, kind: 'can24oz' as const }))
+      : []),
     ...beerRows
       .filter((row) => row.bottlePrice !== null)
       .map((row) => ({ row, kind: 'bottle' as const })),
   ]
-  const writtenRowCount = Math.max(draftRows.length, canRows.length, bottleSlotRows.length)
+  const writtenRowCount = Math.max(
+    draftRows.length,
+    canRows.length,
+    tallBoyRows.length,
+    bottleSlotRows.length,
+  )
   const clearToRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount + DATA_ROW_BUFFER)
   const targetColumns = getBeerTargetColumns(mapping)
 
@@ -544,6 +645,10 @@ function writeBeerRowsToSheet(
 
   canRows.forEach((beerRow, index) => {
     writeCanBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
+  })
+
+  tallBoyRows.forEach((row, index) => {
+    writeTallBoyCanRow(sheetDoc, mapping, mapping.dataStartRow + index, row)
   })
 
   bottleSlotRows.forEach(({ row, kind }, index) => {
@@ -625,6 +730,68 @@ function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNu
   if (canSlot.happyHourCol) writeCellValue(sheetDoc, canSlot.happyHourCol, rowNumber, centsToDollars(beerRow.canHappyHour), mapping.dataStartRow)
 }
 
+function writeTallBoyCanRow(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  rowNumber: number,
+  beerRow: BeerTabPreviewRow,
+) {
+  const tallBoySlot = findFirstOptionalPackagedSlot(mapping)
+  if (!tallBoySlot || beerRow.can24ozPrice === null) return
+
+  writeCellValue(
+    sheetDoc,
+    tallBoySlot.nameCol,
+    rowNumber,
+    beerRow.beerName,
+    mapping.dataStartRow,
+  )
+  if (tallBoySlot.priceCol) {
+    writeCellValue(
+      sheetDoc,
+      tallBoySlot.priceCol,
+      rowNumber,
+      centsToDollars(beerRow.can24ozPrice),
+      mapping.dataStartRow,
+    )
+  }
+  if (tallBoySlot.happyHourCol) {
+    writeCellValue(
+      sheetDoc,
+      tallBoySlot.happyHourCol,
+      rowNumber,
+      centsToDollars(beerRow.can24ozHappyHour),
+      mapping.dataStartRow,
+    )
+  }
+}
+
+function configureTallBoyCanSlot(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  options: TallBoyCanOptions,
+) {
+  if (!options.enabled) return
+
+  const tallBoySlot = findFirstOptionalPackagedSlot(mapping)
+  if (!tallBoySlot) return
+
+  writeCellValue(
+    sheetDoc,
+    tallBoySlot.nameCol,
+    mapping.headerRow,
+    options.label.trim() || DEFAULT_TALL_BOY_CAN_OPTIONS.label,
+    mapping.headerRow,
+  )
+
+  setColumnsHidden(
+    sheetDoc,
+    [tallBoySlot.nameCol, tallBoySlot.priceCol, tallBoySlot.happyHourCol]
+      .filter((column): column is number => column !== null),
+    false,
+  )
+}
+
 function writeBottleSlotBeerRow(
   sheetDoc: Document,
   mapping: BeerTemplateMapping,
@@ -659,6 +826,12 @@ function formatToastDraftSlot(toastSizeOz: number | null) {
 
 function findPackagedSlot(mapping: BeerTemplateMapping, kind: 'can' | 'bottle') {
   return mapping.packagedGroups.find((slot) => slot.kind === kind) ?? null
+}
+
+function findFirstOptionalPackagedSlot(mapping: BeerTemplateMapping) {
+  return mapping.packagedGroups
+    .filter((slot) => slot.kind === 'optional')
+    .sort((left, right) => left.nameCol - right.nameCol)[0] ?? null
 }
 
 function readWorkbookPackage(arrayBuffer: ArrayBuffer): WorkbookPackage {
@@ -884,6 +1057,53 @@ function getBeerTargetColumns(mapping: BeerTemplateMapping) {
     if (slot.happyHourCol) columns.add(slot.happyHourCol)
   })
   return [...columns]
+}
+
+function setColumnsHidden(
+  sheetDoc: Document,
+  columns: number[],
+  hidden: boolean,
+) {
+  const columnSet = new Set(columns)
+
+  Array.from(sheetDoc.getElementsByTagName('col')).forEach((columnNode) => {
+    const min = Number(columnNode.getAttribute('min'))
+    const max = Number(columnNode.getAttribute('max'))
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return
+
+    const intersects = [...columnSet].some(
+      (column) => column >= min && column <= max,
+    )
+    if (!intersects) return
+
+    if (min !== max) {
+      throw new Error(
+        `Unable to change Toast column visibility for grouped column range ${min}-${max}`,
+      )
+    }
+
+    if (hidden) columnNode.setAttribute('hidden', '1')
+    else columnNode.removeAttribute('hidden')
+  })
+}
+
+function validateColumnsVisible(
+  issues: string[],
+  sheetDoc: Document,
+  columns: number[],
+  label: string,
+) {
+  columns.forEach((column) => {
+    const columnNode = Array.from(sheetDoc.getElementsByTagName('col')).find((node) => {
+      const min = Number(node.getAttribute('min'))
+      const max = Number(node.getAttribute('max'))
+      return column >= min && column <= max
+    })
+
+    if (columnNode?.getAttribute('hidden') === '1') {
+      issues.push(`${label}: column ${numberToColumnLetters(column)} is still hidden`)
+    }
+  })
 }
 
 function clearCells(sheetDoc: Document, columns: number[], fromRow: number, toRow: number) {
