@@ -373,51 +373,47 @@ export function validatePopulatedBeerWorkbook({
     }
   }
 
-  bottleRows.forEach(({ row, kind }, index) => {
-    const packagedSlot = kind === '24oz can'
-      ? findPackagedSlot(mapping, 'can24oz') ?? findPackagedSlot(mapping, 'bottle')
-      : findPackagedSlot(mapping, 'bottle')
+  const bottleSlot = findPackagedSlot(mapping, 'bottle')
+  if (bottleSlot) {
+    bottleRows.forEach(({ row, kind }, index) => {
+      const rowNumber = mapping.dataStartRow + index
+      const price = kind === '24oz can' ? row.can24ozPrice : row.bottlePrice
+      const happyHour =
+        kind === '24oz can' ? row.can24ozHappyHour : row.bottleHappyHour
 
-    if (!packagedSlot) return
-
-    const rowNumber = mapping.dataStartRow + index
-    const price = kind === '24oz can' ? row.can24ozPrice : row.bottlePrice
-    const happyHour =
-      kind === '24oz can' ? row.can24ozHappyHour : row.bottleHappyHour
-    const slotLabel = packagedSlot.kind === 'can24oz' ? '24oz Can' : 'Bottle'
-
-    validateCellValue(
-      issues,
-      sheetDoc,
-      workbookPackage.sharedStrings,
-      packagedSlot.nameCol,
-      rowNumber,
-      row.beerName,
-      `${row.beerName} ${kind} name in ${slotLabel} slot`,
-    )
-    if (packagedSlot.priceCol) {
       validateCellValue(
         issues,
         sheetDoc,
         workbookPackage.sharedStrings,
-        packagedSlot.priceCol,
+        bottleSlot.nameCol,
         rowNumber,
-        centsToDollars(price),
-        `${row.beerName} ${kind} price in ${slotLabel} slot`,
+        row.beerName,
+        `${row.beerName} ${kind} name in Bottle slot`,
       )
-    }
-    if (packagedSlot.happyHourCol) {
-      validateCellValue(
-        issues,
-        sheetDoc,
-        workbookPackage.sharedStrings,
-        packagedSlot.happyHourCol,
-        rowNumber,
-        centsToDollars(happyHour),
-        `${row.beerName} ${kind} Happy Hour in ${slotLabel} slot`,
-      )
-    }
-  })
+      if (bottleSlot.priceCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          bottleSlot.priceCol,
+          rowNumber,
+          centsToDollars(price),
+          `${row.beerName} ${kind} price in Bottle slot`,
+        )
+      }
+      if (bottleSlot.happyHourCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          bottleSlot.happyHourCol,
+          rowNumber,
+          centsToDollars(happyHour),
+          `${row.beerName} ${kind} Happy Hour in Bottle slot`,
+        )
+      }
+    })
+  }
 
   return {
     valid: issues.length === 0,
@@ -803,16 +799,14 @@ function writeBottleSlotBeerRow(
   beerRow: BeerTabPreviewRow,
   kind: 'can24oz' | 'bottle',
 ) {
-  const packagedSlot = kind === 'can24oz'
-    ? findPackagedSlot(mapping, 'can24oz') ?? findPackagedSlot(mapping, 'bottle')
-    : findPackagedSlot(mapping, 'bottle')
+  const bottleSlot = findPackagedSlot(mapping, 'bottle')
   const price = kind === 'can24oz' ? beerRow.can24ozPrice : beerRow.bottlePrice
   const happyHour = kind === 'can24oz' ? beerRow.can24ozHappyHour : beerRow.bottleHappyHour
-  if (!packagedSlot || price === null) return
+  if (!bottleSlot || price === null) return
 
-  writeCellValue(sheetDoc, packagedSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
-  if (packagedSlot.priceCol) writeCellValue(sheetDoc, packagedSlot.priceCol, rowNumber, centsToDollars(price), mapping.dataStartRow)
-  if (packagedSlot.happyHourCol) writeCellValue(sheetDoc, packagedSlot.happyHourCol, rowNumber, centsToDollars(happyHour), mapping.dataStartRow)
+  writeCellValue(sheetDoc, bottleSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
+  if (bottleSlot.priceCol) writeCellValue(sheetDoc, bottleSlot.priceCol, rowNumber, centsToDollars(price), mapping.dataStartRow)
+  if (bottleSlot.happyHourCol) writeCellValue(sheetDoc, bottleSlot.happyHourCol, rowNumber, centsToDollars(happyHour), mapping.dataStartRow)
 }
 
 function findDraftSlot(
@@ -830,7 +824,7 @@ function formatToastDraftSlot(toastSizeOz: number | null) {
   return toastSizeOz === null ? 'Pitcher' : `${toastSizeOz}oz`
 }
 
-function findPackagedSlot(mapping: BeerTemplateMapping, kind: 'can' | 'bottle' | 'can24oz') {
+function findPackagedSlot(mapping: BeerTemplateMapping, kind: 'can' | 'bottle') {
   return mapping.packagedGroups.find((slot) => slot.kind === kind) ?? null
 }
 
@@ -873,8 +867,8 @@ function getBeerTemplateMapping(workbookPackage: WorkbookPackage): BeerTemplateM
   if (draftNameCol === null) warnings.push('Beer tab has no Draft Beer column')
   if (draftSizes.length === 0) warnings.push('Beer tab has no draft size columns')
   if (canColumn === null) warnings.push('Beer tab has no Can column')
-  if (!packagedGroups.some((slot) => slot.kind === 'bottle' || slot.kind === 'can24oz')) {
-    warnings.push('Beer tab has no Bottle or 24oz Can column; 24oz cans cannot be written to the fixed Toast template')
+  if (!packagedGroups.some((slot) => slot.kind === 'bottle')) {
+    warnings.push('Beer tab has no Bottle column; 24oz cans cannot be written to the fixed Toast template')
   }
 
   return {
@@ -1203,6 +1197,7 @@ function findRow(sheetDoc: Document, rowNumber: number) {
 function findCell(sheetDoc: Document, column: number, rowNumber: number) {
   const row = findRow(sheetDoc, rowNumber)
   if (!row) return null
+
   return findCellInRow(row, `${numberToColumnLetters(column)}${rowNumber}`)
 }
 
