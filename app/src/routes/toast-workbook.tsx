@@ -451,13 +451,29 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 }
 
 function isLiquorItem(item: NormalizedMenuItem) {
-  const category = clean(item.category).toUpperCase()
-  const toastCategory = clean(item.toastCategory).toUpperCase()
+  return LIQUOR_CATEGORIES.has(normalizeLiquorCategory(item.toastCategory))
+}
 
-  if (category === 'WINE GLASS') return false
+const LIQUOR_CATEGORIES = new Set([
+  'BRANDY/COGNAC',
+  'GIN',
+  'LIQUEURS',
+  'RUM',
+  'SCOTCH',
+  'TEQUILA',
+  'VODKA',
+  'WHISKEY/BOURBON',
+])
 
-  return ['BOURB WHISK', 'BRANDY/COGNAC', 'GIN', 'LIQUEURS', 'RUM', 'SCOTCH', 'TEQUILA', 'VODKA', 'WHISKEY/BOURBON']
-    .includes(category || toastCategory)
+function normalizeLiquorCategory(value?: string) {
+  const category = clean(value).toUpperCase().replace(/&/g, '/')
+
+  if (category === 'BOURB WHISK') return 'WHISKEY/BOURBON'
+  if (category.includes('WHISKEY') || category.includes('BOURBON')) return 'WHISKEY/BOURBON'
+  if (category.includes('BRANDY') || category.includes('COGNAC')) return 'BRANDY/COGNAC'
+  if (category.includes('LIQUEUR') || category.includes('CORDIAL')) return 'LIQUEURS'
+
+  return category
 }
 
 function clean(value?: string) {
