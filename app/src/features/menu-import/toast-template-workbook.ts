@@ -293,21 +293,32 @@ export async function buildToastWorkbookZip(filename: string, workbook: Blob) {
   )
 }
 
-export function downloadToastWorkbookFile(filename: string, blob: Blob) {
-  const file = new File([blob], filename, {
-    type: blob.type || 'application/octet-stream',
+export async function downloadToastWorkbookFile(filename: string, blob: Blob) {
+  const response = await fetch('/api/toast-download', {
+    method: 'POST',
+    headers: {
+      'Content-Type': blob.type || 'application/octet-stream',
+      'X-Toast-Filename': filename,
+    },
+    body: blob,
   })
-  const link = document.createElement('a')
-  const url = URL.createObjectURL(file)
 
-  link.href = url
-  link.download = file.name
-  link.setAttribute('download', file.name)
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
+  const result = (await response.json()) as {
+    token?: string
+    error?: string
+  }
 
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  if (!response.ok || !result.token) {
+    throw new Error(
+      typeof result.error === 'string'
+        ? result.error
+        : 'Unable to prepare Toast download.',
+    )
+  }
+
+  window.location.assign(
+    `/api/toast-download?token=${encodeURIComponent(result.token)}`,
+  )
 }
 
 export function buildToastWorkbookFilename(organizationName: string, now = new Date()) {
