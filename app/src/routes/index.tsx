@@ -10,6 +10,7 @@ import { authClient } from '#/lib/auth-client'
 import {
   listInventoryCatalog,
   mergeInventoryItems,
+  updateInventoryItemCategory,
   updateInventoryOrganizationVariant,
 } from '#/lib/inventory-access'
 
@@ -23,7 +24,13 @@ type CatalogGroup = {
   id: string
   name: string
   category: string
+  categoryId?: string
   items: NormalizedMenuItem[]
+}
+
+type CatalogCategoryOption = {
+  id: string
+  name: string
 }
 
 function CatalogPage() {
@@ -78,6 +85,18 @@ function CatalogPage() {
     [groups],
   )
 
+  const categoryOptions = useMemo(() => {
+    const byId = new Map<string, string>()
+
+    groups.forEach((group) => {
+      if (group.categoryId) byId.set(group.categoryId, group.category)
+    })
+
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name))
+  }, [groups])
+
   const filteredGroups = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
 
@@ -113,6 +132,33 @@ function CatalogPage() {
 
   const selectedGroup =
     groups.find((group) => group.id === selectedGroupId) ?? null
+
+  async function updateGroupCategory(
+    group: CatalogGroup,
+    categoryId: string,
+  ) {
+    if (!canManageAssignments || !activeOrganization?.id) return
+
+    setError(null)
+
+    try {
+      await updateInventoryItemCategory({
+        organizationId: activeOrganization.id,
+        itemId: group.id,
+        categoryId,
+      })
+
+      const catalog = await listInventoryCatalog(activeOrganization.id)
+      setItems(catalog.items.map(catalogRowToNormalizedItem))
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to update the Inventory category.',
+      )
+      throw caught
+    }
+  }
 
   async function mergeGroup(sourceGroup: CatalogGroup, targetItemId: string) {
     if (!canEdit || !activeOrganization?.id || mergingItemId) return
@@ -363,10 +409,12 @@ function CatalogPage() {
             canEdit={canEdit}
             canMerge={canManageAssignments}
             allGroups={groups}
+            categoryOptions={categoryOptions}
             savingVariantId={savingVariantId}
             merging={mergingItemId === selectedGroup.id}
             onClose={() => setSelectedGroupId(null)}
             onUpdate={updateVariant}
+            onUpdateCategory={updateGroupCategory}
             onMerge={mergeGroup}
           />
         ) : null}
@@ -380,16 +428,19 @@ function CatalogDrawer({
   canEdit,
   canMerge,
   allGroups,
+  categoryOptions,
   savingVariantId,
   merging,
   onClose,
   onUpdate,
+  onUpdateCategory,
   onMerge,
 }: {
   group: CatalogGroup
   canEdit: boolean
   canMerge: boolean
   allGroups: CatalogGroup[]
+  categoryOptions: CatalogCategoryOption[]
   savingVariantId: string | null
   merging: boolean
   onClose: () => void
@@ -397,6 +448,7 @@ function CatalogDrawer({
     item: NormalizedMenuItem,
     patch: Partial<NormalizedMenuItem>,
   ) => Promise<void>
+  onUpdateCategory: (group: CatalogGroup, categoryId: string) => Promise<void>
   onMerge: (sourceGroup: CatalogGroup, targetItemId: string) => Promise<void>
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -404,9 +456,11 @@ function CatalogDrawer({
     group.items.map((item) => ({ ...item })),
   )
   const [updating, setUpdating] = useState(false)
+  const [draftCategoryId, setDraftCategoryId] = useState(group.categoryId ?? '')
 
   useEffect(() => {
     setDraftItems(group.items.map((item) => ({ ...item })))
+    setDraftCategoryId(group.categoryId ?? '')
   }, [group.id])
 
   useEffect(() => {
@@ -423,7 +477,10 @@ function CatalogDrawer({
   ).length
   const [mergeTargetId, setMergeTargetId] = useState('')
   const mergeCandidates = allGroups.filter((candidate) => candidate.id !== group.id)
-  const hasChanges = draftItems.some((draftItem) => {
+  const categoryChanged =
+    Boolean(draftCategoryId) && draftCategoryId !== (group.categoryId ?? '')
+
+  const hasChanges = categoryChanged || draftItems.some((draftItem) => {
     const original = group.items.find((item) => item.id === draftItem.id)
     if (!original) return true
 
@@ -461,6 +518,10 @@ function CatalogDrawer({
     setUpdating(true)
 
     try {
+      if (categoryChanged) {
+        await onUpdateCategory(group, draftCategoryId)
+      }
+
       for (const draftItem of draftItems) {
         const original = group.items.find((item) => item.id === draftItem.id)
         if (!original) continue
@@ -519,6 +580,34 @@ function CatalogDrawer({
         </div>
         <button type="button" onClick={onClose}>Close</button>
       </div>
+
+      {canMerge ? (
+        <section className="inventory-drawer-section inventory-master-category-section">
+          <div className="inventory-drawer-section-heading">
+            <div>
+              <p className="inventory-kicker">Shared master item</p>
+              <h3>Category</h3>
+            </div>
+          </div>
+          <label className="inventory-search-control">
+            <span>Canonical category</span>
+            <select
+              value={draftCategoryId}
+              disabled={updating || savingVariantId !== null}
+              onChange={(event) => setDraftCategoryId(event.target.value)}
+            >
+              {categoryOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="inventory-master-category-note">
+            This category is shared across every organization.
+          </p>
+        </section>
+      ) : null}
 
       <section className="inventory-drawer-section">
         <div className="inventory-drawer-section-heading">
@@ -814,7 +903,8 @@ function groupCatalogItems(items: NormalizedMenuItem[]): CatalogGroup[] {
       return {
         id,
         name: first?.name ?? 'Unnamed item',
-        category: first?.toastCategory || 'Uncategorized',
+        category: first?.category || first?.toastCategory || 'Uncategorized',
+        categoryId: first?.masterCategoryId,
         items: sortedItems,
       }
     })
