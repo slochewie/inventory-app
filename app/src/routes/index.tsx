@@ -81,6 +81,18 @@ function CatalogPage() {
   const [happyHourDraftDays, setHappyHourDraftDays] = useState<HappyHourDay[]>([
     ...ALL_HAPPY_HOUR_DAYS,
   ])
+  const [happyHourRange2Enabled, setHappyHourRange2Enabled] = useState(false)
+  const [happyHourRange2Start, setHappyHourRange2Start] = useState('')
+  const [happyHourRange2End, setHappyHourRange2End] = useState('')
+  const [happyHourRange2Days, setHappyHourRange2Days] = useState<HappyHourDay[]>([
+    ...ALL_HAPPY_HOUR_DAYS,
+  ])
+  const [happyHourRange2DraftEnabled, setHappyHourRange2DraftEnabled] = useState(false)
+  const [happyHourRange2DraftStart, setHappyHourRange2DraftStart] = useState('')
+  const [happyHourRange2DraftEnd, setHappyHourRange2DraftEnd] = useState('')
+  const [happyHourRange2DraftDays, setHappyHourRange2DraftDays] = useState<HappyHourDay[]>([
+    ...ALL_HAPPY_HOUR_DAYS,
+  ])
   const [savingHappyHour, setSavingHappyHour] = useState(false)
   const [draft8, setDraft8] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
   const [draft16, setDraft16] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
@@ -126,6 +138,22 @@ function CatalogPage() {
         setHappyHourDraftStart(start)
         setHappyHourDraftEnd(end)
         setHappyHourDraftDays(days)
+
+        const range2Start = organizationConfig.happyHourRange2Start ?? ''
+        const range2End = organizationConfig.happyHourRange2End ?? ''
+        const range2Days =
+          organizationConfig.happyHourRange2Days?.length > 0
+            ? organizationConfig.happyHourRange2Days
+            : [...ALL_HAPPY_HOUR_DAYS]
+
+        setHappyHourRange2Enabled(organizationConfig.happyHourRange2Enabled === true)
+        setHappyHourRange2Start(range2Start)
+        setHappyHourRange2End(range2End)
+        setHappyHourRange2Days(range2Days)
+        setHappyHourRange2DraftEnabled(organizationConfig.happyHourRange2Enabled === true)
+        setHappyHourRange2DraftStart(range2Start)
+        setHappyHourRange2DraftEnd(range2End)
+        setHappyHourRange2DraftDays(range2Days)
 
         const nextDraft8 = {
           enabled: organizationConfig.draft8Enabled === true,
@@ -281,7 +309,11 @@ function CatalogPage() {
     happyHourDraftEnabled !== happyHourEnabled ||
     happyHourDraftStart !== happyHourStart ||
     happyHourDraftEnd !== happyHourEnd ||
-    happyHourDraftDays.join(',') !== happyHourDays.join(',')
+    happyHourDraftDays.join(',') !== happyHourDays.join(',') ||
+    happyHourRange2DraftEnabled !== happyHourRange2Enabled ||
+    happyHourRange2DraftStart !== happyHourRange2Start ||
+    happyHourRange2DraftEnd !== happyHourRange2End ||
+    happyHourRange2DraftDays.join(',') !== happyHourRange2Days.join(',')
 
   async function saveHappyHourSettings() {
     if (
@@ -303,6 +335,16 @@ function CatalogPage() {
       return
     }
 
+    if (
+      happyHourRange2DraftEnabled &&
+      (!happyHourRange2DraftStart ||
+        !happyHourRange2DraftEnd ||
+        happyHourRange2DraftDays.length === 0)
+    ) {
+      setError('Set a Time Range 2 start, end, and at least one day.')
+      return
+    }
+
     setSavingHappyHour(true)
     setError(null)
 
@@ -313,6 +355,10 @@ function CatalogPage() {
         happyHourStart: happyHourDraftStart || null,
         happyHourEnd: happyHourDraftEnd || null,
         happyHourDays: happyHourDraftDays,
+        happyHourRange2Enabled: happyHourRange2DraftEnabled,
+        happyHourRange2Start: happyHourRange2DraftStart || null,
+        happyHourRange2End: happyHourRange2DraftEnd || null,
+        happyHourRange2Days: happyHourRange2DraftDays,
         draft8Enabled: draft8.enabled,
         draft8ActualSizeOz: parseDraftSize(draft8.actualSizeOz),
         draft16Enabled: draft16.enabled,
@@ -330,6 +376,16 @@ function CatalogPage() {
         config?.happyHourDays?.length
           ? config.happyHourDays
           : happyHourDraftDays
+      const nextRange2Enabled =
+        config?.happyHourRange2Enabled ?? happyHourRange2DraftEnabled
+      const nextRange2Start =
+        config?.happyHourRange2Start ?? happyHourRange2DraftStart
+      const nextRange2End =
+        config?.happyHourRange2End ?? happyHourRange2DraftEnd
+      const nextRange2Days =
+        config?.happyHourRange2Days?.length
+          ? config.happyHourRange2Days
+          : happyHourRange2DraftDays
 
       setHappyHourEnabled(nextEnabled)
       setHappyHourStart(nextStart || '')
@@ -339,6 +395,14 @@ function CatalogPage() {
       setHappyHourDraftStart(nextStart || '')
       setHappyHourDraftEnd(nextEnd || '')
       setHappyHourDraftDays(nextDays)
+      setHappyHourRange2Enabled(nextRange2Enabled)
+      setHappyHourRange2Start(nextRange2Start || '')
+      setHappyHourRange2End(nextRange2End || '')
+      setHappyHourRange2Days(nextRange2Days)
+      setHappyHourRange2DraftEnabled(nextRange2Enabled)
+      setHappyHourRange2DraftStart(nextRange2Start || '')
+      setHappyHourRange2DraftEnd(nextRange2End || '')
+      setHappyHourRange2DraftDays(nextRange2Days)
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -393,6 +457,10 @@ function CatalogPage() {
         happyHourStart: happyHourStart || null,
         happyHourEnd: happyHourEnd || null,
         happyHourDays,
+        happyHourRange2Enabled,
+        happyHourRange2Start: happyHourRange2Start || null,
+        happyHourRange2End: happyHourRange2End || null,
+        happyHourRange2Days,
         draft8Enabled: draft8Edit.enabled,
         draft8ActualSizeOz: parseDraftSize(draft8Edit.actualSizeOz),
         draft16Enabled: draft16Edit.enabled,
@@ -599,6 +667,88 @@ function CatalogPage() {
                   </div>
                 </fieldset>
 
+                <div className="inventory-happy-hour-range2">
+                  <div className="inventory-happy-hour-range2-heading">
+                    <div>
+                      <strong>Time Range 2</strong>
+                      <span>Optional second Happy Hour window for the Toast Notes tab.</span>
+                    </div>
+                    <label className="inventory-inline-toggle">
+                      <input
+                        type="checkbox"
+                        checked={happyHourRange2DraftEnabled}
+                        disabled={!happyHourDraftEnabled || savingHappyHour}
+                        onChange={(event) =>
+                          setHappyHourRange2DraftEnabled(event.target.checked)
+                        }
+                      />
+                      <span>{happyHourRange2DraftEnabled ? 'Enabled' : 'Disabled'}</span>
+                    </label>
+                  </div>
+
+                  <div className="inventory-happy-hour-range2-times">
+                    <label className="inventory-search-control">
+                      <span>Start</span>
+                      <input
+                        type="time"
+                        value={happyHourRange2DraftStart}
+                        disabled={
+                          !happyHourDraftEnabled ||
+                          !happyHourRange2DraftEnabled ||
+                          savingHappyHour
+                        }
+                        onChange={(event) => setHappyHourRange2DraftStart(event.target.value)}
+                      />
+                    </label>
+                    <label className="inventory-search-control">
+                      <span>End</span>
+                      <input
+                        type="time"
+                        value={happyHourRange2DraftEnd}
+                        disabled={
+                          !happyHourDraftEnabled ||
+                          !happyHourRange2DraftEnabled ||
+                          savingHappyHour
+                        }
+                        onChange={(event) => setHappyHourRange2DraftEnd(event.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  <fieldset
+                    className="inventory-happy-hour-days"
+                    disabled={
+                      !happyHourDraftEnabled ||
+                      !happyHourRange2DraftEnabled ||
+                      savingHappyHour
+                    }
+                  >
+                    <legend>Days</legend>
+                    <div className="inventory-happy-hour-day-options">
+                      {HAPPY_HOUR_DAY_OPTIONS.map((option) => (
+                        <label key={option.value}>
+                          <input
+                            type="checkbox"
+                            checked={happyHourRange2DraftDays.includes(option.value)}
+                            onChange={(event) => {
+                              setHappyHourRange2DraftDays((current) =>
+                                event.target.checked
+                                  ? ALL_HAPPY_HOUR_DAYS.filter(
+                                      (day) =>
+                                        day === option.value ||
+                                        current.includes(day),
+                                    )
+                                  : current.filter((day) => day !== option.value),
+                              )
+                            }}
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                </div>
+
                 <div className="inventory-happy-hour-actions">
                   <button
                     type="button"
@@ -609,6 +759,10 @@ function CatalogPage() {
                       setHappyHourDraftStart(happyHourStart)
                       setHappyHourDraftEnd(happyHourEnd)
                       setHappyHourDraftDays(happyHourDays)
+                      setHappyHourRange2DraftEnabled(happyHourRange2Enabled)
+                      setHappyHourRange2DraftStart(happyHourRange2Start)
+                      setHappyHourRange2DraftEnd(happyHourRange2End)
+                      setHappyHourRange2DraftDays(happyHourRange2Days)
                     }}
                   >
                     Cancel
