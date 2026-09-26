@@ -194,6 +194,37 @@ export function validatePopulatedBeerWorkbook({
         )
       }
     })
+
+    mapping.draftSizes
+      .filter(
+        (toastSlot) =>
+          !draftSlotMappings.some((draftMapping) =>
+            draftMapping.toastSizeOz === toastSlot.sizeOz,
+          ),
+      )
+      .forEach((toastSlot) => {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          toastSlot.priceCol,
+          rowNumber,
+          null,
+          `${row.beerName} disabled Toast ${toastSlot.label} draft price`,
+        )
+
+        if (toastSlot.happyHourCol) {
+          validateCellValue(
+            issues,
+            sheetDoc,
+            workbookPackage.sharedStrings,
+            toastSlot.happyHourCol,
+            rowNumber,
+            null,
+            `${row.beerName} disabled Toast ${toastSlot.label} Happy Hour`,
+          )
+        }
+      })
   })
 
   const canSlot = findPackagedSlot(mapping, 'can')
