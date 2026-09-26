@@ -556,6 +556,12 @@ function CatalogPage() {
       )
     })
 
+  const savedOptionalBeerCategoryCount =
+    getVisibleOptionalBeerCategoryCount(optionalBeerCategories)
+  const optionalBeerCategoryUiHasChanges =
+    optionalBeerCategoriesHaveChanges ||
+    visibleOptionalBeerCategoryCount !== savedOptionalBeerCategoryCount
+
   function updateOptionalBeerCategoryDraft(
     slot: OptionalBeerCategoryConfig['slot'],
     patch: Partial<Pick<OptionalBeerCategoryConfig, 'enabled' | 'label'>>,
@@ -1094,14 +1100,12 @@ function CatalogPage() {
                     <button
                       type="button"
                       className="inventory-secondary-button"
-                      disabled={!optionalBeerCategoriesHaveChanges || savingOptionalBeerCategories}
+                      disabled={!optionalBeerCategoryUiHasChanges || savingOptionalBeerCategories}
                       onClick={() => {
                         setOptionalBeerCategoryEdits(
                           optionalBeerCategories.map((category) => ({ ...category })),
                         )
-                        setVisibleOptionalBeerCategoryCount(
-                          getVisibleOptionalBeerCategoryCount(optionalBeerCategories),
-                        )
+                        setVisibleOptionalBeerCategoryCount(savedOptionalBeerCategoryCount)
                       }}
                     >
                       Cancel
