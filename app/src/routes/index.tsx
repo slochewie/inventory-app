@@ -8,12 +8,14 @@ import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
 import { formatCurrency, type NormalizedMenuItem } from '#/features/menu-import/types'
 import { authClient } from '#/lib/auth-client'
 import {
+  ALL_HAPPY_HOUR_DAYS,
   getInventoryOrganizationConfig,
   listInventoryCatalog,
   mergeInventoryItems,
   updateInventoryItemCategory,
   updateInventoryOrganizationConfig,
   updateInventoryOrganizationVariant,
+  type HappyHourDay,
 } from '#/lib/inventory-access'
 
 export const Route = createFileRoute('/')({ component: CatalogPage })
@@ -21,6 +23,20 @@ export const Route = createFileRoute('/')({ component: CatalogPage })
 type AvailabilityFilter = 'carried' | 'not-carried' | 'all'
 
 const PAGE_SIZE = 50
+
+const HAPPY_HOUR_DAY_OPTIONS: Array<{
+  value: HappyHourDay
+  label: string
+}> = [
+  { value: 'mon', label: 'Mon' },
+  { value: 'tue', label: 'Tue' },
+  { value: 'wed', label: 'Wed' },
+  { value: 'thu', label: 'Thu' },
+  { value: 'fri', label: 'Fri' },
+  { value: 'sat', label: 'Sat' },
+  { value: 'sun', label: 'Sun' },
+]
+
 
 type CatalogGroup = {
   id: string
@@ -51,9 +67,15 @@ function CatalogPage() {
   const [happyHourEnabled, setHappyHourEnabled] = useState(false)
   const [happyHourStart, setHappyHourStart] = useState('')
   const [happyHourEnd, setHappyHourEnd] = useState('')
+  const [happyHourDays, setHappyHourDays] = useState<HappyHourDay[]>([
+    ...ALL_HAPPY_HOUR_DAYS,
+  ])
   const [happyHourDraftEnabled, setHappyHourDraftEnabled] = useState(false)
   const [happyHourDraftStart, setHappyHourDraftStart] = useState('')
   const [happyHourDraftEnd, setHappyHourDraftEnd] = useState('')
+  const [happyHourDraftDays, setHappyHourDraftDays] = useState<HappyHourDay[]>([
+    ...ALL_HAPPY_HOUR_DAYS,
+  ])
   const [savingHappyHour, setSavingHappyHour] = useState(false)
 
   useEffect(() => {
@@ -79,10 +101,17 @@ function CatalogPage() {
         const end = organizationConfig.happyHourEnd ?? ''
         setHappyHourEnabled(organizationConfig.happyHourEnabled)
         setHappyHourStart(start)
+        const days =
+          organizationConfig.happyHourDays?.length > 0
+            ? organizationConfig.happyHourDays
+            : [...ALL_HAPPY_HOUR_DAYS]
+
         setHappyHourEnd(end)
+        setHappyHourDays(days)
         setHappyHourDraftEnabled(organizationConfig.happyHourEnabled)
         setHappyHourDraftStart(start)
         setHappyHourDraftEnd(end)
+        setHappyHourDraftDays(days)
       })
       .catch((caught) => {
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -211,7 +240,8 @@ function CatalogPage() {
   const happyHourHasChanges =
     happyHourDraftEnabled !== happyHourEnabled ||
     happyHourDraftStart !== happyHourStart ||
-    happyHourDraftEnd !== happyHourEnd
+    happyHourDraftEnd !== happyHourEnd ||
+    happyHourDraftDays.join(',') !== happyHourDays.join(',')
 
   async function saveHappyHourSettings() {
     if (
@@ -225,9 +255,11 @@ function CatalogPage() {
 
     if (
       happyHourDraftEnabled &&
-      (!happyHourDraftStart || !happyHourDraftEnd)
+      (!happyHourDraftStart ||
+        !happyHourDraftEnd ||
+        happyHourDraftDays.length === 0)
     ) {
-      setError('Set both a Happy Hour start and end time.')
+      setError('Set a Happy Hour start, end, and at least one day.')
       return
     }
 
@@ -240,18 +272,25 @@ function CatalogPage() {
         happyHourEnabled: happyHourDraftEnabled,
         happyHourStart: happyHourDraftStart || null,
         happyHourEnd: happyHourDraftEnd || null,
+        happyHourDays: happyHourDraftDays,
       })
 
       const nextEnabled = config?.happyHourEnabled ?? happyHourDraftEnabled
       const nextStart = config?.happyHourStart ?? happyHourDraftStart
       const nextEnd = config?.happyHourEnd ?? happyHourDraftEnd
+      const nextDays =
+        config?.happyHourDays?.length
+          ? config.happyHourDays
+          : happyHourDraftDays
 
       setHappyHourEnabled(nextEnabled)
       setHappyHourStart(nextStart || '')
       setHappyHourEnd(nextEnd || '')
+      setHappyHourDays(nextDays)
       setHappyHourDraftEnabled(nextEnabled)
       setHappyHourDraftStart(nextStart || '')
       setHappyHourDraftEnd(nextEnd || '')
+      setHappyHourDraftDays(nextDays)
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -380,6 +419,35 @@ function CatalogPage() {
               />
             </label>
 
+            <fieldset
+              className="inventory-happy-hour-days"
+              disabled={!happyHourDraftEnabled || savingHappyHour}
+            >
+              <legend>Days</legend>
+              <div className="inventory-happy-hour-day-options">
+                {HAPPY_HOUR_DAY_OPTIONS.map((option) => (
+                  <label key={option.value}>
+                    <input
+                      type="checkbox"
+                      checked={happyHourDraftDays.includes(option.value)}
+                      onChange={(event) => {
+                        setHappyHourDraftDays((current) =>
+                          event.target.checked
+                            ? ALL_HAPPY_HOUR_DAYS.filter(
+                                (day) =>
+                                  day === option.value ||
+                                  current.includes(day),
+                              )
+                            : current.filter((day) => day !== option.value),
+                        )
+                      }}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
             <div className="inventory-happy-hour-actions">
               <button
                 type="button"
@@ -389,6 +457,7 @@ function CatalogPage() {
                   setHappyHourDraftEnabled(happyHourEnabled)
                   setHappyHourDraftStart(happyHourStart)
                   setHappyHourDraftEnd(happyHourEnd)
+                  setHappyHourDraftDays(happyHourDays)
                 }}
               >
                 Cancel
