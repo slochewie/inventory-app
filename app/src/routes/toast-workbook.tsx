@@ -6,7 +6,11 @@ import {
 } from '#/components/authenticated-inventory-shell'
 import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
 import { authClient } from '#/lib/auth-client'
-import { listInventoryCatalog } from '#/lib/inventory-access'
+import {
+  getInventoryOrganizationConfig,
+  listInventoryCatalog,
+  type InventoryOrganizationConfig,
+} from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
 import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
@@ -58,6 +62,8 @@ function ToastWorkbook() {
   >(savedReviewSession?.items.length ? 'saved' : null)
   const [reviewSavedAt, setReviewSavedAt] = useState(savedReviewSession?.savedAt ?? null)
   const [catalogLoading, setCatalogLoading] = useState(false)
+  const [organizationConfig, setOrganizationConfig] =
+    useState<InventoryOrganizationConfig | null>(null)
   const [alohaError, setAlohaError] = useState<string | null>(null)
   const [workbook, setWorkbook] = useState<WorkbookState | null>(null)
   const [workbookError, setWorkbookError] = useState<string | null>(null)
@@ -74,8 +80,12 @@ function ToastWorkbook() {
     const controller = new AbortController()
     setCatalogLoading(true)
 
-    void listInventoryCatalog(activeOrganization.id, controller.signal)
-      .then((catalog) => {
+    void Promise.all([
+      listInventoryCatalog(activeOrganization.id, controller.signal),
+      getInventoryOrganizationConfig(activeOrganization.id, controller.signal),
+    ])
+      .then(([catalog, config]) => {
+        setOrganizationConfig(config)
         if (catalog.items.length === 0) return
 
         const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
@@ -208,6 +218,7 @@ function ToastWorkbook() {
     return buildPopulatedToastTemplateWorkbookWithLiquorAsync({
       templateArrayBuffer: workbook.arrayBuffer.slice(0),
       items,
+      happyHourEnabled: organizationConfig?.happyHourEnabled === true,
     })
   }
 
@@ -322,6 +333,10 @@ function ToastWorkbook() {
                   <dt>Ignored rows</dt>
                   <dd>{summary.ignoredItems}</dd>
                 </div>
+                <div>
+                  <dt>Happy Hour</dt>
+                  <dd>{formatHappyHourSetting(organizationConfig)}</dd>
+                </div>
               </dl>
             </section>
           </>
@@ -349,7 +364,12 @@ function ToastWorkbook() {
               <p className="inventory-kicker">Ready to export</p>
               <h2>Download Toast workbook</h2>
             </div>
-            <p>Writes Beer and Liquor tab values.</p>
+            <p>
+              Writes Beer and Liquor tab values
+              {organizationConfig?.happyHourEnabled
+                ? ` with Happy Hour pricing for ${formatHappyHourWindow(organizationConfig)}.`
+                : ' without Happy Hour pricing.'}
+            </p>
           </div>
 
           <p>
@@ -382,6 +402,29 @@ function ToastWorkbook() {
         </section>
       </section>
   )
+}
+
+function formatHappyHourSetting(
+  config: InventoryOrganizationConfig | null,
+) {
+  if (!config?.happyHourEnabled) return 'Disabled'
+  return formatHappyHourWindow(config)
+}
+
+function formatHappyHourWindow(config: InventoryOrganizationConfig) {
+  if (!config.happyHourStart || !config.happyHourEnd) return 'Enabled'
+
+  return `${formatTime(config.happyHourStart)}–${formatTime(config.happyHourEnd)}`
+}
+
+function formatTime(value: string) {
+  const [hourText, minute = '00'] = value.split(':')
+  const hour = Number(hourText)
+  if (!Number.isFinite(hour)) return value
+
+  const suffix = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  return `${displayHour}:${minute} ${suffix}`
 }
 
 function WorkbookInspectionCard({ workbook }: { workbook: WorkbookState }) {
