@@ -90,6 +90,10 @@ export type InventoryOrganizationConfig = {
   happyHourStart: string | null
   happyHourEnd: string | null
   happyHourDays: HappyHourDay[]
+  happyHourRange2Enabled: boolean
+  happyHourRange2Start: string | null
+  happyHourRange2End: string | null
+  happyHourRange2Days: HappyHourDay[]
   draft8Enabled: boolean
   draft8ActualSizeOz: number | null
   draft16Enabled: boolean
@@ -272,6 +276,10 @@ export async function getInventoryOrganizationConfig(
     happyHourStart: null,
     happyHourEnd: null,
     happyHourDays: [...ALL_HAPPY_HOUR_DAYS],
+    happyHourRange2Enabled: false,
+    happyHourRange2Start: null,
+    happyHourRange2End: null,
+    happyHourRange2Days: [...ALL_HAPPY_HOUR_DAYS],
     draft8Enabled: false,
     draft8ActualSizeOz: null,
     draft16Enabled: false,
@@ -289,6 +297,10 @@ export async function updateInventoryOrganizationConfig(input: {
   happyHourStart: string | null
   happyHourEnd: string | null
   happyHourDays: HappyHourDay[]
+  happyHourRange2Enabled: boolean
+  happyHourRange2Start: string | null
+  happyHourRange2End: string | null
+  happyHourRange2Days: HappyHourDay[]
   draft8Enabled: boolean
   draft8ActualSizeOz: number | null
   draft16Enabled: boolean
