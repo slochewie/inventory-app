@@ -421,6 +421,39 @@ export async function listInventorySourceMappings(
   return Array.isArray(result.mappings) ? result.mappings : []
 }
 
+export async function updateInventoryItemCategory(input: {
+  organizationId: string
+  itemId: string
+  categoryId: string
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/item-category"),
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  )
+  const result = (await response.json()) as {
+    updated?: boolean
+    error?: string
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to update the Inventory category.",
+    )
+  }
+
+  return result.updated === true
+}
+
+
 export async function mergeInventoryItems(input: {
   organizationId: string
   sourceItemId: string
