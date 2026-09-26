@@ -129,9 +129,9 @@ Generated filenames use the organization/store name when available and include a
 
 ### Happy Hour workbook behavior
 
-Organization settings store whether Happy Hour is enabled, one start/end time window, and the selected days of the week. When enabled, the exporter writes that schedule into the Toast **Notes** tab using Time Range 1 for the selected days only. Unselected days remain blank.
+Organization settings store whether Happy Hour is enabled, the Time Range 1 start/end window and selected days, plus an optional Time Range 2 window with its own selected days. When enabled, the exporter writes those schedules into the Toast **Notes** tab. Unselected days remain blank for each range.
 
-Time Range 2 is intentionally left blank. The exporter validates the Notes schedule before allowing download, alongside Beer/Liquor workbook values.
+Time Range 2 is written only when the organization enables it. The exporter validates the Notes schedule before allowing download, alongside Beer/Liquor workbook values.
 
 ### Beer workbook behavior
 

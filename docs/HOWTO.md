@@ -184,9 +184,11 @@ Managers and Admins can edit organization-specific variant state such as:
 They can also manage organization-level **Happy Hour** settings from the Catalog page:
 
 - enable/disable Happy Hour,
-- select the days of the week it applies,
-- set one start time,
-- set one end time.
+- select the Time Range 1 days,
+- set the Time Range 1 start/end time,
+- optionally enable Time Range 2,
+- select separate Time Range 2 days,
+- set the Time Range 2 start/end time.
 
 Changes use explicit **Update** / **Cancel** controls and persist through the Inventory organization-config API.
 
@@ -271,11 +273,10 @@ When Happy Hour is enabled for the selected organization, the exporter writes th
 
 Current behavior:
 
-- Monday through Sunday can be selected independently.
-- The same organization start/end time is used for each selected day.
-- Selected days are written into **Time Range 1**.
-- Unselected days are left blank.
-- **Time Range 2** is intentionally left blank.
+- Monday through Sunday can be selected independently for each configured range.
+- Time Range 1 uses its own organization start/end time and selected days.
+- Time Range 2 is optional and, when enabled, uses its own start/end time and selected days.
+- Unselected days are left blank within each range.
 - If Happy Hour is disabled, both ranges are left blank.
 - Workbook validation checks that the Notes schedule matches the organization settings before download.
 
