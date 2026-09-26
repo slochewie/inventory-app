@@ -266,7 +266,7 @@ function ToastWorkbook() {
     try {
       const populatedWorkbook = await buildPopulatedWorkbook()
       const filename = buildToastWorkbookFilename(organizationName)
-      downloadToastWorkbookFile(filename, populatedWorkbook)
+      await downloadToastWorkbookFile(filename, populatedWorkbook)
     } catch (error) {
       setDownloadError(error instanceof Error ? error.message : 'Unable to populate the Toast workbook')
     }
@@ -279,7 +279,7 @@ function ToastWorkbook() {
       const populatedWorkbook = await buildPopulatedWorkbook()
       const workbookFilename = buildToastWorkbookFilename(organizationName)
       const zip = await buildToastWorkbookZip(workbookFilename, populatedWorkbook)
-      downloadToastWorkbookFile(workbookFilename.replace(/\.xlsx$/i, '.zip'), zip)
+      await downloadToastWorkbookFile(workbookFilename.replace(/\.xlsx$/i, '.zip'), zip)
     } catch (error) {
       setDownloadError(error instanceof Error ? error.message : 'Unable to package the Toast workbook')
     }
