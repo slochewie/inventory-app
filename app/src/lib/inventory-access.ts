@@ -65,11 +65,31 @@ type CatalogResponse = {
   error?: string
 }
 
+export type HappyHourDay =
+  | "mon"
+  | "tue"
+  | "wed"
+  | "thu"
+  | "fri"
+  | "sat"
+  | "sun"
+
+export const ALL_HAPPY_HOUR_DAYS: HappyHourDay[] = [
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
+  "sun",
+]
+
 export type InventoryOrganizationConfig = {
   enabled: boolean
   happyHourEnabled: boolean
   happyHourStart: string | null
   happyHourEnd: string | null
+  happyHourDays: HappyHourDay[]
 }
 
 type OrganizationConfigResponse = {
@@ -243,6 +263,7 @@ export async function getInventoryOrganizationConfig(
     happyHourEnabled: false,
     happyHourStart: null,
     happyHourEnd: null,
+    happyHourDays: [...ALL_HAPPY_HOUR_DAYS],
   }
 }
 
@@ -251,6 +272,7 @@ export async function updateInventoryOrganizationConfig(input: {
   happyHourEnabled: boolean
   happyHourStart: string | null
   happyHourEnd: string | null
+  happyHourDays: HappyHourDay[]
 }) {
   const response = await fetch(
     authEndpoint("/api/auth/inventory/organization-config"),
