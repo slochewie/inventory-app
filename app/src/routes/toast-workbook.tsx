@@ -23,6 +23,7 @@ import {
   buildToastWorkbookZip,
   downloadToastWorkbookFile,
   inspectToastTemplateWorkbook,
+  type ToastDraftSlotMapping,
   type ToastTemplateWorkbookInfo,
 } from '#/features/menu-import/toast-template-workbook'
 import {
@@ -226,6 +227,7 @@ function ToastWorkbook() {
     if (!workbook) throw new Error('Toast source template is not loaded')
 
     const happyHourEnabled = organizationConfig?.happyHourEnabled === true
+    const draftSlotMappings = getOrganizationDraftSlotMappings(organizationConfig)
     const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
       templateArrayBuffer: workbook.arrayBuffer.slice(0),
       items,
@@ -237,6 +239,7 @@ function ToastWorkbook() {
       happyHourRange2Start: organizationConfig?.happyHourRange2Start ?? null,
       happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
+      draftSlotMappings,
     })
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
@@ -250,6 +253,7 @@ function ToastWorkbook() {
       happyHourRange2Start: organizationConfig?.happyHourRange2Start ?? null,
       happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
+      draftSlotMappings,
     })
 
     if (!validation.valid) {
@@ -469,6 +473,27 @@ function ToastWorkbook() {
         </section>
       </section>
   )
+}
+
+function getOrganizationDraftSlotMappings(
+  config: InventoryOrganizationConfig | null,
+): ToastDraftSlotMapping[] {
+  if (!config) return []
+
+  return [
+    config.draft8Enabled && config.draft8ActualSizeOz !== null
+      ? { toastSizeOz: 8, actualSizeOz: config.draft8ActualSizeOz }
+      : null,
+    config.draft16Enabled && config.draft16ActualSizeOz !== null
+      ? { toastSizeOz: 16, actualSizeOz: config.draft16ActualSizeOz }
+      : null,
+    config.draft24Enabled && config.draft24ActualSizeOz !== null
+      ? { toastSizeOz: 24, actualSizeOz: config.draft24ActualSizeOz }
+      : null,
+    config.pitcherEnabled && config.pitcherActualSizeOz !== null
+      ? { toastSizeOz: null, actualSizeOz: config.pitcherActualSizeOz }
+      : null,
+  ].filter((mapping): mapping is ToastDraftSlotMapping => mapping !== null)
 }
 
 function formatHappyHourSetting(
