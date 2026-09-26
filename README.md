@@ -158,7 +158,7 @@ Catalog Beer variants can be assigned to a stable `toastSlot` key:
 
 Those stable keys are independent of the visible category label, so an organization can rename a category without reassigning its variants. During workbook generation, assigned variants populate the matching Toast Optional Beer Category column group and the exporter unhides and renames that group.
 
-For backward compatibility with McCarthy's existing data, unassigned 24oz cans still flow into Optional Beer Category 1 when that slot is enabled. Slot 1 continues to use the legacy Auth storage columns `tallBoyCanEnabled` and `tallBoyCanLabel` internally; the Inventory API/client treats them as the generic Optional Beer Category 1 contract.
+For backward compatibility with McCarthy's existing data, unassigned 24oz cans still flow into Optional Beer Category 1 when that slot is enabled. Slot 1 continues to use the legacy Auth storage columns `tallBoyCanEnabled` and `tallBoyCanLabel` internally, but the Inventory API and client now use only the generic Optional Beer Category 1 contract.
 
 Actual serving/package size remains Inventory data. Organization draft mappings and the Tall Boy label allow the workbook presentation to reflect the venue's configured formats while preserving Toast's template structure.
 
