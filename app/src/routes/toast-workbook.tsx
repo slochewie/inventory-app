@@ -407,7 +407,7 @@ function ToastWorkbook() {
             <p className="inventory-export-context">
               Writes Beer and Liquor tab values
               {organizationConfig?.happyHourEnabled
-                ? ` with Happy Hour pricing for ${formatHappyHourWindow(organizationConfig)}.`
+                ? ` with Happy Hour pricing for ${formatHappyHourSetting(organizationConfig)}.`
                 : ' without Happy Hour pricing.'}
             </p>
           </div>
