@@ -110,6 +110,7 @@ function CatalogPage() {
   const [savingDraftSlots, setSavingDraftSlots] = useState(false)
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryState[]>([])
   const [optionalBeerCategoryEdits, setOptionalBeerCategoryEdits] = useState<OptionalBeerCategoryState[]>([])
+  const [visibleOptionalBeerCategoryCount, setVisibleOptionalBeerCategoryCount] = useState(0)
   const [savingOptionalBeerCategories, setSavingOptionalBeerCategories] = useState(false)
 
   useEffect(() => {
@@ -193,6 +194,9 @@ function CatalogPage() {
         setOptionalBeerCategories(nextOptionalBeerCategories)
         setOptionalBeerCategoryEdits(
           nextOptionalBeerCategories.map((category) => ({ ...category })),
+        )
+        setVisibleOptionalBeerCategoryCount(
+          getVisibleOptionalBeerCategoryCount(nextOptionalBeerCategories),
         )
       })
       .catch((caught) => {
@@ -652,6 +656,9 @@ function CatalogPage() {
 
       setOptionalBeerCategories(savedCategories)
       setOptionalBeerCategoryEdits(savedCategories.map((category) => ({ ...category })))
+      setVisibleOptionalBeerCategoryCount(
+        getVisibleOptionalBeerCategoryCount(savedCategories),
+      )
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -1021,70 +1028,94 @@ function CatalogPage() {
                 <div className="inventory-draft-slots-copy">
                   <h2>Optional beer categories</h2>
                   <p>
-                    Enable any of Toast's five hidden Optional Beer Category slots and name each one for this organization.
+                    Add only the Toast Optional Beer Category slots this organization uses.
                   </p>
                 </div>
 
-                <div className="inventory-draft-slots-grid">
-                  {optionalBeerCategoryEdits.map((category) => (
-                    <div key={category.key} className="inventory-draft-slot-field">
-                      <label className="inventory-inline-toggle">
-                        <input
-                          type="checkbox"
-                          checked={category.enabled}
-                          disabled={savingOptionalBeerCategories}
-                          onChange={(event) =>
-                            updateOptionalBeerCategoryDraft(category.slot, {
-                              enabled: event.target.checked,
-                            })
-                          }
-                        />
-                        <span>
-                          Optional Beer Category {category.slot} ·{' '}
-                          {category.enabled ? 'Enabled' : 'Disabled'}
-                        </span>
-                      </label>
+                {visibleOptionalBeerCategoryCount > 0 ? (
+                  <div className="inventory-draft-slots-grid">
+                    {optionalBeerCategoryEdits
+                      .slice(0, visibleOptionalBeerCategoryCount)
+                      .map((category) => (
+                        <div key={category.key} className="inventory-draft-slot-field">
+                          <label className="inventory-inline-toggle">
+                            <input
+                              type="checkbox"
+                              checked={category.enabled}
+                              disabled={savingOptionalBeerCategories}
+                              onChange={(event) =>
+                                updateOptionalBeerCategoryDraft(category.slot, {
+                                  enabled: event.target.checked,
+                                })
+                              }
+                            />
+                            <span>
+                              Optional Beer Category {category.slot} ·{' '}
+                              {category.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </label>
 
-                      <label className="inventory-search-control">
-                        <span>Category label</span>
-                        <input
-                          type="text"
-                          value={category.label}
-                          disabled={!category.enabled || savingOptionalBeerCategories}
-                          onChange={(event) =>
-                            updateOptionalBeerCategoryDraft(category.slot, {
-                              label: event.target.value,
-                            })
-                          }
-                          placeholder={`Optional Beer Category ${category.slot}`}
-                        />
-                      </label>
-                    </div>
-                  ))}
-                </div>
+                          <label className="inventory-search-control">
+                            <span>Category label</span>
+                            <input
+                              type="text"
+                              value={category.label}
+                              disabled={!category.enabled || savingOptionalBeerCategories}
+                              onChange={(event) =>
+                                updateOptionalBeerCategoryDraft(category.slot, {
+                                  label: event.target.value,
+                                })
+                              }
+                              placeholder={`Optional Beer Category ${category.slot}`}
+                            />
+                          </label>
+                        </div>
+                      ))}
+                  </div>
+                ) : null}
 
-                <div className="inventory-draft-slots-actions">
+                {visibleOptionalBeerCategoryCount < optionalBeerCategoryEdits.length ? (
                   <button
                     type="button"
                     className="inventory-secondary-button"
-                    disabled={!optionalBeerCategoriesHaveChanges || savingOptionalBeerCategories}
+                    disabled={savingOptionalBeerCategories}
                     onClick={() =>
-                      setOptionalBeerCategoryEdits(
-                        optionalBeerCategories.map((category) => ({ ...category })),
+                      setVisibleOptionalBeerCategoryCount((current) =>
+                        Math.min(current + 1, optionalBeerCategoryEdits.length),
                       )
                     }
                   >
-                    Cancel
+                    Add Optional Beer Category
                   </button>
-                  <button
-                    type="button"
-                    className="inventory-primary-button"
-                    disabled={!optionalBeerCategoriesHaveChanges || savingOptionalBeerCategories}
-                    onClick={() => void saveOptionalBeerCategorySettings()}
-                  >
-                    {savingOptionalBeerCategories ? 'Saving…' : 'Update'}
-                  </button>
-                </div>
+                ) : null}
+
+                {visibleOptionalBeerCategoryCount > 0 ? (
+                  <div className="inventory-draft-slots-actions">
+                    <button
+                      type="button"
+                      className="inventory-secondary-button"
+                      disabled={!optionalBeerCategoriesHaveChanges || savingOptionalBeerCategories}
+                      onClick={() => {
+                        setOptionalBeerCategoryEdits(
+                          optionalBeerCategories.map((category) => ({ ...category })),
+                        )
+                        setVisibleOptionalBeerCategoryCount(
+                          getVisibleOptionalBeerCategoryCount(optionalBeerCategories),
+                        )
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="inventory-primary-button"
+                      disabled={!optionalBeerCategoriesHaveChanges || savingOptionalBeerCategories}
+                      onClick={() => void saveOptionalBeerCategorySettings()}
+                    >
+                      {savingOptionalBeerCategories ? 'Saving…' : 'Update'}
+                    </button>
+                  </div>
+                ) : null}
               </section>
             </div>
           </details>
@@ -1754,6 +1785,18 @@ function DraftSlotField({
       </label>
     </div>
   )
+}
+
+function getVisibleOptionalBeerCategoryCount(
+  categories: readonly OptionalBeerCategoryConfig[],
+) {
+  let visibleCount = 0
+
+  categories.forEach((category, index) => {
+    if (category.enabled) visibleCount = index + 1
+  })
+
+  return visibleCount
 }
 
 function draftSlotEquals(left: DraftSlotState, right: DraftSlotState) {
