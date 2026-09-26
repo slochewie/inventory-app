@@ -385,16 +385,7 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
         pitcherEnabled: pitcher.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-        optionalBeerCategory1Enabled: optionalBeerCategories[0]?.enabled ?? false,
-        optionalBeerCategory1Label: optionalBeerCategories[0]?.label ?? 'Optional Beer Category 1',
-        optionalBeerCategory2Enabled: optionalBeerCategories[1]?.enabled ?? false,
-        optionalBeerCategory2Label: optionalBeerCategories[1]?.label ?? 'Optional Beer Category 2',
-        optionalBeerCategory3Enabled: optionalBeerCategories[2]?.enabled ?? false,
-        optionalBeerCategory3Label: optionalBeerCategories[2]?.label ?? 'Optional Beer Category 3',
-        optionalBeerCategory4Enabled: optionalBeerCategories[3]?.enabled ?? false,
-        optionalBeerCategory4Label: optionalBeerCategories[3]?.label ?? 'Optional Beer Category 4',
-        optionalBeerCategory5Enabled: optionalBeerCategories[4]?.enabled ?? false,
-        optionalBeerCategory5Label: optionalBeerCategories[4]?.label ?? 'Optional Beer Category 5',
+        ...buildOptionalBeerCategoryConfig(optionalBeerCategories),
       })
 
       const nextEnabled = config?.happyHourEnabled ?? happyHourDraftEnabled
@@ -497,16 +488,7 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24Edit.actualSizeOz),
         pitcherEnabled: pitcherEdit.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcherEdit.actualSizeOz),
-        optionalBeerCategory1Enabled: optionalBeerCategories[0]?.enabled ?? false,
-        optionalBeerCategory1Label: optionalBeerCategories[0]?.label ?? 'Optional Beer Category 1',
-        optionalBeerCategory2Enabled: optionalBeerCategories[1]?.enabled ?? false,
-        optionalBeerCategory2Label: optionalBeerCategories[1]?.label ?? 'Optional Beer Category 2',
-        optionalBeerCategory3Enabled: optionalBeerCategories[2]?.enabled ?? false,
-        optionalBeerCategory3Label: optionalBeerCategories[2]?.label ?? 'Optional Beer Category 3',
-        optionalBeerCategory4Enabled: optionalBeerCategories[3]?.enabled ?? false,
-        optionalBeerCategory4Label: optionalBeerCategories[3]?.label ?? 'Optional Beer Category 4',
-        optionalBeerCategory5Enabled: optionalBeerCategories[4]?.enabled ?? false,
-        optionalBeerCategory5Label: optionalBeerCategories[4]?.label ?? 'Optional Beer Category 5',
+        ...buildOptionalBeerCategoryConfig(optionalBeerCategories),
       })
 
       const nextDraft8 = {
@@ -657,31 +639,13 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
         pitcherEnabled: pitcher.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-        optionalBeerCategory1Enabled: slot1?.enabled ?? false,
-        optionalBeerCategory1Label: slot1?.label ?? 'Optional Beer Category 1',
-        optionalBeerCategory2Enabled: slot2?.enabled ?? false,
-        optionalBeerCategory2Label: slot2?.label ?? 'Optional Beer Category 2',
-        optionalBeerCategory3Enabled: slot3?.enabled ?? false,
-        optionalBeerCategory3Label: slot3?.label ?? 'Optional Beer Category 3',
-        optionalBeerCategory4Enabled: slot4?.enabled ?? false,
-        optionalBeerCategory4Label: slot4?.label ?? 'Optional Beer Category 4',
-        optionalBeerCategory5Enabled: slot5?.enabled ?? false,
-        optionalBeerCategory5Label: slot5?.label ?? 'Optional Beer Category 5',
+        ...buildOptionalBeerCategoryConfig(normalizedCategories),
       })
 
       const savedCategories = getOptionalBeerCategories(
         config ?? ({
           ...buildCurrentOrganizationConfig(),
-          optionalBeerCategory1Enabled: slot1?.enabled ?? false,
-          optionalBeerCategory1Label: slot1?.label ?? 'Optional Beer Category 1',
-          optionalBeerCategory2Enabled: slot2?.enabled ?? false,
-          optionalBeerCategory2Label: slot2?.label ?? 'Optional Beer Category 2',
-          optionalBeerCategory3Enabled: slot3?.enabled ?? false,
-          optionalBeerCategory3Label: slot3?.label ?? 'Optional Beer Category 3',
-          optionalBeerCategory4Enabled: slot4?.enabled ?? false,
-          optionalBeerCategory4Label: slot4?.label ?? 'Optional Beer Category 4',
-          optionalBeerCategory5Enabled: slot5?.enabled ?? false,
-          optionalBeerCategory5Label: slot5?.label ?? 'Optional Beer Category 5',
+          ...buildOptionalBeerCategoryConfig(normalizedCategories),
         } satisfies InventoryOrganizationConfig),
       )
 
@@ -702,8 +666,6 @@ function CatalogPage() {
   }
 
   function buildCurrentOrganizationConfig(): InventoryOrganizationConfig {
-    const [slot1, slot2, slot3, slot4, slot5] = optionalBeerCategories
-
     return {
       enabled: true,
       happyHourEnabled,
@@ -722,16 +684,7 @@ function CatalogPage() {
       draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
       pitcherEnabled: pitcher.enabled,
       pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-      optionalBeerCategory1Enabled: slot1?.enabled ?? false,
-      optionalBeerCategory1Label: slot1?.label ?? 'Optional Beer Category 1',
-      optionalBeerCategory2Enabled: slot2?.enabled ?? false,
-      optionalBeerCategory2Label: slot2?.label ?? 'Optional Beer Category 2',
-      optionalBeerCategory3Enabled: slot3?.enabled ?? false,
-      optionalBeerCategory3Label: slot3?.label ?? 'Optional Beer Category 3',
-      optionalBeerCategory4Enabled: slot4?.enabled ?? false,
-      optionalBeerCategory4Label: slot4?.label ?? 'Optional Beer Category 4',
-      optionalBeerCategory5Enabled: slot5?.enabled ?? false,
-      optionalBeerCategory5Label: slot5?.label ?? 'Optional Beer Category 5',
+      ...buildOptionalBeerCategoryConfig(optionalBeerCategories),
     }
   }
 
@@ -1826,6 +1779,37 @@ function DraftSlotField({
       </label>
     </div>
   )
+}
+
+function buildOptionalBeerCategoryConfig(
+  categories: readonly OptionalBeerCategoryConfig[],
+): Pick<
+  InventoryOrganizationConfig,
+  | 'optionalBeerCategory1Enabled'
+  | 'optionalBeerCategory1Label'
+  | 'optionalBeerCategory2Enabled'
+  | 'optionalBeerCategory2Label'
+  | 'optionalBeerCategory3Enabled'
+  | 'optionalBeerCategory3Label'
+  | 'optionalBeerCategory4Enabled'
+  | 'optionalBeerCategory4Label'
+  | 'optionalBeerCategory5Enabled'
+  | 'optionalBeerCategory5Label'
+> {
+  const [slot1, slot2, slot3, slot4, slot5] = categories
+
+  return {
+    optionalBeerCategory1Enabled: slot1?.enabled ?? false,
+    optionalBeerCategory1Label: slot1?.label ?? 'Optional Beer Category 1',
+    optionalBeerCategory2Enabled: slot2?.enabled ?? false,
+    optionalBeerCategory2Label: slot2?.label ?? 'Optional Beer Category 2',
+    optionalBeerCategory3Enabled: slot3?.enabled ?? false,
+    optionalBeerCategory3Label: slot3?.label ?? 'Optional Beer Category 3',
+    optionalBeerCategory4Enabled: slot4?.enabled ?? false,
+    optionalBeerCategory4Label: slot4?.label ?? 'Optional Beer Category 4',
+    optionalBeerCategory5Enabled: slot5?.enabled ?? false,
+    optionalBeerCategory5Label: slot5?.label ?? 'Optional Beer Category 5',
+  }
 }
 
 function getVisibleOptionalBeerCategoryCount(
