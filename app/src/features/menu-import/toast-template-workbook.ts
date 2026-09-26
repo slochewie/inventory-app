@@ -1,5 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
-import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from './beer-preview'
+import { buildBeerTabPreviewRows, getDraftBeerPrice, type BeerTabPreviewRow } from './beer-preview'
 import type { NormalizedMenuItem } from './types'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -62,6 +62,16 @@ type DraftSizeSlot = {
   happyHourCol: number | null
 }
 
+export type ToastDraftSlotMapping = {
+  toastSizeOz: number | null
+  actualSizeOz: number
+}
+
+const LEGACY_DRAFT_SLOT_MAPPINGS: ToastDraftSlotMapping[] = [
+  { toastSizeOz: 8, actualSizeOz: 10 },
+  { toastSizeOz: 16, actualSizeOz: 16 },
+]
+
 type PackagedGroupSlot = {
   label: string
   kind: 'can' | 'bottle' | 'can24oz' | 'optional'
@@ -97,13 +107,15 @@ export function buildPopulatedToastTemplateWorkbook({
   templateArrayBuffer,
   items,
   happyHourEnabled = true,
+  draftSlotMappings = LEGACY_DRAFT_SLOT_MAPPINGS,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
+  draftSlotMappings?: readonly ToastDraftSlotMapping[]
 }) {
   const workbookPackage = readWorkbookPackage(templateArrayBuffer)
-  populateBeerSheet(workbookPackage, items, happyHourEnabled)
+  populateBeerSheet(workbookPackage, items, happyHourEnabled, draftSlotMappings)
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
 
@@ -111,18 +123,20 @@ export function validatePopulatedBeerWorkbook({
   workbookArrayBuffer,
   items,
   happyHourEnabled = true,
+  draftSlotMappings = LEGACY_DRAFT_SLOT_MAPPINGS,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
+  draftSlotMappings?: readonly ToastDraftSlotMapping[]
 }) {
   const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
   const mapping = getBeerTemplateMapping(workbookPackage)
   const sheetDoc = parseXml(getTextFile(workbookPackage.files, mapping.sheetPath))
-  const beerRows = buildWorkbookBeerRows(items, happyHourEnabled)
+  const beerRows = buildWorkbookBeerRows(items, happyHourEnabled, draftSlotMappings)
   const issues: string[] = []
 
-  const draftRows = beerRows.filter(hasDraftBeerPrice)
+  const draftRows = beerRows.filter((row) => hasConfiguredDraftBeerPrice(row, draftSlotMappings))
   const canRows = beerRows.filter((row) => row.canPrice !== null)
   const bottleRows = [
     ...beerRows
@@ -147,53 +161,39 @@ export function validatePopulatedBeerWorkbook({
       )
     }
 
-    const tenOunceSlot = findDraftSlot(mapping, 10)
-    if (tenOunceSlot) {
-      validateCellValue(
-        issues,
-        sheetDoc,
-        workbookPackage.sharedStrings,
-        tenOunceSlot.priceCol,
-        rowNumber,
-        centsToDollars(row.draft10ozPrice),
-        `${row.beerName} 10oz price in Toast ${tenOunceSlot.label} slot`,
-      )
-      if (tenOunceSlot.happyHourCol) {
-        validateCellValue(
-          issues,
-          sheetDoc,
-          workbookPackage.sharedStrings,
-          tenOunceSlot.happyHourCol,
-          rowNumber,
-          centsToDollars(row.draft10ozHappyHour),
-          `${row.beerName} 10oz Happy Hour`,
+    draftSlotMappings.forEach((draftMapping) => {
+      const toastSlot = findDraftSlot(mapping, draftMapping.toastSizeOz)
+      if (!toastSlot) {
+        issues.push(
+          `Toast Beer tab is missing configured draft slot ${formatToastDraftSlot(draftMapping.toastSizeOz)}`,
         )
+        return
       }
-    }
 
-    const sixteenOunceSlot = findDraftSlot(mapping, 16)
-    if (sixteenOunceSlot) {
+      const draftPrice = getDraftBeerPrice(row, draftMapping.actualSizeOz)
+
       validateCellValue(
         issues,
         sheetDoc,
         workbookPackage.sharedStrings,
-        sixteenOunceSlot.priceCol,
+        toastSlot.priceCol,
         rowNumber,
-        centsToDollars(row.draft16ozPrice),
-        `${row.beerName} 16oz price`,
+        centsToDollars(draftPrice?.price ?? null),
+        `${row.beerName} ${draftMapping.actualSizeOz}oz price in Toast ${toastSlot.label} slot`,
       )
-      if (sixteenOunceSlot.happyHourCol) {
+
+      if (toastSlot.happyHourCol) {
         validateCellValue(
           issues,
           sheetDoc,
           workbookPackage.sharedStrings,
-          sixteenOunceSlot.happyHourCol,
+          toastSlot.happyHourCol,
           rowNumber,
-          centsToDollars(row.draft16ozHappyHour),
-          `${row.beerName} 16oz Happy Hour`,
+          centsToDollars(draftPrice?.happyHour ?? null),
+          `${row.beerName} ${draftMapping.actualSizeOz}oz Happy Hour in Toast ${toastSlot.label} slot`,
         )
       }
-    }
+    })
   })
 
   const canSlot = findPackagedSlot(mapping, 'can')
@@ -355,12 +355,18 @@ function populateBeerSheet(
   workbookPackage: WorkbookPackage,
   items: NormalizedMenuItem[],
   happyHourEnabled: boolean,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
 ) {
   const mapping = getBeerTemplateMapping(workbookPackage)
   const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
   const sheetDoc = parseXml(sheetXml)
-  const beerRows = buildWorkbookBeerRows(items, happyHourEnabled)
-  const writtenRowCount = writeBeerRowsToSheet(sheetDoc, mapping, beerRows)
+  const beerRows = buildWorkbookBeerRows(items, happyHourEnabled, draftSlotMappings)
+  const writtenRowCount = writeBeerRowsToSheet(
+    sheetDoc,
+    mapping,
+    beerRows,
+    draftSlotMappings,
+  )
 
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
   workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
@@ -369,11 +375,16 @@ function populateBeerSheet(
 function buildWorkbookBeerRows(
   items: NormalizedMenuItem[],
   happyHourEnabled: boolean,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
 ) {
   const merged = new Map<string, BeerTabPreviewRow>()
 
   buildBeerTabPreviewRows(items, happyHourEnabled)
-    .filter((row) => hasAnyBeerPrice(row) && !isOmittedWorkbookBeer(row.beerName))
+    .filter(
+      (row) =>
+        hasAnyBeerPrice(row, draftSlotMappings) &&
+        !isOmittedWorkbookBeer(row.beerName),
+    )
     .forEach((row) => {
       const key = workbookBeerKey(row.beerName)
       const existing = merged.get(key)
@@ -382,6 +393,7 @@ function buildWorkbookBeerRows(
         merged.set(key, {
           ...row,
           beerName: titleWorkbookBeerName(row.beerName),
+          draftBySizeOz: { ...row.draftBySizeOz },
           reviewNotes: [...row.reviewNotes],
         })
         return
@@ -394,10 +406,9 @@ function buildWorkbookBeerRows(
 }
 
 function mergeWorkbookBeerRow(target: BeerTabPreviewRow, source: BeerTabPreviewRow) {
-  if (source.draft10ozPrice !== null) target.draft10ozPrice = source.draft10ozPrice
-  if (source.draft10ozHappyHour !== null) target.draft10ozHappyHour = source.draft10ozHappyHour
-  if (source.draft16ozPrice !== null) target.draft16ozPrice = source.draft16ozPrice
-  if (source.draft16ozHappyHour !== null) target.draft16ozHappyHour = source.draft16ozHappyHour
+  Object.entries(source.draftBySizeOz).forEach(([sizeOz, price]) => {
+    target.draftBySizeOz[sizeOz] = price
+  })
   if (source.canPrice !== null) target.canPrice = source.canPrice
   if (source.canHappyHour !== null) target.canHappyHour = source.canHappyHour
   if (source.can24ozPrice !== null) target.can24ozPrice = source.can24ozPrice
@@ -426,7 +437,7 @@ function normalizeWorkbookBeerName(value: string) {
 
 function workbookBeerKey(value: string) {
   return normalizeWorkbookBeerName(value)
-    .replace(/\b(10\s*oz|10oz|16\s*oz|16oz|20\s*oz|20oz|24\s*oz|24oz)\b/gi, '')
+    .replace(/\b\d+(?:\.\d+)?\s*oz\b/gi, '')
     .replace(/\b(draft|pint|imperial|imp|reg|regular|can|bottle|btl|tall)\b/gi, '')
     .replace(/[.'’]/g, '')
     .replace(/[^a-z0-9$]+/g, ' ')
@@ -443,8 +454,15 @@ function titleWorkbookBeerName(value: string) {
     .replace(/\bNa\b/g, 'NA')
 }
 
-function writeBeerRowsToSheet(sheetDoc: Document, mapping: BeerTemplateMapping, beerRows: BeerTabPreviewRow[]) {
-  const draftRows = beerRows.filter(hasDraftBeerPrice)
+function writeBeerRowsToSheet(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  beerRows: BeerTabPreviewRow[],
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+) {
+  const draftRows = beerRows.filter((row) =>
+    hasConfiguredDraftBeerPrice(row, draftSlotMappings),
+  )
   const canRows = beerRows.filter((row) => row.canPrice !== null)
   const bottleSlotRows = [
     ...beerRows
@@ -461,7 +479,13 @@ function writeBeerRowsToSheet(sheetDoc: Document, mapping: BeerTemplateMapping, 
   clearCells(sheetDoc, targetColumns, mapping.dataStartRow, clearToRow)
 
   draftRows.forEach((beerRow, index) => {
-    writeDraftBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
+    writeDraftBeerRow(
+      sheetDoc,
+      mapping,
+      mapping.dataStartRow + index,
+      beerRow,
+      draftSlotMappings,
+    )
   })
 
   canRows.forEach((beerRow, index) => {
@@ -475,27 +499,46 @@ function writeBeerRowsToSheet(sheetDoc: Document, mapping: BeerTemplateMapping, 
   return writtenRowCount
 }
 
-function writeDraftBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
+function writeDraftBeerRow(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  rowNumber: number,
+  beerRow: BeerTabPreviewRow,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+) {
   if (mapping.draftNameCol === null) return
 
-  const draft10Slot = findDraftSlot(mapping, 10)
-  const draft16Slot = findDraftSlot(mapping, 16)
+  writeCellValue(
+    sheetDoc,
+    mapping.draftNameCol,
+    rowNumber,
+    beerRow.beerName,
+    mapping.dataStartRow,
+  )
 
-  writeCellValue(sheetDoc, mapping.draftNameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
+  draftSlotMappings.forEach((draftMapping) => {
+    const toastSlot = findDraftSlot(mapping, draftMapping.toastSizeOz)
+    if (!toastSlot) return
 
-  if (draft10Slot) {
-    writeCellValue(sheetDoc, draft10Slot.priceCol, rowNumber, centsToDollars(beerRow.draft10ozPrice), mapping.dataStartRow)
-    if (draft10Slot.happyHourCol) {
-      writeCellValue(sheetDoc, draft10Slot.happyHourCol, rowNumber, centsToDollars(beerRow.draft10ozHappyHour), mapping.dataStartRow)
+    const draftPrice = getDraftBeerPrice(beerRow, draftMapping.actualSizeOz)
+
+    writeCellValue(
+      sheetDoc,
+      toastSlot.priceCol,
+      rowNumber,
+      centsToDollars(draftPrice?.price ?? null),
+      mapping.dataStartRow,
+    )
+    if (toastSlot.happyHourCol) {
+      writeCellValue(
+        sheetDoc,
+        toastSlot.happyHourCol,
+        rowNumber,
+        centsToDollars(draftPrice?.happyHour ?? null),
+        mapping.dataStartRow,
+      )
     }
-  }
-
-  if (draft16Slot) {
-    writeCellValue(sheetDoc, draft16Slot.priceCol, rowNumber, centsToDollars(beerRow.draft16ozPrice), mapping.dataStartRow)
-    if (draft16Slot.happyHourCol) {
-      writeCellValue(sheetDoc, draft16Slot.happyHourCol, rowNumber, centsToDollars(beerRow.draft16ozHappyHour), mapping.dataStartRow)
-    }
-  }
+  })
 }
 
 function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
@@ -524,22 +567,19 @@ function writeBottleSlotBeerRow(
   if (bottleSlot.happyHourCol) writeCellValue(sheetDoc, bottleSlot.happyHourCol, rowNumber, centsToDollars(happyHour), mapping.dataStartRow)
 }
 
-function findDraftSlot(mapping: BeerTemplateMapping, sourceSizeOz: 10 | 16) {
-  if (sourceSizeOz === 10) {
-    const eightOunceSlot = mapping.draftSizes.find((slot) => slot.sizeOz === 8)
-    if (eightOunceSlot) return eightOunceSlot
-
-    return [...mapping.draftSizes]
-      .filter((slot) => slot.sizeOz !== null)
-      .sort((left, right) => Number(left.sizeOz) - Number(right.sizeOz))[0] ?? null
-  }
-
-  const exact = mapping.draftSizes.find((slot) => slot.sizeOz === 16)
-  if (exact) return exact
-
-  return mapping.draftSizes.find(
-    (slot) => slot.sizeOz !== null && slot.sizeOz >= 14 && slot.sizeOz <= 20,
+function findDraftSlot(
+  mapping: BeerTemplateMapping,
+  toastSizeOz: number | null,
+) {
+  return mapping.draftSizes.find((slot) =>
+    toastSizeOz === null
+      ? slot.sizeOz === null && /^pitcher$/i.test(slot.label)
+      : slot.sizeOz === toastSizeOz,
   ) ?? null
+}
+
+function formatToastDraftSlot(toastSizeOz: number | null) {
+  return toastSizeOz === null ? 'Pitcher' : `${toastSizeOz}oz`
 }
 
 function findPackagedSlot(mapping: BeerTemplateMapping, kind: 'can' | 'bottle') {
@@ -999,18 +1039,26 @@ function validateCellValue(
   }
 }
 
-function hasAnyBeerPrice(row: BeerTabPreviewRow) {
-  return [
-    row.draft10ozPrice,
-    row.draft16ozPrice,
-    row.canPrice,
-    row.can24ozPrice,
-    row.bottlePrice,
-  ].some((value) => value !== null)
+function hasAnyBeerPrice(
+  row: BeerTabPreviewRow,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+) {
+  return (
+    hasConfiguredDraftBeerPrice(row, draftSlotMappings) ||
+    [row.canPrice, row.can24ozPrice, row.bottlePrice].some(
+      (value) => value !== null,
+    )
+  )
 }
 
-function hasDraftBeerPrice(row: BeerTabPreviewRow) {
-  return row.draft10ozPrice !== null || row.draft16ozPrice !== null
+function hasConfiguredDraftBeerPrice(
+  row: BeerTabPreviewRow,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+) {
+  return draftSlotMappings.some(
+    (mapping) => getDraftBeerPrice(row, mapping.actualSizeOz)?.price !== null &&
+      getDraftBeerPrice(row, mapping.actualSizeOz)?.price !== undefined,
+  )
 }
 
 function centsToDollars(cents: number | null) {
