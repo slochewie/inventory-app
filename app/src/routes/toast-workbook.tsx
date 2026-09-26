@@ -468,7 +468,6 @@ const LIQUOR_CATEGORIES = new Set([
 function normalizeLiquorCategory(value?: string) {
   const category = clean(value).toUpperCase().replace(/&/g, '/')
 
-  if (category === 'BOURB WHISK') return 'WHISKEY/BOURBON'
   if (category.includes('WHISKEY') || category.includes('BOURBON')) return 'WHISKEY/BOURBON'
   if (category.includes('BRANDY') || category.includes('COGNAC')) return 'BRANDY/COGNAC'
   if (category.includes('LIQUEUR') || category.includes('CORDIAL')) return 'LIQUEURS'
