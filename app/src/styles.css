@@ -1029,11 +1029,15 @@ select {
   z-index: 2;
   display: flex;
   justify-content: flex-end;
-  gap: 0.65rem;
+  gap: 1rem;
   margin: 0 -1.25rem -1.25rem;
   border-top: 1px solid #e5e7eb;
   background: #fff;
   padding: 1rem 1.25rem;
+}
+
+.inventory-drawer-actions > button {
+  min-width: 7rem;
 }
 
 .inventory-secondary-button {
