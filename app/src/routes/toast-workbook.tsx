@@ -76,6 +76,7 @@ function ToastWorkbook() {
     draftRows: number
     canRows: number
     bottleSlotRows: number
+    tallBoyRows: number
     liquorRows: number
     happyHourNotes: boolean
   } | null>(null)
@@ -228,6 +229,10 @@ function ToastWorkbook() {
 
     const happyHourEnabled = organizationConfig?.happyHourEnabled === true
     const draftSlotMappings = getOrganizationDraftSlotMappings(organizationConfig)
+    const tallBoyCan = {
+      enabled: organizationConfig?.tallBoyCanEnabled === true,
+      label: organizationConfig?.tallBoyCanLabel?.trim() || 'Tall Boy Can',
+    }
     const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
       templateArrayBuffer: workbook.arrayBuffer.slice(0),
       items,
@@ -240,6 +245,7 @@ function ToastWorkbook() {
       happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
       draftSlotMappings,
+      tallBoyCan,
     })
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
@@ -254,6 +260,7 @@ function ToastWorkbook() {
       happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
       draftSlotMappings,
+      tallBoyCan,
     })
 
     if (!validation.valid) {
@@ -267,6 +274,7 @@ function ToastWorkbook() {
       draftRows: validation.beer.draftRows,
       canRows: validation.beer.canRows,
       bottleSlotRows: validation.beer.bottleSlotRows,
+      tallBoyRows: validation.beer.tallBoyRows,
       liquorRows: validation.liquorRows,
       happyHourNotes: validation.happyHourNotes,
     })
@@ -400,8 +408,8 @@ function ToastWorkbook() {
             <h2>Fresh Toast template</h2>
             <p>
               Inventory automatically loads the repository's pristine Toast Menu Template.
-              Export generation writes menu values into its existing cells without renaming
-              headers or changing the workbook structure.
+              Export generation writes menu values into the existing Toast template, including
+              organization-specific draft headers and enabled optional Beer categories.
             </p>
             <p><strong>{TOAST_TEMPLATE_FILE_NAME}</strong></p>
           </div>
@@ -435,6 +443,7 @@ function ToastWorkbook() {
               <strong>Workbook validated</strong>
               <span>
                 {workbookValidation.draftRows} draft rows · {workbookValidation.canRows} can rows ·{' '}
+                {workbookValidation.tallBoyRows} Tall Boy rows ·{' '}
                 {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows ·{' '}
                 Notes schedule checked
               </span>
