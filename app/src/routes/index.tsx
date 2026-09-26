@@ -489,6 +489,8 @@ function CatalogDrawer({
       }
 
       onClose()
+    } catch {
+      // updateVariant already surfaces the save error in the Catalog page.
     } finally {
       setUpdating(false)
     }
@@ -549,9 +551,6 @@ function CatalogDrawer({
                         onChange={(event) =>
                           updateDraft(item.id, {
                             organizationEnabled: event.target.checked,
-                            exportToToast: event.target.checked
-                              ? item.exportToToast
-                              : false,
                           })
                         }
                       />
@@ -676,6 +675,14 @@ function CatalogDrawer({
         </p>
       ) : null}
 
+      <section className="inventory-drawer-section inventory-drawer-help">
+        <p className="inventory-kicker">How this works</p>
+        <p>
+          Availability, Toast export, price, and Happy Hour values are specific to the selected organization.
+          The master item remains shared across organizations.
+        </p>
+      </section>
+
       {canEdit ? (
         <footer className="inventory-drawer-actions">
           <button
@@ -696,14 +703,6 @@ function CatalogDrawer({
           </button>
         </footer>
       ) : null}
-
-      <section className="inventory-drawer-section inventory-drawer-help">
-        <p className="inventory-kicker">How this works</p>
-        <p>
-          Availability, Toast export, price, and Happy Hour values are specific to the selected organization.
-          The master item remains shared across organizations.
-        </p>
-      </section>
     </dialog>
   )
 }
