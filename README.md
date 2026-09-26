@@ -144,9 +144,21 @@ Current beer mapping includes:
 - organization-specific optional Beer grouping → existing **Optional Beer Category** slot
 - bottle → existing Bottle slot
 
-Optional Beer Category 1 is organization-configured rather than intrinsically tied to Tall Boys or any other package type. When enabled, the exporter unhides the first Optional Beer Category and renames its package header cell (P14) to the label entered for that organization. McCarthy's currently uses the label **Tall Boy Can**, while another organization can use a different label.
+Toast exposes five hidden **Optional Beer Category** groups on the Beer tab. Inventory now supports all five as organization settings.
 
-The catalog also carries the persisted organization `toastSlot` value into normalized export items. That is the structural assignment point for expanding the same model across all five Optional Beer Category slots. The current Auth field names for slot 1 remain a legacy compatibility detail at the client boundary.
+The UI uses progressive disclosure: an organization with no optional Beer categories sees only **Add Optional Beer Category**. Each press reveals the next slot in order, up to five. Enabled slots are persisted with an organization-specific label and only those saved slots remain visible on reload. McCarthy's currently uses Optional Beer Category 1 with the label **Tall Boy Can**.
+
+Catalog Beer variants can be assigned to a stable `toastSlot` key:
+
+- `optional-beer-1`
+- `optional-beer-2`
+- `optional-beer-3`
+- `optional-beer-4`
+- `optional-beer-5`
+
+Those stable keys are independent of the visible category label, so an organization can rename a category without reassigning its variants. During workbook generation, assigned variants populate the matching Toast Optional Beer Category column group and the exporter unhides and renames that group.
+
+For backward compatibility with McCarthy's existing data, unassigned 24oz cans still flow into Optional Beer Category 1 when that slot is enabled. Slot 1 continues to use the legacy Auth storage columns `tallBoyCanEnabled` and `tallBoyCanLabel` internally; the Inventory API/client treats them as the generic Optional Beer Category 1 contract.
 
 Actual serving/package size remains Inventory data. Organization draft mappings and the Tall Boy label allow the workbook presentation to reflect the venue's configured formats while preserving Toast's template structure.
 
