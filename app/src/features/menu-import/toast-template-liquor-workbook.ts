@@ -82,7 +82,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourRange2End = null,
   happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
   draftSlotMappings,
-  optionalBeerCategory1,
+  optionalBeerCategories,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -95,14 +95,14 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourRange2End?: string | null
   happyHourRange2Days?: readonly string[]
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
-  optionalBeerCategory1?: OptionalBeerCategoryOptions
+  optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
 }) {
   const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({
     templateArrayBuffer,
     items,
     happyHourEnabled,
     draftSlotMappings,
-    optionalBeerCategory1,
+    optionalBeerCategories,
   })
   const beerWorkbookBuffer = await beerPopulatedWorkbook.arrayBuffer()
   const workbookPackage = readWorkbookPackage(beerWorkbookBuffer)
@@ -135,7 +135,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourRange2End = null,
   happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
   draftSlotMappings,
-  optionalBeerCategory1,
+  optionalBeerCategories,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -148,14 +148,14 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourRange2End?: string | null
   happyHourRange2Days?: readonly string[]
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
-  optionalBeerCategory1?: OptionalBeerCategoryOptions
+  optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
 }) {
   const beer = validatePopulatedBeerWorkbook({
     workbookArrayBuffer,
     items,
     happyHourEnabled,
     draftSlotMappings,
-    optionalBeerCategory1,
+    optionalBeerCategories,
   })
   const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
   const mapping = getLiquorTemplateMapping(workbookPackage)
@@ -199,6 +199,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
       canRows: beer.canRows,
       bottleSlotRows: beer.bottleSlotRows,
       optionalBeerCategory1Rows: beer.optionalBeerCategory1Rows,
+      optionalBeerCategoryRows: beer.optionalBeerCategoryRows,
     },
     liquorRows,
     happyHourNotes: happyHourNotes.valid,

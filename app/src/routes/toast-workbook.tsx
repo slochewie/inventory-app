@@ -8,6 +8,7 @@ import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
 import { authClient } from '#/lib/auth-client'
 import {
   getInventoryOrganizationConfig,
+  getOptionalBeerCategories,
   listInventoryCatalog,
   type InventoryOrganizationConfig,
 } from '#/lib/inventory-access'
@@ -77,6 +78,7 @@ function ToastWorkbook() {
     canRows: number
     bottleSlotRows: number
     optionalBeerCategory1Rows: number
+    optionalBeerCategoryRows: number[]
     liquorRows: number
     happyHourNotes: boolean
   } | null>(null)
@@ -229,12 +231,12 @@ function ToastWorkbook() {
 
     const happyHourEnabled = organizationConfig?.happyHourEnabled === true
     const draftSlotMappings = getOrganizationDraftSlotMappings(organizationConfig)
-    const optionalBeerCategory1 = {
-      enabled: organizationConfig?.optionalBeerCategory1Enabled === true,
-      label:
-        organizationConfig?.optionalBeerCategory1Label?.trim() ||
-        'Optional Beer Category 1',
-    }
+    const optionalBeerCategories = organizationConfig
+      ? getOptionalBeerCategories(organizationConfig).map(({ enabled, label }) => ({
+          enabled,
+          label,
+        }))
+      : []
     const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
       templateArrayBuffer: workbook.arrayBuffer.slice(0),
       items,
@@ -247,7 +249,7 @@ function ToastWorkbook() {
       happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
       draftSlotMappings,
-      optionalBeerCategory1,
+      optionalBeerCategories,
     })
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
@@ -262,7 +264,7 @@ function ToastWorkbook() {
       happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
       draftSlotMappings,
-      optionalBeerCategory1,
+      optionalBeerCategories,
     })
 
     if (!validation.valid) {
@@ -277,6 +279,7 @@ function ToastWorkbook() {
       canRows: validation.beer.canRows,
       bottleSlotRows: validation.beer.bottleSlotRows,
       optionalBeerCategory1Rows: validation.beer.optionalBeerCategory1Rows,
+      optionalBeerCategoryRows: validation.beer.optionalBeerCategoryRows,
       liquorRows: validation.liquorRows,
       happyHourNotes: validation.happyHourNotes,
     })
@@ -445,8 +448,15 @@ function ToastWorkbook() {
               <strong>Workbook validated</strong>
               <span>
                 {workbookValidation.draftRows} draft rows · {workbookValidation.canRows} can rows ·{' '}
-                {workbookValidation.optionalBeerCategory1Rows}{' '}
-                {(organizationConfig?.optionalBeerCategory1Label?.trim() || 'Optional Beer Category 1')} rows ·{' '}
+                {organizationConfig
+                  ? getOptionalBeerCategories(organizationConfig)
+                      .filter((category) => category.enabled)
+                      .map((category) =>
+                        `${workbookValidation.optionalBeerCategoryRows[category.slot - 1] ?? 0} ${category.label} rows`,
+                      )
+                      .join(' · ')
+                  : '0 optional Beer rows'}
+                {' · '}
                 {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows ·{' '}
                 Notes schedule checked
               </span>
@@ -455,7 +465,7 @@ function ToastWorkbook() {
             <div className="inventory-workbook-validation">
               <strong>Automatic validation</strong>
               <span>
-                Beer/Liquor values, Happy Hour cells, 24oz cans, and the Notes-tab schedule are checked before download.
+                Beer/Liquor values, Happy Hour cells, optional Beer categories, 24oz cans, and the Notes-tab schedule are checked before download.
               </span>
             </div>
           )}

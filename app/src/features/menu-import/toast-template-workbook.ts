@@ -85,10 +85,13 @@ type OptionalPackagedBeerSlotDefinition = OptionalPackagedSlotOptions & {
   getHappyHour: (row: BeerTabPreviewRow) => number | null
 }
 
-const DEFAULT_OPTIONAL_BEER_CATEGORY_1_OPTIONS: OptionalBeerCategoryOptions = {
-  enabled: false,
-  label: 'Optional Beer Category 1',
-}
+const DEFAULT_OPTIONAL_BEER_CATEGORIES: readonly OptionalBeerCategoryOptions[] = [
+  { enabled: false, label: 'Optional Beer Category 1' },
+  { enabled: false, label: 'Optional Beer Category 2' },
+  { enabled: false, label: 'Optional Beer Category 3' },
+  { enabled: false, label: 'Optional Beer Category 4' },
+  { enabled: false, label: 'Optional Beer Category 5' },
+]
 
 const LEGACY_DRAFT_SLOT_MAPPINGS: ToastDraftSlotMapping[] = [
   { toastSizeOz: 8, actualSizeOz: 10 },
@@ -131,13 +134,13 @@ export function buildPopulatedToastTemplateWorkbook({
   items,
   happyHourEnabled = true,
   draftSlotMappings = LEGACY_DRAFT_SLOT_MAPPINGS,
-  optionalBeerCategory1 = DEFAULT_OPTIONAL_BEER_CATEGORY_1_OPTIONS,
+  optionalBeerCategories = DEFAULT_OPTIONAL_BEER_CATEGORIES,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
-  optionalBeerCategory1?: OptionalBeerCategoryOptions
+  optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
 }) {
   const workbookPackage = readWorkbookPackage(templateArrayBuffer)
   populateBeerSheet(
@@ -145,7 +148,7 @@ export function buildPopulatedToastTemplateWorkbook({
     items,
     happyHourEnabled,
     draftSlotMappings,
-    optionalBeerCategory1,
+    optionalBeerCategories,
   )
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
@@ -155,13 +158,13 @@ export function validatePopulatedBeerWorkbook({
   items,
   happyHourEnabled = true,
   draftSlotMappings = LEGACY_DRAFT_SLOT_MAPPINGS,
-  optionalBeerCategory1 = DEFAULT_OPTIONAL_BEER_CATEGORY_1_OPTIONS,
+  optionalBeerCategories = DEFAULT_OPTIONAL_BEER_CATEGORIES,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
-  optionalBeerCategory1?: OptionalBeerCategoryOptions
+  optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
 }) {
   const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
   const mapping = getBeerTemplateMapping(workbookPackage)
@@ -195,11 +198,13 @@ export function validatePopulatedBeerWorkbook({
   const canRows = beerRows.filter((row) => row.canPrice !== null)
   const optionalPackagedSlots = buildOptionalPackagedBeerSlotDefinitions(
     beerRows,
-    optionalBeerCategory1,
+    optionalBeerCategories,
   )
-  const optionalBeerCategory1Rows = optionalPackagedSlots[0]?.rows ?? []
+  const optionalBeerCategoryRows = optionalPackagedSlots.map(
+    (definition) => definition.rows.length,
+  )
   const bottleRows = [
-    ...(!optionalBeerCategory1.enabled
+    ...(!(optionalBeerCategories[0]?.enabled ?? false)
       ? beerRows
           .filter((row) => row.can24ozPrice !== null)
           .map((row) => ({ row, kind: '24oz can' as const }))
@@ -390,7 +395,8 @@ export function validatePopulatedBeerWorkbook({
     draftRows: draftRows.length,
     canRows: canRows.length,
     bottleSlotRows: bottleRows.length,
-    optionalBeerCategory1Rows: optionalBeerCategory1Rows.length,
+    optionalBeerCategory1Rows: optionalBeerCategoryRows[0] ?? 0,
+    optionalBeerCategoryRows,
   }
 }
 
@@ -465,7 +471,7 @@ function populateBeerSheet(
   items: NormalizedMenuItem[],
   happyHourEnabled: boolean,
   draftSlotMappings: readonly ToastDraftSlotMapping[],
-  optionalBeerCategory1: OptionalBeerCategoryOptions,
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
 ) {
   const mapping = getBeerTemplateMapping(workbookPackage)
   const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
@@ -476,7 +482,7 @@ function populateBeerSheet(
     mapping,
     beerRows,
     draftSlotMappings,
-    optionalBeerCategory1,
+    optionalBeerCategories,
   )
 
   writeDraftSizeHeaders(sheetDoc, mapping, draftSlotMappings)
@@ -506,6 +512,7 @@ function buildWorkbookBeerRows(
           ...row,
           beerName: titleWorkbookBeerName(row.beerName),
           draftBySizeOz: { ...row.draftBySizeOz },
+          optionalBySlot: { ...row.optionalBySlot },
           reviewNotes: [...row.reviewNotes],
         })
         return
@@ -525,6 +532,9 @@ function mergeWorkbookBeerRow(target: BeerTabPreviewRow, source: BeerTabPreviewR
   if (source.canHappyHour !== null) target.canHappyHour = source.canHappyHour
   if (source.can24ozPrice !== null) target.can24ozPrice = source.can24ozPrice
   if (source.can24ozHappyHour !== null) target.can24ozHappyHour = source.can24ozHappyHour
+  Object.entries(source.optionalBySlot).forEach(([slot, price]) => {
+    target.optionalBySlot[slot] = price
+  })
   if (source.bottlePrice !== null) target.bottlePrice = source.bottlePrice
   if (source.bottleHappyHour !== null) target.bottleHappyHour = source.bottleHappyHour
   target.reviewNotes.push(...source.reviewNotes)
@@ -571,7 +581,7 @@ function writeBeerRowsToSheet(
   mapping: BeerTemplateMapping,
   beerRows: BeerTabPreviewRow[],
   draftSlotMappings: readonly ToastDraftSlotMapping[],
-  optionalBeerCategory1: OptionalBeerCategoryOptions,
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
 ) {
   const draftRows = beerRows.filter((row) =>
     hasConfiguredDraftBeerPrice(row, draftSlotMappings),
@@ -579,11 +589,10 @@ function writeBeerRowsToSheet(
   const canRows = beerRows.filter((row) => row.canPrice !== null)
   const optionalPackagedSlots = buildOptionalPackagedBeerSlotDefinitions(
     beerRows,
-    optionalBeerCategory1,
+    optionalBeerCategories,
   )
-  const optionalBeerCategory1Rows = optionalPackagedSlots[0]?.rows ?? []
   const bottleSlotRows = [
-    ...(!optionalBeerCategory1.enabled
+    ...(!(optionalBeerCategories[0]?.enabled ?? false)
       ? beerRows
           .filter((row) => row.can24ozPrice !== null)
           .map((row) => ({ row, kind: 'can24oz' as const }))
@@ -595,7 +604,7 @@ function writeBeerRowsToSheet(
   const writtenRowCount = Math.max(
     draftRows.length,
     canRows.length,
-    optionalBeerCategory1Rows.length,
+    ...optionalPackagedSlots.map((definition) => definition.rows.length),
     bottleSlotRows.length,
   )
   const clearToRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount + DATA_ROW_BUFFER)
@@ -710,21 +719,37 @@ function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNu
 
 function buildOptionalPackagedBeerSlotDefinitions(
   beerRows: BeerTabPreviewRow[],
-  optionalBeerCategory1: OptionalBeerCategoryOptions,
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
 ): OptionalPackagedBeerSlotDefinition[] {
-  return [
-    {
-      enabled: optionalBeerCategory1.enabled,
-      label: optionalBeerCategory1.label,
-      slotIndex: 0,
-      description: optionalBeerCategory1.label.trim() || 'Optional Beer Category 1',
-      rows: optionalBeerCategory1.enabled
-        ? beerRows.filter((row) => row.can24ozPrice !== null)
-        : [],
-      getPrice: (row) => row.can24ozPrice,
-      getHappyHour: (row) => row.can24ozHappyHour,
-    },
-  ]
+  return DEFAULT_OPTIONAL_BEER_CATEGORIES.map((defaultOptions, slotIndex) => {
+    const configured = optionalBeerCategories[slotIndex] ?? defaultOptions
+    const slotKey = `optional-beer-${slotIndex + 1}`
+    const rows = configured.enabled
+      ? beerRows.filter((row) => {
+          if (row.optionalBySlot[slotKey]?.price !== null &&
+              row.optionalBySlot[slotKey]?.price !== undefined) {
+            return true
+          }
+
+          return slotIndex === 0 && row.can24ozPrice !== null
+        })
+      : []
+
+    return {
+      enabled: configured.enabled,
+      label: configured.label,
+      slotIndex,
+      description:
+        configured.label.trim() || `Optional Beer Category ${slotIndex + 1}`,
+      rows,
+      getPrice: (row) =>
+        row.optionalBySlot[slotKey]?.price ??
+        (slotIndex === 0 ? row.can24ozPrice : null),
+      getHappyHour: (row) =>
+        row.optionalBySlot[slotKey]?.happyHour ??
+        (slotIndex === 0 ? row.can24ozHappyHour : null),
+    }
+  })
 }
 
 function writeOptionalPackagedSlotRows<T>({
@@ -1467,6 +1492,9 @@ function hasAnyBeerPrice(
     hasConfiguredDraftBeerPrice(row, draftSlotMappings) ||
     [row.canPrice, row.can24ozPrice, row.bottlePrice].some(
       (value) => value !== null,
+    ) ||
+    Object.values(row.optionalBySlot).some(
+      (value) => value.price !== null,
     )
   )
 }

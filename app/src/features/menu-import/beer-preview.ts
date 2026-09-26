@@ -12,6 +12,7 @@ export type BeerTabPreviewRow = {
   canHappyHour: number | null
   can24ozPrice: number | null
   can24ozHappyHour: number | null
+  optionalBySlot: Record<string, DraftBeerPrice>
   bottlePrice: number | null
   bottleHappyHour: number | null
   reviewNotes: string[]
@@ -44,6 +45,7 @@ function createBeerTabPreviewRow(beerName: string): BeerTabPreviewRow {
     canHappyHour: null,
     can24ozPrice: null,
     can24ozHappyHour: null,
+    optionalBySlot: {},
     bottlePrice: null,
     bottleHappyHour: null,
     reviewNotes: [],
@@ -70,6 +72,14 @@ function applyBeerSlot(
       row.reviewNotes.push(`${item.name}: draft size is unknown`)
     }
 
+    return
+  }
+
+  if (isOptionalBeerSlot(item.toastSlot)) {
+    row.optionalBySlot[item.toastSlot] = {
+      price: item.basePriceCents,
+      happyHour: happyHourEnabled ? item.happyHourPriceCents : null,
+    }
     return
   }
 
@@ -157,4 +167,9 @@ function getBeerName(name: string, toastDestination: string) {
   if (!normalized) normalized = name.trim()
 
   return normalized || 'Unknown beer'
+}
+
+
+function isOptionalBeerSlot(value: string | null | undefined): value is `optional-beer-${1 | 2 | 3 | 4 | 5}` {
+  return typeof value === 'string' && /^optional-beer-[1-5]$/.test(value)
 }
