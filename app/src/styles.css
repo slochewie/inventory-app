@@ -985,6 +985,18 @@ select {
   padding: 0.2rem 0.5rem;
 }
 
+.inventory-master-category-section {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 1rem;
+}
+
+.inventory-master-category-note {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .inventory-merge-section {
   border-top: 1px solid #e5e7eb;
   padding-top: 1rem;
