@@ -10,7 +10,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for the operator and development workflow.
 
 - Better Auth sign-in, organization selection, account switching, and per-organization Inventory access.
 - Inventory application roles: Viewer, Staff, Manager, and Admin.
-- Persistent shared master item catalog with organization-specific availability, pricing, Happy Hour pricing, Toast-export state, and display-name overrides.
+- Persistent shared master item catalog with organization-specific availability, pricing, Happy Hour pricing/schedule, Toast-export state, and display-name overrides.
 - Aloha menu-price CSV import and normalization.
 - Import review before persistence.
 - Persistent import history and conflict reporting.
@@ -21,6 +21,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for the operator and development workflow.
 - Restrict master-item merge controls to Inventory Admins.
 - Export the current organization's persistent catalog to Toast.
 - Generate populated Toast XLSX or ZIP packages from the repository's pristine Toast template.
+- Populate and validate the Toast Notes-tab Happy Hour schedule by organization-selected days and time window.
 - Preserve Toast's fixed workbook headers and structure.
 - Separate organization availability from the `Export to Toast` setting.
 - Use canonical Inventory categories for Toast export and workbook summaries.
@@ -124,7 +125,13 @@ The app can download:
 - a populated `.xlsx` for inspection, or
 - a `.zip` containing the same populated workbook for sending to Toast.
 
-Generated filenames use the organization/store name when available and include a Pacific-time timestamp.
+Generated filenames use the organization/store name when available and include a Pacific-time timestamp. Downloads are staged briefly through a same-origin server route so iOS browsers receive a real attachment response with the intended filename; the staged file remains available long enough for browsers that issue a preview request before the actual download.
+
+### Happy Hour workbook behavior
+
+Organization settings store whether Happy Hour is enabled, one start/end time window, and the selected days of the week. When enabled, the exporter writes that schedule into the Toast **Notes** tab using Time Range 1 for the selected days only. Unselected days remain blank.
+
+Time Range 2 is intentionally left blank. The exporter validates the Notes schedule before allowing download, alongside Beer/Liquor workbook values.
 
 ### Beer workbook behavior
 
