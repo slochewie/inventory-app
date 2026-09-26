@@ -738,6 +738,45 @@ select {
   font-weight: 800;
 }
 
+.inventory-happy-hour-card {
+  display: grid;
+  width: min(100%, 96rem);
+  grid-template-columns: minmax(18rem, 1fr) auto minmax(9rem, 11rem) minmax(9rem, 11rem) auto;
+  gap: 0.9rem;
+  align-items: end;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+}
+
+.inventory-happy-hour-copy h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1rem;
+}
+
+.inventory-happy-hour-copy p:last-child {
+  margin: 0.3rem 0 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.inventory-happy-hour-toggle {
+  align-self: center;
+  white-space: nowrap;
+}
+
+.inventory-happy-hour-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.inventory-happy-hour-actions button {
+  min-width: 6rem;
+}
+
 .inventory-catalog-toolbar {
   display: grid;
   width: min(100%, 96rem);
@@ -2176,6 +2215,24 @@ select {
 @media (max-width: 1100px) {
   .inventory-review-controls,
   .inventory-reconcile-searches,
+  .inventory-happy-hour-card {
+    grid-template-columns: 1fr 1fr;
+    align-items: end;
+  }
+
+  .inventory-happy-hour-copy,
+  .inventory-happy-hour-actions {
+    grid-column: 1 / -1;
+  }
+
+  .inventory-happy-hour-toggle {
+    grid-column: 1 / -1;
+  }
+
+  .inventory-happy-hour-actions {
+    justify-content: flex-end;
+  }
+
   .inventory-catalog-toolbar {
     grid-template-columns: 1fr;
   }
