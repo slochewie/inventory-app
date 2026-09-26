@@ -229,12 +229,10 @@ function ToastWorkbook() {
 
     const happyHourEnabled = organizationConfig?.happyHourEnabled === true
     const draftSlotMappings = getOrganizationDraftSlotMappings(organizationConfig)
-    // Auth still exposes the original field names. Inventory treats them as
-    // compatibility transport for Optional Beer Category 1.
     const optionalBeerCategory1 = {
-      enabled: organizationConfig?.tallBoyCanEnabled === true,
+      enabled: organizationConfig?.optionalBeerCategory1Enabled === true,
       label:
-        organizationConfig?.tallBoyCanLabel?.trim() ||
+        organizationConfig?.optionalBeerCategory1Label?.trim() ||
         'Optional Beer Category 1',
     }
     const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
@@ -448,7 +446,7 @@ function ToastWorkbook() {
               <span>
                 {workbookValidation.draftRows} draft rows · {workbookValidation.canRows} can rows ·{' '}
                 {workbookValidation.optionalBeerCategory1Rows}{' '}
-                {(organizationConfig?.tallBoyCanLabel?.trim() || 'Optional Beer Category 1')} rows ·{' '}
+                {(organizationConfig?.optionalBeerCategory1Label?.trim() || 'Optional Beer Category 1')} rows ·{' '}
                 {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows ·{' '}
                 Notes schedule checked
               </span>

@@ -186,9 +186,9 @@ function CatalogPage() {
         setDraft24Edit(nextDraft24)
         setPitcherEdit(nextPitcher)
 
-        const nextOptionalBeerCategory1Enabled = organizationConfig.tallBoyCanEnabled === true
+        const nextOptionalBeerCategory1Enabled = organizationConfig.optionalBeerCategory1Enabled === true
         const nextOptionalBeerCategory1Label =
-          organizationConfig.tallBoyCanLabel?.trim() || 'Optional Beer Category 1'
+          organizationConfig.optionalBeerCategory1Label?.trim() || 'Optional Beer Category 1'
         setOptionalBeerCategory1Enabled(nextOptionalBeerCategory1Enabled)
         setOptionalBeerCategory1Label(nextOptionalBeerCategory1Label)
         setOptionalBeerCategory1EditEnabled(nextOptionalBeerCategory1Enabled)
@@ -380,8 +380,8 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
         pitcherEnabled: pitcher.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-        tallBoyCanEnabled: optionalBeerCategory1Enabled,
-        tallBoyCanLabel: optionalBeerCategory1Label,
+        optionalBeerCategory1Enabled,
+        optionalBeerCategory1Label,
       })
 
       const nextEnabled = config?.happyHourEnabled ?? happyHourDraftEnabled
@@ -484,8 +484,8 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24Edit.actualSizeOz),
         pitcherEnabled: pitcherEdit.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcherEdit.actualSizeOz),
-        tallBoyCanEnabled: optionalBeerCategory1Enabled,
-        tallBoyCanLabel: optionalBeerCategory1Label,
+        optionalBeerCategory1Enabled,
+        optionalBeerCategory1Label,
       })
 
       const nextDraft8 = {
@@ -566,13 +566,13 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
         pitcherEnabled: pitcher.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-        tallBoyCanEnabled: optionalBeerCategory1EditEnabled,
-        tallBoyCanLabel: nextLabel || 'Optional Beer Category 1',
+        optionalBeerCategory1Enabled: optionalBeerCategory1EditEnabled,
+        optionalBeerCategory1Label: nextLabel || 'Optional Beer Category 1',
       })
 
-      const savedEnabled = config?.tallBoyCanEnabled ?? optionalBeerCategory1EditEnabled
+      const savedEnabled = config?.optionalBeerCategory1Enabled ?? optionalBeerCategory1EditEnabled
       const savedLabel =
-        config?.tallBoyCanLabel?.trim() ||
+        config?.optionalBeerCategory1Label?.trim() ||
         nextLabel ||
         'Optional Beer Category 1'
 

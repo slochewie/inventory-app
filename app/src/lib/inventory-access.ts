@@ -102,13 +102,27 @@ export type InventoryOrganizationConfig = {
   draft24ActualSizeOz: number | null
   pitcherEnabled: boolean
   pitcherActualSizeOz: number | null
-  tallBoyCanEnabled: boolean
-  tallBoyCanLabel: string
+  optionalBeerCategory1Enabled: boolean
+  optionalBeerCategory1Label: string
+  optionalBeerCategory2Enabled: boolean
+  optionalBeerCategory2Label: string
+  optionalBeerCategory3Enabled: boolean
+  optionalBeerCategory3Label: string
+  optionalBeerCategory4Enabled: boolean
+  optionalBeerCategory4Label: string
+  optionalBeerCategory5Enabled: boolean
+  optionalBeerCategory5Label: string
 }
+
+type InventoryOrganizationConfigTransport =
+  Partial<InventoryOrganizationConfig> & {
+    tallBoyCanEnabled?: boolean
+    tallBoyCanLabel?: string
+  }
 
 type OrganizationConfigResponse = {
   organizationId?: string
-  config?: InventoryOrganizationConfig
+  config?: InventoryOrganizationConfigTransport
   updated?: boolean
   error?: string
 }
@@ -272,38 +286,7 @@ export async function getInventoryOrganizationConfig(
     )
   }
 
-  if (result.config) {
-    const legacyLabel = result.config.tallBoyCanLabel?.trim()
-    return {
-      ...result.config,
-      tallBoyCanLabel:
-        !result.config.tallBoyCanEnabled && legacyLabel === "Tall Boy Can"
-          ? "Optional Beer Category 1"
-          : legacyLabel || "Optional Beer Category 1",
-    }
-  }
-
-  return {
-    enabled: true,
-    happyHourEnabled: false,
-    happyHourStart: null,
-    happyHourEnd: null,
-    happyHourDays: [...ALL_HAPPY_HOUR_DAYS],
-    happyHourRange2Enabled: false,
-    happyHourRange2Start: null,
-    happyHourRange2End: null,
-    happyHourRange2Days: [...ALL_HAPPY_HOUR_DAYS],
-    draft8Enabled: false,
-    draft8ActualSizeOz: null,
-    draft16Enabled: false,
-    draft16ActualSizeOz: null,
-    draft24Enabled: false,
-    draft24ActualSizeOz: null,
-    pitcherEnabled: false,
-    pitcherActualSizeOz: null,
-    tallBoyCanEnabled: false,
-    tallBoyCanLabel: "Optional Beer Category 1",
-  }
+  return normalizeInventoryOrganizationConfig(result.config)
 }
 
 export async function updateInventoryOrganizationConfig(input: {
@@ -324,8 +307,16 @@ export async function updateInventoryOrganizationConfig(input: {
   draft24ActualSizeOz: number | null
   pitcherEnabled: boolean
   pitcherActualSizeOz: number | null
-  tallBoyCanEnabled: boolean
-  tallBoyCanLabel: string
+  optionalBeerCategory1Enabled: boolean
+  optionalBeerCategory1Label: string
+  optionalBeerCategory2Enabled?: boolean
+  optionalBeerCategory2Label?: string
+  optionalBeerCategory3Enabled?: boolean
+  optionalBeerCategory3Label?: string
+  optionalBeerCategory4Enabled?: boolean
+  optionalBeerCategory4Label?: string
+  optionalBeerCategory5Enabled?: boolean
+  optionalBeerCategory5Label?: string
 }) {
   const response = await fetch(
     authEndpoint("/api/auth/inventory/organization-config"),
@@ -335,7 +326,13 @@ export async function updateInventoryOrganizationConfig(input: {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        ...input,
+        // Temporary aliases keep this client compatible with the pre-generic
+        // Auth deployment during the rolling update. New Auth ignores them.
+        tallBoyCanEnabled: input.optionalBeerCategory1Enabled,
+        tallBoyCanLabel: input.optionalBeerCategory1Label,
+      }),
     },
   )
   const result = (await response.json()) as OrganizationConfigResponse
@@ -348,7 +345,71 @@ export async function updateInventoryOrganizationConfig(input: {
     )
   }
 
-  return result.config ?? null
+  return result.config
+    ? normalizeInventoryOrganizationConfig(result.config)
+    : null
+}
+
+function normalizeInventoryOrganizationConfig(
+  config?: InventoryOrganizationConfigTransport | null,
+): InventoryOrganizationConfig {
+  const legacyEnabled = config?.tallBoyCanEnabled === true
+  const legacyLabel = config?.tallBoyCanLabel?.trim()
+  const slot1Enabled =
+    config?.optionalBeerCategory1Enabled ?? legacyEnabled
+  const slot1ConfiguredLabel = config?.optionalBeerCategory1Label?.trim()
+  const slot1Label =
+    slot1ConfiguredLabel ||
+    (!slot1Enabled && legacyLabel === "Tall Boy Can"
+      ? "Optional Beer Category 1"
+      : legacyLabel) ||
+    "Optional Beer Category 1"
+
+  return {
+    enabled: config?.enabled ?? true,
+    happyHourEnabled: config?.happyHourEnabled ?? false,
+    happyHourStart: config?.happyHourStart ?? null,
+    happyHourEnd: config?.happyHourEnd ?? null,
+    happyHourDays: config?.happyHourDays?.length
+      ? config.happyHourDays
+      : [...ALL_HAPPY_HOUR_DAYS],
+    happyHourRange2Enabled: config?.happyHourRange2Enabled ?? false,
+    happyHourRange2Start: config?.happyHourRange2Start ?? null,
+    happyHourRange2End: config?.happyHourRange2End ?? null,
+    happyHourRange2Days: config?.happyHourRange2Days?.length
+      ? config.happyHourRange2Days
+      : [...ALL_HAPPY_HOUR_DAYS],
+    draft8Enabled: config?.draft8Enabled ?? false,
+    draft8ActualSizeOz: config?.draft8ActualSizeOz ?? null,
+    draft16Enabled: config?.draft16Enabled ?? false,
+    draft16ActualSizeOz: config?.draft16ActualSizeOz ?? null,
+    draft24Enabled: config?.draft24Enabled ?? false,
+    draft24ActualSizeOz: config?.draft24ActualSizeOz ?? null,
+    pitcherEnabled: config?.pitcherEnabled ?? false,
+    pitcherActualSizeOz: config?.pitcherActualSizeOz ?? null,
+    optionalBeerCategory1Enabled: slot1Enabled,
+    optionalBeerCategory1Label: slot1Label,
+    optionalBeerCategory2Enabled:
+      config?.optionalBeerCategory2Enabled ?? false,
+    optionalBeerCategory2Label:
+      config?.optionalBeerCategory2Label?.trim() ||
+      "Optional Beer Category 2",
+    optionalBeerCategory3Enabled:
+      config?.optionalBeerCategory3Enabled ?? false,
+    optionalBeerCategory3Label:
+      config?.optionalBeerCategory3Label?.trim() ||
+      "Optional Beer Category 3",
+    optionalBeerCategory4Enabled:
+      config?.optionalBeerCategory4Enabled ?? false,
+    optionalBeerCategory4Label:
+      config?.optionalBeerCategory4Label?.trim() ||
+      "Optional Beer Category 4",
+    optionalBeerCategory5Enabled:
+      config?.optionalBeerCategory5Enabled ?? false,
+    optionalBeerCategory5Label:
+      config?.optionalBeerCategory5Label?.trim() ||
+      "Optional Beer Category 5",
+  }
 }
 
 
