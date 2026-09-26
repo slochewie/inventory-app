@@ -17,6 +17,7 @@ export function catalogRowToNormalizedItem(
     id: row.variant.id,
     masterItemId: row.id,
     masterName: row.name,
+    masterCategoryId: row.category?.id,
     variantLabel: variantLabel || 'Standard',
     variantKind: row.variant.kind,
     variantSizeOz: row.variant.sizeOz,
