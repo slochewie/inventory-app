@@ -141,12 +141,12 @@ Current beer mapping includes:
 
 - organization-configured draft sizes → selected existing Toast draft slots
 - standard can → existing Can slot
-- Tall Boy / oversized can → first existing **Optional Beer Category** slot when Tall Boy Can is enabled
+- organization-specific optional Beer grouping → existing **Optional Beer Category** slot
 - bottle → existing Bottle slot
 
-When Tall Boy Can is enabled for the organization, the exporter unhides the first Optional Beer Category, renames its package header cell (P14) to the configured organization label, and writes Tall Boy names, prices, and Happy Hour prices into that slot. It does not route those items into Bottle.
+Optional Beer Category 1 is organization-configured rather than intrinsically tied to Tall Boys or any other package type. When enabled, the exporter unhides the first Optional Beer Category and renames its package header cell (P14) to the label entered for that organization. McCarthy's currently uses the label **Tall Boy Can**, while another organization can use a different label.
 
-Standard cans, Tall Boy cans, and bottles remain separate Inventory variants/source items. The optional category reuse is structural: it repurposes Toast's existing optional Beer slot without adding columns to the workbook.
+The catalog also carries the persisted organization `toastSlot` value into normalized export items. That is the structural assignment point for expanding the same model across all five Optional Beer Category slots. The current Auth field names for slot 1 remain a legacy compatibility detail at the client boundary.
 
 Actual serving/package size remains Inventory data. Organization draft mappings and the Tall Boy label allow the workbook presentation to reflect the venue's configured formats while preserving Toast's template structure.
 

@@ -302,19 +302,16 @@ Current mapping:
 | --- | --- |
 | organization-configured draft size | configured existing Toast draft slot |
 | standard Can | existing Can slot |
-| Tall Boy / oversized can | first existing Optional Beer Category slot when enabled |
+| organization-specific optional Beer grouping | configured Optional Beer Category slot |
 | Bottle | existing Bottle slot |
 
-The organization settings control whether the Tall Boy Can slot is enabled and what label it uses. When enabled, export:
+The organization settings control whether Optional Beer Category 1 is enabled and what label it uses. When enabled, export:
 
 1. unhides the first Optional Beer Category,
-2. renames its package header cell (P14) to the configured organization label,
-3. writes Tall Boy names into that optional section, and
-4. writes its normal and Happy Hour prices into the paired price cells.
+2. renames its package header cell (P14) to the configured organization label, and
+3. writes the assigned optional-category names and prices into that existing section.
 
-Tall Boy cans are not written into Bottle when this feature is enabled. Bottles continue using the Bottle section.
-
-A standard can, Tall Boy can, and bottle remain separate Inventory variants/items even when their cleaned names are similar. Reusing the existing Optional Beer Category preserves Toast's workbook structure while giving the venue a dedicated Tall Boy package slot.
+The slot itself is generic. McCarthy's currently labels Optional Beer Category 1 **Tall Boy Can**, but another organization can name the slot differently. Reusing Toast's existing Optional Beer Category preserves the workbook structure without adding custom columns.
 
 ## 14. Canonical categories
 
@@ -468,11 +465,11 @@ Check both organization controls:
 
 Also verify the variant is active and has a valid Toast category/destination for its export path.
 
-### A Tall Boy / oversized can does not appear where expected
+### An Optional Beer Category item does not appear where expected
 
-Verify the item is classified as an oversized can and that the organization's **Tall Boy Can** setting is enabled.
+Verify Optional Beer Category 1 is enabled for the organization and that its configured label is correct.
 
-When enabled, the writer uses the first existing Optional Beer Category, unhides it, and applies the configured organization label to P14. Tall Boy cans should not appear in Bottle.
+When enabled, the writer uses the first existing Optional Beer Category, unhides it, and applies the organization-specific label to P14. McCarthy's currently uses **Tall Boy Can** as that label; the slot itself is not hardcoded to Tall Boys.
 
 ### An import creates or maps to the wrong product
 
