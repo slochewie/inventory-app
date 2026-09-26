@@ -77,8 +77,6 @@ export const Route = createFileRoute('/api/toast-download')({
             return new Response('Download expired or not found', { status: 404 })
           }
 
-          await removeDownload(token)
-
           return new Response(bytes, {
             headers: {
               'Content-Type': metadata.contentType,
