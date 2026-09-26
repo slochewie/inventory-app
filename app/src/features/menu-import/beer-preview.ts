@@ -74,8 +74,10 @@ function applyBeerSlot(
   }
 
   if (
-    (variantKind === 'can' && item.variantSizeOz === 24) ||
-    destination.includes('24oz can')
+    (variantKind === 'can' &&
+      typeof item.variantSizeOz === 'number' &&
+      item.variantSizeOz >= 24) ||
+    /\b(?:24|25)\s*oz\s*can\b/i.test(item.toastDestination)
   ) {
     row.can24ozPrice = item.basePriceCents
     row.can24ozHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
