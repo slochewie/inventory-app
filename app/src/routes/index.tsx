@@ -622,6 +622,11 @@ function CatalogPage() {
             </div>
 
             <div className="inventory-draft-slot-list">
+              <div className="inventory-draft-slot-header" aria-hidden="true">
+                <span>Toast slot</span>
+                <span>Used</span>
+                <span>Actual size</span>
+              </div>
               <DraftSlotField toastLabel="8oz" value={draft8Edit} disabled={savingDraftSlots} onChange={setDraft8Edit} />
               <DraftSlotField toastLabel="16oz" value={draft16Edit} disabled={savingDraftSlots} onChange={setDraft16Edit} />
               <DraftSlotField toastLabel="24oz" value={draft24Edit} disabled={savingDraftSlots} onChange={setDraft24Edit} />
@@ -1232,22 +1237,36 @@ function DraftSlotField({
   disabled: boolean
   onChange: (value: DraftSlotState) => void
 }) {
+  const toastSize = toastLabel.endsWith('oz')
+    ? toastLabel.replace('oz', '')
+    : ''
+
   return (
     <div className="inventory-draft-slot-row">
-      <label className="inventory-inline-toggle">
+      <strong>{toastLabel}</strong>
+
+      <label className="inventory-draft-slot-used">
         <input
           type="checkbox"
           checked={value.enabled}
           disabled={disabled}
-          onChange={(event) =>
-            onChange({ ...value, enabled: event.target.checked })
-          }
+          onChange={(event) => {
+            const enabled = event.target.checked
+            onChange({
+              ...value,
+              enabled,
+              actualSizeOz:
+                enabled && !value.actualSizeOz.trim() && toastSize
+                  ? toastSize
+                  : value.actualSizeOz,
+            })
+          }}
         />
-        <span>{toastLabel} Toast slot</span>
+        <span>{value.enabled ? 'Yes' : 'No'}</span>
       </label>
 
-      <label className="inventory-search-control inventory-draft-size-input">
-        <span>Actual size</span>
+      <label className="inventory-draft-size-input">
+        <span className="sr-only">{toastLabel} actual size in ounces</span>
         <div className="inventory-draft-size-control">
           <input
             type="number"
@@ -1256,9 +1275,12 @@ function DraftSlotField({
             inputMode="numeric"
             value={value.actualSizeOz}
             disabled={!value.enabled || disabled}
-            placeholder={toastLabel === 'Pitcher' ? '' : toastLabel.replace('oz', '')}
-            onChange={(event) =>
-              onChange({ ...value, actualSizeOz: event.target.value })
+            placeholder="—"
+            onInput={(event) =>
+              onChange({
+                ...value,
+                actualSizeOz: (event.currentTarget as HTMLInputElement).value,
+              })
             }
           />
           <span>oz</span>
