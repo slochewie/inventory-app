@@ -22,6 +22,11 @@ export const Route = createFileRoute('/')({ component: CatalogPage })
 
 type AvailabilityFilter = 'carried' | 'not-carried' | 'all'
 
+type DraftSlotState = {
+  enabled: boolean
+  actualSizeOz: string
+}
+
 const PAGE_SIZE = 50
 
 const HAPPY_HOUR_DAY_OPTIONS: Array<{
@@ -77,6 +82,15 @@ function CatalogPage() {
     ...ALL_HAPPY_HOUR_DAYS,
   ])
   const [savingHappyHour, setSavingHappyHour] = useState(false)
+  const [draft8, setDraft8] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
+  const [draft16, setDraft16] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
+  const [draft24, setDraft24] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
+  const [pitcher, setPitcher] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
+  const [draft8Edit, setDraft8Edit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
+  const [draft16Edit, setDraft16Edit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
+  const [draft24Edit, setDraft24Edit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
+  const [pitcherEdit, setPitcherEdit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
+  const [savingDraftSlots, setSavingDraftSlots] = useState(false)
 
   useEffect(() => {
     if (!activeOrganization?.id) {
@@ -112,6 +126,32 @@ function CatalogPage() {
         setHappyHourDraftStart(start)
         setHappyHourDraftEnd(end)
         setHappyHourDraftDays(days)
+
+        const nextDraft8 = {
+          enabled: organizationConfig.draft8Enabled === true,
+          actualSizeOz: organizationConfig.draft8ActualSizeOz?.toString() ?? '',
+        }
+        const nextDraft16 = {
+          enabled: organizationConfig.draft16Enabled === true,
+          actualSizeOz: organizationConfig.draft16ActualSizeOz?.toString() ?? '',
+        }
+        const nextDraft24 = {
+          enabled: organizationConfig.draft24Enabled === true,
+          actualSizeOz: organizationConfig.draft24ActualSizeOz?.toString() ?? '',
+        }
+        const nextPitcher = {
+          enabled: organizationConfig.pitcherEnabled === true,
+          actualSizeOz: organizationConfig.pitcherActualSizeOz?.toString() ?? '',
+        }
+
+        setDraft8(nextDraft8)
+        setDraft16(nextDraft16)
+        setDraft24(nextDraft24)
+        setPitcher(nextPitcher)
+        setDraft8Edit(nextDraft8)
+        setDraft16Edit(nextDraft16)
+        setDraft24Edit(nextDraft24)
+        setPitcherEdit(nextPitcher)
       })
       .catch((caught) => {
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -273,6 +313,14 @@ function CatalogPage() {
         happyHourStart: happyHourDraftStart || null,
         happyHourEnd: happyHourDraftEnd || null,
         happyHourDays: happyHourDraftDays,
+        draft8Enabled: draft8.enabled,
+        draft8ActualSizeOz: parseDraftSize(draft8.actualSizeOz),
+        draft16Enabled: draft16.enabled,
+        draft16ActualSizeOz: parseDraftSize(draft16.actualSizeOz),
+        draft24Enabled: draft24.enabled,
+        draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
+        pitcherEnabled: pitcher.enabled,
+        pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
       })
 
       const nextEnabled = config?.happyHourEnabled ?? happyHourDraftEnabled
@@ -299,6 +347,95 @@ function CatalogPage() {
       )
     } finally {
       setSavingHappyHour(false)
+    }
+  }
+
+  const draftSlotsHaveChanges =
+    !draftSlotEquals(draft8, draft8Edit) ||
+    !draftSlotEquals(draft16, draft16Edit) ||
+    !draftSlotEquals(draft24, draft24Edit) ||
+    !draftSlotEquals(pitcher, pitcherEdit)
+
+  async function saveDraftSlotSettings() {
+    if (
+      !canEdit ||
+      !activeOrganization?.id ||
+      !draftSlotsHaveChanges ||
+      savingDraftSlots
+    ) {
+      return
+    }
+
+    const slots = [
+      ['8oz', draft8Edit],
+      ['16oz', draft16Edit],
+      ['24oz', draft24Edit],
+      ['Pitcher', pitcherEdit],
+    ] as const
+
+    const invalidSlot = slots.find(([, slot]) => {
+      const size = parseDraftSize(slot.actualSizeOz)
+      return slot.enabled && (size === null || size <= 0)
+    })
+
+    if (invalidSlot) {
+      setError(`Set an actual size for the enabled ${invalidSlot[0]} Toast draft slot.`)
+      return
+    }
+
+    setSavingDraftSlots(true)
+    setError(null)
+
+    try {
+      const config = await updateInventoryOrganizationConfig({
+        organizationId: activeOrganization.id,
+        happyHourEnabled,
+        happyHourStart: happyHourStart || null,
+        happyHourEnd: happyHourEnd || null,
+        happyHourDays,
+        draft8Enabled: draft8Edit.enabled,
+        draft8ActualSizeOz: parseDraftSize(draft8Edit.actualSizeOz),
+        draft16Enabled: draft16Edit.enabled,
+        draft16ActualSizeOz: parseDraftSize(draft16Edit.actualSizeOz),
+        draft24Enabled: draft24Edit.enabled,
+        draft24ActualSizeOz: parseDraftSize(draft24Edit.actualSizeOz),
+        pitcherEnabled: pitcherEdit.enabled,
+        pitcherActualSizeOz: parseDraftSize(pitcherEdit.actualSizeOz),
+      })
+
+      const nextDraft8 = {
+        enabled: config?.draft8Enabled ?? draft8Edit.enabled,
+        actualSizeOz: config?.draft8ActualSizeOz?.toString() ?? draft8Edit.actualSizeOz,
+      }
+      const nextDraft16 = {
+        enabled: config?.draft16Enabled ?? draft16Edit.enabled,
+        actualSizeOz: config?.draft16ActualSizeOz?.toString() ?? draft16Edit.actualSizeOz,
+      }
+      const nextDraft24 = {
+        enabled: config?.draft24Enabled ?? draft24Edit.enabled,
+        actualSizeOz: config?.draft24ActualSizeOz?.toString() ?? draft24Edit.actualSizeOz,
+      }
+      const nextPitcher = {
+        enabled: config?.pitcherEnabled ?? pitcherEdit.enabled,
+        actualSizeOz: config?.pitcherActualSizeOz?.toString() ?? pitcherEdit.actualSizeOz,
+      }
+
+      setDraft8(nextDraft8)
+      setDraft16(nextDraft16)
+      setDraft24(nextDraft24)
+      setPitcher(nextPitcher)
+      setDraft8Edit(nextDraft8)
+      setDraft16Edit(nextDraft16)
+      setDraft24Edit(nextDraft24)
+      setPitcherEdit(nextPitcher)
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to save draft size settings.',
+      )
+    } finally {
+      setSavingDraftSlots(false)
     }
   }
 
@@ -469,6 +606,49 @@ function CatalogPage() {
                 onClick={() => void saveHappyHourSettings()}
               >
                 {savingHappyHour ? 'Saving…' : 'Update'}
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {canEdit ? (
+          <section className="inventory-draft-slots-card">
+            <div className="inventory-draft-slots-copy">
+              <p className="inventory-kicker">Organization settings</p>
+              <h2>Draft sizes</h2>
+              <p>
+                Map this location's actual draft sizes to Toast's fixed draft slots.
+              </p>
+            </div>
+
+            <div className="inventory-draft-slot-list">
+              <DraftSlotField toastLabel="8oz" value={draft8Edit} disabled={savingDraftSlots} onChange={setDraft8Edit} />
+              <DraftSlotField toastLabel="16oz" value={draft16Edit} disabled={savingDraftSlots} onChange={setDraft16Edit} />
+              <DraftSlotField toastLabel="24oz" value={draft24Edit} disabled={savingDraftSlots} onChange={setDraft24Edit} />
+              <DraftSlotField toastLabel="Pitcher" value={pitcherEdit} disabled={savingDraftSlots} onChange={setPitcherEdit} />
+            </div>
+
+            <div className="inventory-draft-slots-actions">
+              <button
+                type="button"
+                className="inventory-secondary-button"
+                disabled={!draftSlotsHaveChanges || savingDraftSlots}
+                onClick={() => {
+                  setDraft8Edit(draft8)
+                  setDraft16Edit(draft16)
+                  setDraft24Edit(draft24)
+                  setPitcherEdit(pitcher)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="inventory-primary-button"
+                disabled={!draftSlotsHaveChanges || savingDraftSlots}
+                onClick={() => void saveDraftSlotSettings()}
+              >
+                {savingDraftSlots ? 'Saving…' : 'Update'}
               </button>
             </div>
           </section>
@@ -1039,6 +1219,68 @@ function NameField({
       ) : null}
     </label>
   )
+}
+
+function DraftSlotField({
+  toastLabel,
+  value,
+  disabled,
+  onChange,
+}: {
+  toastLabel: string
+  value: DraftSlotState
+  disabled: boolean
+  onChange: (value: DraftSlotState) => void
+}) {
+  return (
+    <div className="inventory-draft-slot-row">
+      <label className="inventory-inline-toggle">
+        <input
+          type="checkbox"
+          checked={value.enabled}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({ ...value, enabled: event.target.checked })
+          }
+        />
+        <span>{toastLabel} Toast slot</span>
+      </label>
+
+      <label className="inventory-search-control inventory-draft-size-input">
+        <span>Actual size</span>
+        <div className="inventory-draft-size-control">
+          <input
+            type="number"
+            min="1"
+            step="1"
+            inputMode="numeric"
+            value={value.actualSizeOz}
+            disabled={!value.enabled || disabled}
+            placeholder={toastLabel === 'Pitcher' ? '' : toastLabel.replace('oz', '')}
+            onChange={(event) =>
+              onChange({ ...value, actualSizeOz: event.target.value })
+            }
+          />
+          <span>oz</span>
+        </div>
+      </label>
+    </div>
+  )
+}
+
+function draftSlotEquals(left: DraftSlotState, right: DraftSlotState) {
+  return (
+    left.enabled === right.enabled &&
+    left.actualSizeOz.trim() === right.actualSizeOz.trim()
+  )
+}
+
+function parseDraftSize(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function MoneyField({
