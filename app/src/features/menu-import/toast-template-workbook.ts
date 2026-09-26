@@ -67,7 +67,7 @@ export type ToastDraftSlotMapping = {
   actualSizeOz: number
 }
 
-export type TallBoyCanOptions = {
+export type OptionalBeerCategoryOptions = {
   enabled: boolean
   label: string
 }
@@ -85,9 +85,9 @@ type OptionalPackagedBeerSlotDefinition = OptionalPackagedSlotOptions & {
   getHappyHour: (row: BeerTabPreviewRow) => number | null
 }
 
-const DEFAULT_TALL_BOY_CAN_OPTIONS: TallBoyCanOptions = {
+const DEFAULT_OPTIONAL_BEER_CATEGORY_1_OPTIONS: OptionalBeerCategoryOptions = {
   enabled: false,
-  label: 'Tall Boy Can',
+  label: 'Optional Beer Category 1',
 }
 
 const LEGACY_DRAFT_SLOT_MAPPINGS: ToastDraftSlotMapping[] = [
@@ -131,13 +131,13 @@ export function buildPopulatedToastTemplateWorkbook({
   items,
   happyHourEnabled = true,
   draftSlotMappings = LEGACY_DRAFT_SLOT_MAPPINGS,
-  tallBoyCan = DEFAULT_TALL_BOY_CAN_OPTIONS,
+  optionalBeerCategory1 = DEFAULT_OPTIONAL_BEER_CATEGORY_1_OPTIONS,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
-  tallBoyCan?: TallBoyCanOptions
+  optionalBeerCategory1?: OptionalBeerCategoryOptions
 }) {
   const workbookPackage = readWorkbookPackage(templateArrayBuffer)
   populateBeerSheet(
@@ -145,7 +145,7 @@ export function buildPopulatedToastTemplateWorkbook({
     items,
     happyHourEnabled,
     draftSlotMappings,
-    tallBoyCan,
+    optionalBeerCategory1,
   )
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
@@ -155,13 +155,13 @@ export function validatePopulatedBeerWorkbook({
   items,
   happyHourEnabled = true,
   draftSlotMappings = LEGACY_DRAFT_SLOT_MAPPINGS,
-  tallBoyCan = DEFAULT_TALL_BOY_CAN_OPTIONS,
+  optionalBeerCategory1 = DEFAULT_OPTIONAL_BEER_CATEGORY_1_OPTIONS,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
-  tallBoyCan?: TallBoyCanOptions
+  optionalBeerCategory1?: OptionalBeerCategoryOptions
 }) {
   const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
   const mapping = getBeerTemplateMapping(workbookPackage)
@@ -195,11 +195,11 @@ export function validatePopulatedBeerWorkbook({
   const canRows = beerRows.filter((row) => row.canPrice !== null)
   const optionalPackagedSlots = buildOptionalPackagedBeerSlotDefinitions(
     beerRows,
-    tallBoyCan,
+    optionalBeerCategory1,
   )
-  const tallBoyRows = optionalPackagedSlots[0]?.rows ?? []
+  const optionalBeerCategory1Rows = optionalPackagedSlots[0]?.rows ?? []
   const bottleRows = [
-    ...(!tallBoyCan.enabled
+    ...(!optionalBeerCategory1.enabled
       ? beerRows
           .filter((row) => row.can24ozPrice !== null)
           .map((row) => ({ row, kind: '24oz can' as const }))
@@ -390,7 +390,7 @@ export function validatePopulatedBeerWorkbook({
     draftRows: draftRows.length,
     canRows: canRows.length,
     bottleSlotRows: bottleRows.length,
-    tallBoyRows: tallBoyRows.length,
+    optionalBeerCategory1Rows: optionalBeerCategory1Rows.length,
   }
 }
 
@@ -465,7 +465,7 @@ function populateBeerSheet(
   items: NormalizedMenuItem[],
   happyHourEnabled: boolean,
   draftSlotMappings: readonly ToastDraftSlotMapping[],
-  tallBoyCan: TallBoyCanOptions,
+  optionalBeerCategory1: OptionalBeerCategoryOptions,
 ) {
   const mapping = getBeerTemplateMapping(workbookPackage)
   const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
@@ -476,7 +476,7 @@ function populateBeerSheet(
     mapping,
     beerRows,
     draftSlotMappings,
-    tallBoyCan,
+    optionalBeerCategory1,
   )
 
   writeDraftSizeHeaders(sheetDoc, mapping, draftSlotMappings)
@@ -571,7 +571,7 @@ function writeBeerRowsToSheet(
   mapping: BeerTemplateMapping,
   beerRows: BeerTabPreviewRow[],
   draftSlotMappings: readonly ToastDraftSlotMapping[],
-  tallBoyCan: TallBoyCanOptions,
+  optionalBeerCategory1: OptionalBeerCategoryOptions,
 ) {
   const draftRows = beerRows.filter((row) =>
     hasConfiguredDraftBeerPrice(row, draftSlotMappings),
@@ -579,11 +579,11 @@ function writeBeerRowsToSheet(
   const canRows = beerRows.filter((row) => row.canPrice !== null)
   const optionalPackagedSlots = buildOptionalPackagedBeerSlotDefinitions(
     beerRows,
-    tallBoyCan,
+    optionalBeerCategory1,
   )
-  const tallBoyRows = optionalPackagedSlots[0]?.rows ?? []
+  const optionalBeerCategory1Rows = optionalPackagedSlots[0]?.rows ?? []
   const bottleSlotRows = [
-    ...(!tallBoyCan.enabled
+    ...(!optionalBeerCategory1.enabled
       ? beerRows
           .filter((row) => row.can24ozPrice !== null)
           .map((row) => ({ row, kind: 'can24oz' as const }))
@@ -595,7 +595,7 @@ function writeBeerRowsToSheet(
   const writtenRowCount = Math.max(
     draftRows.length,
     canRows.length,
-    tallBoyRows.length,
+    optionalBeerCategory1Rows.length,
     bottleSlotRows.length,
   )
   const clearToRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount + DATA_ROW_BUFFER)
@@ -710,15 +710,15 @@ function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNu
 
 function buildOptionalPackagedBeerSlotDefinitions(
   beerRows: BeerTabPreviewRow[],
-  tallBoyCan: TallBoyCanOptions,
+  optionalBeerCategory1: OptionalBeerCategoryOptions,
 ): OptionalPackagedBeerSlotDefinition[] {
   return [
     {
-      enabled: tallBoyCan.enabled,
-      label: tallBoyCan.label,
+      enabled: optionalBeerCategory1.enabled,
+      label: optionalBeerCategory1.label,
       slotIndex: 0,
-      description: 'Tall Boy Can',
-      rows: tallBoyCan.enabled
+      description: optionalBeerCategory1.label.trim() || 'Optional Beer Category 1',
+      rows: optionalBeerCategory1.enabled
         ? beerRows.filter((row) => row.can24ozPrice !== null)
         : [],
       getPrice: (row) => row.can24ozPrice,

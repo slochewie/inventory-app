@@ -291,7 +291,7 @@ export async function getInventoryOrganizationConfig(
     pitcherEnabled: false,
     pitcherActualSizeOz: null,
     tallBoyCanEnabled: false,
-    tallBoyCanLabel: "Tall Boy Can",
+    tallBoyCanLabel: "Optional Beer Category 1",
   }
 }
 

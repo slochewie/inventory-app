@@ -27,6 +27,7 @@ export function catalogRowToNormalizedItem(
     category: categoryName,
     toastCategory,
     toastDestination: row.organization.toastDestinationOverride ?? '',
+    toastSlot: row.organization.toastSlot,
     basePriceCents: row.effectivePriceCents,
     happyHourPriceCents: row.organization.happyHourPriceCents,
     effectiveTimes: [],

@@ -76,7 +76,7 @@ function ToastWorkbook() {
     draftRows: number
     canRows: number
     bottleSlotRows: number
-    tallBoyRows: number
+    optionalBeerCategory1Rows: number
     liquorRows: number
     happyHourNotes: boolean
   } | null>(null)
@@ -229,9 +229,13 @@ function ToastWorkbook() {
 
     const happyHourEnabled = organizationConfig?.happyHourEnabled === true
     const draftSlotMappings = getOrganizationDraftSlotMappings(organizationConfig)
-    const tallBoyCan = {
+    // Auth still exposes the original field names. Inventory treats them as
+    // compatibility transport for Optional Beer Category 1.
+    const optionalBeerCategory1 = {
       enabled: organizationConfig?.tallBoyCanEnabled === true,
-      label: organizationConfig?.tallBoyCanLabel?.trim() || 'Tall Boy Can',
+      label:
+        organizationConfig?.tallBoyCanLabel?.trim() ||
+        'Optional Beer Category 1',
     }
     const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
       templateArrayBuffer: workbook.arrayBuffer.slice(0),
@@ -245,7 +249,7 @@ function ToastWorkbook() {
       happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
       draftSlotMappings,
-      tallBoyCan,
+      optionalBeerCategory1,
     })
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
@@ -260,7 +264,7 @@ function ToastWorkbook() {
       happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
       draftSlotMappings,
-      tallBoyCan,
+      optionalBeerCategory1,
     })
 
     if (!validation.valid) {
@@ -274,7 +278,7 @@ function ToastWorkbook() {
       draftRows: validation.beer.draftRows,
       canRows: validation.beer.canRows,
       bottleSlotRows: validation.beer.bottleSlotRows,
-      tallBoyRows: validation.beer.tallBoyRows,
+      optionalBeerCategory1Rows: validation.beer.optionalBeerCategory1Rows,
       liquorRows: validation.liquorRows,
       happyHourNotes: validation.happyHourNotes,
     })
@@ -443,7 +447,8 @@ function ToastWorkbook() {
               <strong>Workbook validated</strong>
               <span>
                 {workbookValidation.draftRows} draft rows · {workbookValidation.canRows} can rows ·{' '}
-                {workbookValidation.tallBoyRows} Tall Boy rows ·{' '}
+                {workbookValidation.optionalBeerCategory1Rows}{' '}
+                {(organizationConfig?.tallBoyCanLabel?.trim() || 'Optional Beer Category 1')} rows ·{' '}
                 {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows ·{' '}
                 Notes schedule checked
               </span>
