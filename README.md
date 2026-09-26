@@ -1,62 +1,178 @@
 # Inventory App
 
-NiteOwl inventory/menu tooling for moving menu data between point-of-sale systems.
+NiteOwl Inventory is an authenticated, organization-aware menu catalog and point-of-sale import/export application.
 
-The current workflow imports an **Aloha menu-price CSV**, normalizes it into a reusable menu-item model, lets the operator review and edit the staged items in the browser, and then populates a fresh copy of the repository's pristine **Toast Menu Template** workbook.
-
-## Current capabilities
-
-- Import Aloha menu-price CSV exports.
-- Normalize Aloha report rows into menu items.
-- Detect base and Happy Hour pricing.
-- Review, search, filter, include, or exclude items before export.
-- Edit Toast-facing category/destination data.
-- Save reviewed state in the browser.
-- Download a durable `toast-export-review.csv` file.
-- Restore reviewed state from `toast-export-review.csv`.
-- Generate Toast-facing CSV exports.
-- Populate the bundled pristine Toast `.xlsx` Menu Template without changing its headers or structure.
-- Import an already populated Toast Menu Template `.xlsx` back into reviewed menu state.
-- Map draft beer sizes and packaged beer slots, including separate standard-can and 24oz-can items.
+The current application uses Better Auth for session and organization context, persists Inventory data through the Auth service's Inventory API, imports menu data from Aloha CSV or populated Toast workbooks, maintains a shared master catalog with organization-specific variants/settings, and exports the selected organization's current catalog into a fresh copy of Toast's Menu Template workbook.
 
 See [docs/HOWTO.md](docs/HOWTO.md) for the operator and development workflow.
 
+## Current capabilities
+
+- Better Auth sign-in, organization selection, account switching, and per-organization Inventory access.
+- Inventory application roles: Viewer, Staff, Manager, and Admin.
+- Persistent shared master item catalog with organization-specific availability, pricing, Happy Hour pricing, Toast-export state, and display-name overrides.
+- Aloha menu-price CSV import and normalization.
+- Import review before persistence.
+- Persistent import history and conflict reporting.
+- Persistent source mappings for Aloha and Toast imports.
+- Mapping review/reconciliation for managers and admins.
+- Import already populated Toast Menu Template workbooks.
+- Merge duplicate master catalog items while preserving/moving variants.
+- Restrict master-item merge controls to Inventory Admins.
+- Export the current organization's persistent catalog to Toast.
+- Generate populated Toast XLSX or ZIP packages from the repository's pristine Toast template.
+- Preserve Toast's fixed workbook headers and structure.
+- Separate organization availability from the `Export to Toast` setting.
+- Use canonical Inventory categories for Toast export and workbook summaries.
+- Retain the older reusable Aloha → Toast CLI normalization pipeline.
+
 ## Application routes
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Main Inventory route; this will become the authenticated/database-backed experience |
-| `/toast-workbook` | Main Toast workbook route; this will become authenticated/database-backed |
-| `/toast-template-import` | Import a populated Toast Menu Template workbook into reviewed menu state |
-| `/wip` | Frozen unauthenticated snapshot of the working Menu Items workflow for temporary manager access |
-| `/wip/toast-workbook` | Frozen unauthenticated snapshot of the working Toast workbook workflow |
+| Route | Purpose | Minimum Inventory capability |
+| --- | --- | --- |
+| `/` | Persistent organization Catalog | Viewer |
+| `/import-review` | Consolidated New Import, History, and Mapping Review workspace | Viewer; import/edit tabs are role-gated |
+| `/toast-template-import` | Import a populated Toast workbook and save it to Inventory | Staff |
+| `/toast-workbook` | Export the selected organization's persistent catalog to Toast | Staff |
+| `/assignments` | Enable Inventory access and assign Inventory roles | Admin |
+| `/imports` | Standalone import-history view retained for compatibility | Viewer |
+| `/reconcile` | Standalone mapping-review view retained for compatibility | Manager |
+| `/wip` | Frozen unauthenticated legacy Menu Items workflow | None |
+| `/wip/toast-workbook` | Frozen unauthenticated legacy Toast workbook workflow | None |
+
+The authenticated routes are now the primary application. The `/wip` routes are legacy snapshots and should not be used as the architecture reference for new features.
+
+## Inventory roles
+
+Inventory permissions are scoped to the selected organization.
+
+| Role | View catalog/history | Import / export | Edit catalog / mappings | Manage assignments / merge master items |
+| --- | ---: | ---: | ---: | ---: |
+| Viewer | Yes | No | No | No |
+| Staff | Yes | Yes | No | No |
+| Manager | Yes | Yes | Yes | No |
+| Admin | Yes | Yes | Yes | Yes |
+
+The UI hides or blocks routes/actions that the current Inventory role cannot use. Access is also verified against the Auth service for the selected organization.
+
+## Data model
+
+The catalog separates shared product identity from organization-specific state.
+
+A master Inventory item can have one or more variants, such as:
+
+- 10oz Draft
+- 16oz Draft
+- standard Can
+- 24oz Can
+- Bottle
+- Standard
+
+Each organization can independently control variant state including:
+
+- whether the organization carries it,
+- whether it exports to Toast,
+- price override,
+- Happy Hour price,
+- Toast name override,
+- Toast category/destination overrides.
+
+This is why **Available here** and **Export to Toast** are separate controls.
+
+## Import workflow
+
+The primary Aloha import workflow lives at `/import-review`.
+
+A new import:
+
+1. reads the Aloha menu-price CSV,
+2. normalizes the source rows,
+3. detects base/Happy Hour pricing and review conditions,
+4. lets the operator include/exclude or edit rows,
+5. saves approved rows to the persistent Inventory catalog,
+6. records an import-history entry, and
+7. creates/updates source mappings used for subsequent reconciliation.
+
+The same workspace also exposes **History** and, for Managers/Admins, **Mapping review**.
+
+Populated Toast workbooks can be imported at `/toast-template-import` and persisted through the same Inventory import API.
+
+## Catalog workflow
+
+The root route `/` is the persistent Catalog.
+
+Catalog rows are grouped by master item and show their variants. Operators can filter by canonical Toast category and by organization availability.
+
+Managers/Admins can edit organization-specific state. Admins can additionally merge duplicate master items into a selected target master item.
+
+Catalog naming supports a shared master name plus organization-specific Toast/display-name overrides.
+
+## Toast export
+
+The normal `/toast-workbook` workflow loads the selected organization's persistent Inventory catalog automatically.
+
+Advanced source overrides still allow an older review CSV or raw Aloha CSV for testing/restoration, but persistent Inventory is the default source.
+
+Each export starts from the pristine workbook mounted read-only at:
+
+```text
+toast/menu/Toast-Menu-Template-Your-Restaurant-Name.xlsx
+```
+
+The app can download:
+
+- a populated `.xlsx` for inspection, or
+- a `.zip` containing the same populated workbook for sending to Toast.
+
+Generated filenames use the organization/store name when available and include a Pacific-time timestamp.
+
+### Beer workbook behavior
+
+Toast's workbook is treated as a fixed template. The exporter writes values into existing cells without renaming headers or adding custom columns.
+
+Current beer mapping includes:
+
+- 10oz draft → existing Toast 8oz draft slot
+- 16oz draft → existing Toast 16oz draft slot
+- standard can → existing Can slot
+- 24oz can → existing Bottle slot
+- bottle → existing Bottle slot
+
+Standard cans, 24oz cans, and bottles remain separate Inventory variants/source items even when multiple formats share a fixed Toast section.
+
+Actual serving/package size remains Inventory data. Any mismatch with Toast's fixed labels should be explained to the Toast representative rather than changing the source template headers.
 
 ## Repository layout
 
 ```text
 inventory-app/
-├── app/                  # TanStack Start application
+├── app/
 │   └── src/
+│       ├── components/          # authenticated shell + local UI
 │       ├── features/
-│       │   └── menu-import/
+│       │   ├── import-review/   # history and mapping/reconciliation panels
+│       │   └── menu-import/     # normalization, catalog adapters, Toast import/export
+│       ├── lib/                 # Better Auth + Inventory API clients
 │       └── routes/
-├── bash-scripts/         # Earlier/reusable Aloha → Toast CLI pipeline
+├── bash-scripts/                # earlier/reusable Aloha → Toast CLI pipeline
 ├── docs/
 │   └── HOWTO.md
+├── toast/
+│   └── menu/                    # pristine Toast workbook source
 ├── Dockerfile
 └── docker-compose.yml
 ```
-
-The browser application and the scripts share the same overall goal, but the browser workflow is the primary interactive path.
 
 ## Development stack
 
 - Node.js 26
 - TanStack Start / TanStack Router
 - React 19
-- Vite
-- TypeScript
-- Shared `@niteowl/ui` and `@niteowl/app-config` packages
+- Vite 8
+- TypeScript 6
+- Better Auth client
+- Tailwind CSS / shadcn UI
+- shared `@niteowl/ui` and `@niteowl/app-config` packages
 - Docker Compose
 
 ## Local development
@@ -72,51 +188,48 @@ The Compose file expects the shared NiteOwl repositories beside this repository:
 
 The `niteowl-dev` Docker network must already exist.
 
-From the repository root:
+The service now starts the TanStack/Vite development server automatically:
 
 ```bash
+cd ~/docker/inventory-app
 docker compose up -d --build
-docker compose exec inventory-app npm install
-docker compose exec inventory-app npm run dev
 ```
 
-The development server listens on container port 3000 and is exposed as:
+The previous `sleep infinity` command remains commented in `docker-compose.yml` so it can be restored temporarily if an interactive-only container is needed.
 
-```text
-http://localhost:3350
-```
+The app listens on container port 3000 and is exposed on host port 3350.
 
-To run a production build check:
+Useful commands:
 
 ```bash
+# Follow app output
+docker compose logs -f inventory-app
+
+# Install/update dependencies
+docker compose exec inventory-app npm install
+
+# Generate TanStack routes
+docker compose exec inventory-app npm run generate-routes
+
+# Production build check
 docker compose exec inventory-app npm run build
 ```
 
+## Auth service dependency
+
+The Inventory frontend does not own the persistent database directly. It uses authenticated endpoints exposed by the NiteOwl Auth service, including access, catalog, imports, mappings, assignments, organization-variant updates, and master-item merge operations.
+
+Requests use the current Better Auth session and selected organization.
+
 ## CSV safety
 
-Root-level CSV files are ignored by Git. Aloha exports and generated CSVs can therefore be kept in the repository working directory without accidentally committing venue menu data.
+Root-level CSV files are ignored by Git. Local Aloha exports and generated CSVs can therefore live in the repository working directory without accidentally committing venue menu data.
 
 Generated CLI output under `output/` is also ignored.
 
-## Beer workbook behavior
-
-The Toast workbook is treated as a fixed template. Export generation writes menu data into existing cells but does not rename headers, add custom columns, or otherwise repurpose the workbook structure.
-
-Beer records remain independent source items and are mapped into the existing Toast Beer-tab slots:
-
-- 10oz draft -> existing 8oz draft slot
-- 16oz draft -> existing 16oz draft slot
-- standard can -> existing Can slot
-- 24oz can -> existing Bottle slot
-- bottle -> existing Bottle slot
-
-A 24oz can is **not** assumed to be the same item as a standard can with the same apparent beer name. If both 24oz cans and bottles are present, both are written as separate rows in the existing Bottle section.
-
-Actual organization serving/package sizes are inventory data, not workbook-header changes. Differences from Toast's fixed labels should be called out in the Notes tab for the Toast representative.
-
 ## CLI normalization pipeline
 
-The older/reusable command-line pipeline is documented separately in [bash-scripts/README.md](bash-scripts/README.md).
+The older command-line pipeline is documented in [bash-scripts/README.md](bash-scripts/README.md).
 
 Run its tests with:
 
@@ -126,10 +239,12 @@ bash ./bash-scripts/test-all.sh
 
 ## Frozen WIP routes
 
-The `/wip` and `/wip/toast-workbook` routes are intentionally unauthenticated snapshots of the working browser workflow. They exist temporarily for location managers while the primary `/` and `/toast-workbook` routes are migrated to Better Auth and persistent Inventory database storage.
+`/wip` and `/wip/toast-workbook` are intentionally unauthenticated frozen snapshots of the earlier browser workflow.
 
-Do not add Better Auth or database requirements to the WIP routes.
+Do not add Better Auth or persistent Inventory dependencies to those routes. New application work should target the authenticated Catalog / Import & Review / Export to Toast architecture instead.
 
 ## Status
 
-This project is under active development. Beer and Liquor workbook population are implemented. Additional Toast workbook tabs and broader inventory/menu-management features can be added on top of the normalized menu-item model.
+The persistent authenticated Inventory architecture is active. Current work supports catalog management, organization-specific variants, Aloha and Toast imports, history/reconciliation, assignments, master-item merging, and Beer/Liquor Toast workbook export.
+
+Additional Toast workbook tabs and broader inventory-management workflows can continue to build on the persistent master-item/variant model.
