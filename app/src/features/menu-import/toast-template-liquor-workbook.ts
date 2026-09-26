@@ -56,10 +56,14 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   templateArrayBuffer,
   items,
   happyHourEnabled = true,
+  happyHourStart = null,
+  happyHourEnd = null,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
+  happyHourStart?: string | null
+  happyHourEnd?: string | null
 }) {
   const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({
     templateArrayBuffer,
@@ -70,6 +74,12 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   const workbookPackage = readWorkbookPackage(beerWorkbookBuffer)
 
   populateLiquorSheet(workbookPackage, items, happyHourEnabled)
+  populateHappyHourNotesSheet(
+    workbookPackage,
+    happyHourEnabled,
+    happyHourStart,
+    happyHourEnd,
+  )
 
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
@@ -78,10 +88,14 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   workbookArrayBuffer,
   items,
   happyHourEnabled = true,
+  happyHourStart = null,
+  happyHourEnd = null,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
+  happyHourStart?: string | null
+  happyHourEnd?: string | null
 }) {
   const beer = validatePopulatedBeerWorkbook({
     workbookArrayBuffer,
@@ -109,6 +123,14 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     })
   })
 
+  const happyHourNotes = validateHappyHourNotesSheet(
+    workbookPackage,
+    happyHourEnabled,
+    happyHourStart,
+    happyHourEnd,
+  )
+  issues.push(...happyHourNotes.issues)
+
   return {
     valid: issues.length === 0,
     issues,
@@ -118,6 +140,116 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
       bottleSlotRows: beer.bottleSlotRows,
     },
     liquorRows,
+    happyHourNotes: happyHourNotes.valid,
+  }
+}
+
+function populateHappyHourNotesSheet(
+  workbookPackage: WorkbookPackage,
+  enabled: boolean,
+  start: string | null,
+  end: string | null,
+) {
+  const notesSheet = getWorkbookSheets(workbookPackage)
+    .find((sheet) => sheet.name.toLowerCase() === 'notes')
+  if (!notesSheet) throw new Error('Toast template is missing a Notes tab')
+
+  const sheetDoc = parseXml(getTextFile(workbookPackage.files, notesSheet.path))
+  const range1Columns = [5, 6, 8, 9]
+  const range2Columns = [11, 12, 14, 15]
+
+  for (let rowNumber = 20; rowNumber <= 26; rowNumber += 1) {
+    ;[...range1Columns, ...range2Columns].forEach((column) => {
+      clearCellValue(sheetDoc, column, rowNumber)
+    })
+  }
+
+  if (enabled) {
+    if (!start || !end) {
+      throw new Error('Happy Hour is enabled but its start/end time is missing')
+    }
+
+    const startTime = splitHappyHourTime(start)
+    const endTime = splitHappyHourTime(end)
+
+    for (let rowNumber = 20; rowNumber <= 26; rowNumber += 1) {
+      writeCellValue(sheetDoc, 5, rowNumber, startTime.time, rowNumber)
+      writeCellValue(sheetDoc, 6, rowNumber, startTime.meridiem, rowNumber)
+      writeCellValue(sheetDoc, 8, rowNumber, endTime.time, rowNumber)
+      writeCellValue(sheetDoc, 9, rowNumber, endTime.meridiem, rowNumber)
+    }
+  }
+
+  workbookPackage.files[notesSheet.path] = strToU8(serializeXml(sheetDoc))
+}
+
+function validateHappyHourNotesSheet(
+  workbookPackage: WorkbookPackage,
+  enabled: boolean,
+  start: string | null,
+  end: string | null,
+) {
+  const notesSheet = getWorkbookSheets(workbookPackage)
+    .find((sheet) => sheet.name.toLowerCase() === 'notes')
+  if (!notesSheet) {
+    return { valid: false, issues: ['Toast template is missing a Notes tab'] }
+  }
+
+  const sheetDoc = parseXml(getTextFile(workbookPackage.files, notesSheet.path))
+  const issues: string[] = []
+  const expectedStart = enabled && start ? splitHappyHourTime(start) : null
+  const expectedEnd = enabled && end ? splitHappyHourTime(end) : null
+
+  for (let rowNumber = 20; rowNumber <= 26; rowNumber += 1) {
+    const expected = expectedStart && expectedEnd
+      ? [
+          [5, expectedStart.time],
+          [6, expectedStart.meridiem],
+          [8, expectedEnd.time],
+          [9, expectedEnd.meridiem],
+        ] as const
+      : [
+          [5, ''],
+          [6, ''],
+          [8, ''],
+          [9, ''],
+        ] as const
+
+    expected.forEach(([column, value]) => {
+      const cell = findCell(sheetDoc, column, rowNumber)
+      const actual = cell
+        ? getCellDisplayValue(cell, workbookPackage.sharedStrings)
+        : ''
+      if (actual !== value) {
+        issues.push('Notes Happy Hour schedule does not match organization settings')
+      }
+    })
+
+    ;[11, 12, 14, 15].forEach((column) => {
+      const cell = findCell(sheetDoc, column, rowNumber)
+      const actual = cell
+        ? getCellDisplayValue(cell, workbookPackage.sharedStrings)
+        : ''
+      if (actual !== '') {
+        issues.push('Notes Happy Hour Time Range 2 should be blank')
+      }
+    })
+  }
+
+  return { valid: issues.length === 0, issues: [...new Set(issues)] }
+}
+
+function splitHappyHourTime(value: string) {
+  const [hourText, minute = '00'] = value.split(':')
+  const hour = Number(hourText)
+
+  if (!Number.isFinite(hour) || hour < 0 || hour > 23) {
+    throw new Error('Invalid Happy Hour time')
+  }
+
+  return {
+    time: `${hour % 12 || 12}:${minute}`,
+    meridiem: hour >= 12 ? 'PM' : 'AM',
   }
 }
 
