@@ -33,11 +33,14 @@ Inventory and Toast behavior for one Better Auth organization/location.
 - `happyHourEnabled`
 - `happyHourStart` — nullable local wall-clock value
 - `happyHourEnd` — nullable local wall-clock value
+- `happyHourDays` — comma-separated selected day keys (`mon,tue,wed,thu,fri,sat,sun`) exposed by the API as an array
 - `createdAt`
 - `updatedAt`
 - unique: `organizationId`
 
 Real-world serving/package sizes belong in Inventory data. Toast's XLSX column labels are treated as fixed and are never renamed.
+
+Happy Hour configuration is organization-scoped. The current model supports one start/end time window plus independently selected days of the week. During Toast export, selected days are written to the Notes tab's Time Range 1; unselected days remain blank and Time Range 2 is intentionally left blank.
 
 ## Master catalog
 
@@ -194,3 +197,5 @@ Better Auth / Inventory plugin owns:
 The Toast workbook remains an output format, not the data model.
 
 The pristine repository workbook is never modified in place. Each export starts from a fresh copy and writes values only into existing cells.
+
+Generated XLSX/ZIP files are staged temporarily through the Inventory app's same-origin download route so the final response can supply `Content-Disposition` with the intended filename. Staged downloads expire automatically and remain available across repeated GET requests within the TTL to support iOS browser preview/download behavior.
