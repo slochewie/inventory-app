@@ -8,9 +8,11 @@ import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
 import { formatCurrency, type NormalizedMenuItem } from '#/features/menu-import/types'
 import { authClient } from '#/lib/auth-client'
 import {
+  getInventoryOrganizationConfig,
   listInventoryCatalog,
   mergeInventoryItems,
   updateInventoryItemCategory,
+  updateInventoryOrganizationConfig,
   updateInventoryOrganizationVariant,
 } from '#/lib/inventory-access'
 
@@ -46,6 +48,13 @@ function CatalogPage() {
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null)
   const [mergingItemId, setMergingItemId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [happyHourEnabled, setHappyHourEnabled] = useState(false)
+  const [happyHourStart, setHappyHourStart] = useState('')
+  const [happyHourEnd, setHappyHourEnd] = useState('')
+  const [happyHourDraftEnabled, setHappyHourDraftEnabled] = useState(false)
+  const [happyHourDraftStart, setHappyHourDraftStart] = useState('')
+  const [happyHourDraftEnd, setHappyHourDraftEnd] = useState('')
+  const [savingHappyHour, setSavingHappyHour] = useState(false)
 
   useEffect(() => {
     if (!activeOrganization?.id) {
@@ -57,11 +66,23 @@ function CatalogPage() {
     setLoading(true)
     setError(null)
 
-    void listInventoryCatalog(activeOrganization.id, controller.signal)
-      .then((catalog) => {
+    void Promise.all([
+      listInventoryCatalog(activeOrganization.id, controller.signal),
+      getInventoryOrganizationConfig(activeOrganization.id, controller.signal),
+    ])
+      .then(([catalog, organizationConfig]) => {
         setItems(catalog.items.map(catalogRowToNormalizedItem))
         setSelectedGroupId(null)
         setPage(1)
+
+        const start = organizationConfig.happyHourStart ?? ''
+        const end = organizationConfig.happyHourEnd ?? ''
+        setHappyHourEnabled(organizationConfig.happyHourEnabled)
+        setHappyHourStart(start)
+        setHappyHourEnd(end)
+        setHappyHourDraftEnabled(organizationConfig.happyHourEnabled)
+        setHappyHourDraftStart(start)
+        setHappyHourDraftEnd(end)
       })
       .catch((caught) => {
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -187,6 +208,61 @@ function CatalogPage() {
     }
   }
 
+  const happyHourHasChanges =
+    happyHourDraftEnabled !== happyHourEnabled ||
+    happyHourDraftStart !== happyHourStart ||
+    happyHourDraftEnd !== happyHourEnd
+
+  async function saveHappyHourSettings() {
+    if (
+      !canEdit ||
+      !activeOrganization?.id ||
+      !happyHourHasChanges ||
+      savingHappyHour
+    ) {
+      return
+    }
+
+    if (
+      happyHourDraftEnabled &&
+      (!happyHourDraftStart || !happyHourDraftEnd)
+    ) {
+      setError('Set both a Happy Hour start and end time.')
+      return
+    }
+
+    setSavingHappyHour(true)
+    setError(null)
+
+    try {
+      const config = await updateInventoryOrganizationConfig({
+        organizationId: activeOrganization.id,
+        happyHourEnabled: happyHourDraftEnabled,
+        happyHourStart: happyHourDraftStart || null,
+        happyHourEnd: happyHourDraftEnd || null,
+      })
+
+      const nextEnabled = config?.happyHourEnabled ?? happyHourDraftEnabled
+      const nextStart = config?.happyHourStart ?? happyHourDraftStart
+      const nextEnd = config?.happyHourEnd ?? happyHourDraftEnd
+
+      setHappyHourEnabled(nextEnabled)
+      setHappyHourStart(nextStart || '')
+      setHappyHourEnd(nextEnd || '')
+      setHappyHourDraftEnabled(nextEnabled)
+      setHappyHourDraftStart(nextStart || '')
+      setHappyHourDraftEnd(nextEnd || '')
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to save Happy Hour settings.',
+      )
+    } finally {
+      setSavingHappyHour(false)
+    }
+  }
+
   async function updateVariant(
     item: NormalizedMenuItem,
     patch: Partial<NormalizedMenuItem>,
@@ -263,6 +339,71 @@ function CatalogPage() {
             </p>
           </div>
         </header>
+
+        {canEdit ? (
+          <section className="inventory-happy-hour-card">
+            <div className="inventory-happy-hour-copy">
+              <p className="inventory-kicker">Organization settings</p>
+              <h2>Happy Hour</h2>
+              <p>
+                Set when {activeOrganization?.name ?? 'this organization'} uses Happy Hour pricing.
+              </p>
+            </div>
+
+            <label className="inventory-inline-toggle inventory-happy-hour-toggle">
+              <input
+                type="checkbox"
+                checked={happyHourDraftEnabled}
+                disabled={savingHappyHour}
+                onChange={(event) => setHappyHourDraftEnabled(event.target.checked)}
+              />
+              <span>{happyHourDraftEnabled ? 'Enabled' : 'Disabled'}</span>
+            </label>
+
+            <label className="inventory-search-control">
+              <span>Start</span>
+              <input
+                type="time"
+                value={happyHourDraftStart}
+                disabled={!happyHourDraftEnabled || savingHappyHour}
+                onChange={(event) => setHappyHourDraftStart(event.target.value)}
+              />
+            </label>
+
+            <label className="inventory-search-control">
+              <span>End</span>
+              <input
+                type="time"
+                value={happyHourDraftEnd}
+                disabled={!happyHourDraftEnabled || savingHappyHour}
+                onChange={(event) => setHappyHourDraftEnd(event.target.value)}
+              />
+            </label>
+
+            <div className="inventory-happy-hour-actions">
+              <button
+                type="button"
+                className="inventory-secondary-button"
+                disabled={!happyHourHasChanges || savingHappyHour}
+                onClick={() => {
+                  setHappyHourDraftEnabled(happyHourEnabled)
+                  setHappyHourDraftStart(happyHourStart)
+                  setHappyHourDraftEnd(happyHourEnd)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="inventory-primary-button"
+                disabled={!happyHourHasChanges || savingHappyHour}
+                onClick={() => void saveHappyHourSettings()}
+              >
+                {savingHappyHour ? 'Saving…' : 'Update'}
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="inventory-catalog-toolbar" aria-label="Catalog filters">
           <label className="inventory-search-control inventory-catalog-search">
