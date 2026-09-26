@@ -103,11 +103,11 @@ function CatalogPage() {
   const [draft24Edit, setDraft24Edit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
   const [pitcherEdit, setPitcherEdit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
   const [savingDraftSlots, setSavingDraftSlots] = useState(false)
-  const [tallBoyCanEnabled, setTallBoyCanEnabled] = useState(false)
-  const [tallBoyCanLabel, setTallBoyCanLabel] = useState('Tall Boy Can')
-  const [tallBoyCanEditEnabled, setTallBoyCanEditEnabled] = useState(false)
-  const [tallBoyCanEditLabel, setTallBoyCanEditLabel] = useState('Tall Boy Can')
-  const [savingTallBoyCan, setSavingTallBoyCan] = useState(false)
+  const [optionalBeerCategory1Enabled, setOptionalBeerCategory1Enabled] = useState(false)
+  const [optionalBeerCategory1Label, setOptionalBeerCategory1Label] = useState('Optional Beer Category 1')
+  const [optionalBeerCategory1EditEnabled, setOptionalBeerCategory1EditEnabled] = useState(false)
+  const [optionalBeerCategory1EditLabel, setOptionalBeerCategory1EditLabel] = useState('Optional Beer Category 1')
+  const [savingOptionalBeerCategory1, setSavingOptionalBeerCategory1] = useState(false)
 
   useEffect(() => {
     if (!activeOrganization?.id) {
@@ -186,13 +186,13 @@ function CatalogPage() {
         setDraft24Edit(nextDraft24)
         setPitcherEdit(nextPitcher)
 
-        const nextTallBoyCanEnabled = organizationConfig.tallBoyCanEnabled === true
-        const nextTallBoyCanLabel =
-          organizationConfig.tallBoyCanLabel?.trim() || 'Tall Boy Can'
-        setTallBoyCanEnabled(nextTallBoyCanEnabled)
-        setTallBoyCanLabel(nextTallBoyCanLabel)
-        setTallBoyCanEditEnabled(nextTallBoyCanEnabled)
-        setTallBoyCanEditLabel(nextTallBoyCanLabel)
+        const nextOptionalBeerCategory1Enabled = organizationConfig.tallBoyCanEnabled === true
+        const nextOptionalBeerCategory1Label =
+          organizationConfig.tallBoyCanLabel?.trim() || 'Optional Beer Category 1'
+        setOptionalBeerCategory1Enabled(nextOptionalBeerCategory1Enabled)
+        setOptionalBeerCategory1Label(nextOptionalBeerCategory1Label)
+        setOptionalBeerCategory1EditEnabled(nextOptionalBeerCategory1Enabled)
+        setOptionalBeerCategory1EditLabel(nextOptionalBeerCategory1Label)
       })
       .catch((caught) => {
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -380,8 +380,8 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
         pitcherEnabled: pitcher.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-        tallBoyCanEnabled,
-        tallBoyCanLabel,
+        tallBoyCanEnabled: optionalBeerCategory1Enabled,
+        tallBoyCanLabel: optionalBeerCategory1Label,
       })
 
       const nextEnabled = config?.happyHourEnabled ?? happyHourDraftEnabled
@@ -484,8 +484,8 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24Edit.actualSizeOz),
         pitcherEnabled: pitcherEdit.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcherEdit.actualSizeOz),
-        tallBoyCanEnabled,
-        tallBoyCanLabel,
+        tallBoyCanEnabled: optionalBeerCategory1Enabled,
+        tallBoyCanLabel: optionalBeerCategory1Label,
       })
 
       const nextDraft8 = {
@@ -524,27 +524,27 @@ function CatalogPage() {
     }
   }
 
-  const tallBoyCanHasChanges =
-    tallBoyCanEditEnabled !== tallBoyCanEnabled ||
-    tallBoyCanEditLabel.trim() !== tallBoyCanLabel
+  const optionalBeerCategory1HasChanges =
+    optionalBeerCategory1EditEnabled !== optionalBeerCategory1Enabled ||
+    optionalBeerCategory1EditLabel.trim() !== optionalBeerCategory1Label
 
-  async function saveTallBoyCanSettings() {
+  async function saveOptionalBeerCategory1Settings() {
     if (
       !canEdit ||
       !activeOrganization?.id ||
-      !tallBoyCanHasChanges ||
-      savingTallBoyCan
+      !optionalBeerCategory1HasChanges ||
+      savingOptionalBeerCategory1
     ) {
       return
     }
 
-    const nextLabel = tallBoyCanEditLabel.trim()
-    if (tallBoyCanEditEnabled && !nextLabel) {
-      setError('Set a label for the Tall Boy Can beer category.')
+    const nextLabel = optionalBeerCategory1EditLabel.trim()
+    if (optionalBeerCategory1EditEnabled && !nextLabel) {
+      setError('Set a label for Optional Beer Category 1.')
       return
     }
 
-    setSavingTallBoyCan(true)
+    setSavingOptionalBeerCategory1(true)
     setError(null)
 
     try {
@@ -566,28 +566,28 @@ function CatalogPage() {
         draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
         pitcherEnabled: pitcher.enabled,
         pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-        tallBoyCanEnabled: tallBoyCanEditEnabled,
-        tallBoyCanLabel: nextLabel || 'Tall Boy Can',
+        tallBoyCanEnabled: optionalBeerCategory1EditEnabled,
+        tallBoyCanLabel: nextLabel || 'Optional Beer Category 1',
       })
 
-      const savedEnabled = config?.tallBoyCanEnabled ?? tallBoyCanEditEnabled
+      const savedEnabled = config?.tallBoyCanEnabled ?? optionalBeerCategory1EditEnabled
       const savedLabel =
         config?.tallBoyCanLabel?.trim() ||
         nextLabel ||
-        'Tall Boy Can'
+        'Optional Beer Category 1'
 
-      setTallBoyCanEnabled(savedEnabled)
-      setTallBoyCanLabel(savedLabel)
-      setTallBoyCanEditEnabled(savedEnabled)
-      setTallBoyCanEditLabel(savedLabel)
+      setOptionalBeerCategory1Enabled(savedEnabled)
+      setOptionalBeerCategory1Label(savedLabel)
+      setOptionalBeerCategory1EditEnabled(savedEnabled)
+      setOptionalBeerCategory1EditLabel(savedLabel)
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : 'Unable to save Tall Boy Can settings.',
+          : 'Unable to save Optional Beer Category 1 settings.',
       )
     } finally {
-      setSavingTallBoyCan(false)
+      setSavingOptionalBeerCategory1(false)
     }
   }
 
@@ -909,30 +909,30 @@ function CatalogPage() {
 
               <section className="inventory-organization-settings-section inventory-draft-slots-settings">
                 <div className="inventory-draft-slots-copy">
-                  <h2>Optional beer category</h2>
+                  <h2>Optional beer category 1</h2>
                   <p>
-                    Use Toast's first hidden optional Beer category for oversized cans such as 24oz or 25oz tall boys.
+                    Enable Toast's first hidden Optional Beer Category and set the organization-specific label that should appear in the workbook.
                   </p>
                 </div>
 
                 <label className="inventory-inline-toggle">
                   <input
                     type="checkbox"
-                    checked={tallBoyCanEditEnabled}
-                    disabled={savingTallBoyCan}
-                    onChange={(event) => setTallBoyCanEditEnabled(event.target.checked)}
+                    checked={optionalBeerCategory1EditEnabled}
+                    disabled={savingOptionalBeerCategory1}
+                    onChange={(event) => setOptionalBeerCategory1EditEnabled(event.target.checked)}
                   />
-                  <span>{tallBoyCanEditEnabled ? 'Enabled' : 'Disabled'}</span>
+                  <span>{optionalBeerCategory1EditEnabled ? 'Enabled' : 'Disabled'}</span>
                 </label>
 
                 <label className="inventory-search-control">
                   <span>Category label</span>
                   <input
                     type="text"
-                    value={tallBoyCanEditLabel}
-                    disabled={!tallBoyCanEditEnabled || savingTallBoyCan}
-                    onChange={(event) => setTallBoyCanEditLabel(event.target.value)}
-                    placeholder="Tall Boy Can"
+                    value={optionalBeerCategory1EditLabel}
+                    disabled={!optionalBeerCategory1EditEnabled || savingOptionalBeerCategory1}
+                    onChange={(event) => setOptionalBeerCategory1EditLabel(event.target.value)}
+                    placeholder="Category name"
                   />
                 </label>
 
@@ -940,10 +940,10 @@ function CatalogPage() {
                   <button
                     type="button"
                     className="inventory-secondary-button"
-                    disabled={!tallBoyCanHasChanges || savingTallBoyCan}
+                    disabled={!optionalBeerCategory1HasChanges || savingOptionalBeerCategory1}
                     onClick={() => {
-                      setTallBoyCanEditEnabled(tallBoyCanEnabled)
-                      setTallBoyCanEditLabel(tallBoyCanLabel)
+                      setOptionalBeerCategory1EditEnabled(optionalBeerCategory1Enabled)
+                      setOptionalBeerCategory1EditLabel(optionalBeerCategory1Label)
                     }}
                   >
                     Cancel
@@ -951,10 +951,10 @@ function CatalogPage() {
                   <button
                     type="button"
                     className="inventory-primary-button"
-                    disabled={!tallBoyCanHasChanges || savingTallBoyCan}
-                    onClick={() => void saveTallBoyCanSettings()}
+                    disabled={!optionalBeerCategory1HasChanges || savingOptionalBeerCategory1}
+                    onClick={() => void saveOptionalBeerCategory1Settings()}
                   >
-                    {savingTallBoyCan ? 'Saving…' : 'Update'}
+                    {savingOptionalBeerCategory1 ? 'Saving…' : 'Update'}
                   </button>
                 </div>
               </section>
