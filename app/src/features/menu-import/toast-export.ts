@@ -15,7 +15,7 @@ const REVIEW_EXPORT_HEADERS = [
   'Source Kind',
   'Source Item #',
   'Item Name',
-  'Aloha Category',
+  'Source Category',
   'Toast Category',
   'Toast Destination',
   'Base Price ($)',
@@ -126,7 +126,7 @@ export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportF
       filename: 'toast-all-rows-audit.csv',
       rows: [REVIEW_EXPORT_HEADERS, ...auditRows],
       rowCount: auditRows.length,
-      note: 'Full audit/reconciliation file. This intentionally includes ignored and not-exporting rows so you can inspect everything imported from Aloha.',
+      note: 'Full audit/reconciliation file. This intentionally includes ignored and not-exporting rows so you can inspect source imports and normalization decisions.',
     },
   ]
 }
