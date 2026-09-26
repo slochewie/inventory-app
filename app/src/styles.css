@@ -1243,6 +1243,50 @@ select {
   line-height: 1.5;
 }
 
+
+.inventory-import-review-heading h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.inventory-import-source-card {
+  display: grid;
+  width: min(100%, 96rem);
+  gap: 0;
+  border: 1px dashed #cbd5e1;
+  border-radius: 1rem;
+  background: #fff;
+  overflow: hidden;
+}
+
+.inventory-import-source-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+}
+
+.inventory-import-source-option strong {
+  font-size: 1rem;
+}
+
+.inventory-import-source-option p {
+  max-width: 48rem;
+  margin: 0.35rem 0 0;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.inventory-import-source-divider {
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.inventory-import-empty-workflow {
+  min-height: 7.5rem;
+}
+
+
 .inventory-import-message {
   width: min(100%, 96rem);
   margin: 1rem 0 0;
@@ -2123,6 +2167,16 @@ select {
   .inventory-catalog-price-grid,
   .inventory-import-review-summary {
     grid-template-columns: 1fr;
+  }
+
+  .inventory-import-source-option {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inventory-import-source-option .inventory-upload-control,
+  .inventory-import-source-option .inventory-secondary-link {
+    width: 100%;
   }
 
   .inventory-import-drop-card,
