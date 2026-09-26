@@ -3,6 +3,7 @@ import { buildToastExportFiles } from './toast-export'
 import {
   buildPopulatedToastTemplateWorkbook,
   validatePopulatedBeerWorkbook,
+  type TallBoyCanOptions,
   type ToastDraftSlotMapping,
 } from './toast-template-workbook'
 import type { NormalizedMenuItem } from './types'
@@ -81,6 +82,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourRange2End = null,
   happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
   draftSlotMappings,
+  tallBoyCan,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -93,12 +95,14 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourRange2End?: string | null
   happyHourRange2Days?: readonly string[]
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
+  tallBoyCan?: TallBoyCanOptions
 }) {
   const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({
     templateArrayBuffer,
     items,
     happyHourEnabled,
     draftSlotMappings,
+    tallBoyCan,
   })
   const beerWorkbookBuffer = await beerPopulatedWorkbook.arrayBuffer()
   const workbookPackage = readWorkbookPackage(beerWorkbookBuffer)
@@ -131,6 +135,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourRange2End = null,
   happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
   draftSlotMappings,
+  tallBoyCan,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -143,12 +148,14 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourRange2End?: string | null
   happyHourRange2Days?: readonly string[]
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
+  tallBoyCan?: TallBoyCanOptions
 }) {
   const beer = validatePopulatedBeerWorkbook({
     workbookArrayBuffer,
     items,
     happyHourEnabled,
     draftSlotMappings,
+    tallBoyCan,
   })
   const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
   const mapping = getLiquorTemplateMapping(workbookPackage)
@@ -191,6 +198,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
       draftRows: beer.draftRows,
       canRows: beer.canRows,
       bottleSlotRows: beer.bottleSlotRows,
+      tallBoyRows: beer.tallBoyRows,
     },
     liquorRows,
     happyHourNotes: happyHourNotes.valid,
