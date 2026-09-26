@@ -3,6 +3,7 @@ import { buildToastExportFiles } from './toast-export'
 import {
   buildPopulatedToastTemplateWorkbook,
   validatePopulatedBeerWorkbook,
+  type ToastDraftSlotMapping,
 } from './toast-template-workbook'
 import type { NormalizedMenuItem } from './types'
 
@@ -79,6 +80,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourRange2Start = null,
   happyHourRange2End = null,
   happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
+  draftSlotMappings,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -90,11 +92,13 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourRange2Start?: string | null
   happyHourRange2End?: string | null
   happyHourRange2Days?: readonly string[]
+  draftSlotMappings?: readonly ToastDraftSlotMapping[]
 }) {
   const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({
     templateArrayBuffer,
     items,
     happyHourEnabled,
+    draftSlotMappings,
   })
   const beerWorkbookBuffer = await beerPopulatedWorkbook.arrayBuffer()
   const workbookPackage = readWorkbookPackage(beerWorkbookBuffer)
@@ -126,6 +130,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourRange2Start = null,
   happyHourRange2End = null,
   happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
+  draftSlotMappings,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -137,11 +142,13 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourRange2Start?: string | null
   happyHourRange2End?: string | null
   happyHourRange2Days?: readonly string[]
+  draftSlotMappings?: readonly ToastDraftSlotMapping[]
 }) {
   const beer = validatePopulatedBeerWorkbook({
     workbookArrayBuffer,
     items,
     happyHourEnabled,
+    draftSlotMappings,
   })
   const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
   const mapping = getLiquorTemplateMapping(workbookPackage)
