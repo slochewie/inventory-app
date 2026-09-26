@@ -233,6 +233,10 @@ function ToastWorkbook() {
       happyHourStart: organizationConfig?.happyHourStart ?? null,
       happyHourEnd: organizationConfig?.happyHourEnd ?? null,
       happyHourDays: organizationConfig?.happyHourDays,
+      happyHourRange2Enabled: organizationConfig?.happyHourRange2Enabled === true,
+      happyHourRange2Start: organizationConfig?.happyHourRange2Start ?? null,
+      happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
+      happyHourRange2Days: organizationConfig?.happyHourRange2Days,
     })
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
@@ -242,6 +246,10 @@ function ToastWorkbook() {
       happyHourStart: organizationConfig?.happyHourStart ?? null,
       happyHourEnd: organizationConfig?.happyHourEnd ?? null,
       happyHourDays: organizationConfig?.happyHourDays,
+      happyHourRange2Enabled: organizationConfig?.happyHourRange2Enabled === true,
+      happyHourRange2Start: organizationConfig?.happyHourRange2Start ?? null,
+      happyHourRange2End: organizationConfig?.happyHourRange2End ?? null,
+      happyHourRange2Days: organizationConfig?.happyHourRange2Days,
     })
 
     if (!validation.valid) {
@@ -467,7 +475,19 @@ function formatHappyHourSetting(
   config: InventoryOrganizationConfig | null,
 ) {
   if (!config?.happyHourEnabled) return 'Disabled'
-  return `${formatHappyHourDays(config.happyHourDays)} · ${formatHappyHourWindow(config)}`
+  const range1 = `${formatHappyHourDays(config.happyHourDays)} · ${formatHappyHourWindow(config)}`
+  if (!config.happyHourRange2Enabled) return range1
+
+  const range2Days =
+    config.happyHourRange2Days?.length > 0
+      ? config.happyHourRange2Days
+      : config.happyHourDays
+  const range2Window =
+    config.happyHourRange2Start && config.happyHourRange2End
+      ? `${formatTime(config.happyHourRange2Start)}–${formatTime(config.happyHourRange2End)}`
+      : 'Enabled'
+
+  return `${range1} · Range 2: ${formatHappyHourDays(range2Days)} · ${range2Window}`
 }
 
 function formatHappyHourDays(days: readonly string[]) {
