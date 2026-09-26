@@ -13,6 +13,22 @@ const SPREADSHEET_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/mai
 const RELATIONSHIP_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 const DATA_ROW_BUFFER = 20
 
+const DEFAULT_HAPPY_HOUR_DAYS = [
+  'mon',
+  'tue',
+  'wed',
+  'thu',
+  'fri',
+  'sat',
+  'sun',
+] as const
+
+const HAPPY_HOUR_NOTE_ROWS = DEFAULT_HAPPY_HOUR_DAYS.map((day, index) => ({
+  day,
+  rowNumber: 20 + index,
+}))
+
+
 type WorkbookPackage = {
   files: Record<string, Uint8Array>
   sharedStrings: string[]
@@ -58,12 +74,14 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourEnabled = true,
   happyHourStart = null,
   happyHourEnd = null,
+  happyHourDays = DEFAULT_HAPPY_HOUR_DAYS,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   happyHourStart?: string | null
   happyHourEnd?: string | null
+  happyHourDays?: readonly string[]
 }) {
   const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({
     templateArrayBuffer,
@@ -79,6 +97,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
     happyHourEnabled,
     happyHourStart,
     happyHourEnd,
+    happyHourDays,
   )
 
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
@@ -90,12 +109,14 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourEnabled = true,
   happyHourStart = null,
   happyHourEnd = null,
+  happyHourDays = DEFAULT_HAPPY_HOUR_DAYS,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   happyHourStart?: string | null
   happyHourEnd?: string | null
+  happyHourDays?: readonly string[]
 }) {
   const beer = validatePopulatedBeerWorkbook({
     workbookArrayBuffer,
@@ -128,6 +149,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     happyHourEnabled,
     happyHourStart,
     happyHourEnd,
+    happyHourDays,
   )
   issues.push(...happyHourNotes.issues)
 
@@ -149,6 +171,7 @@ function populateHappyHourNotesSheet(
   enabled: boolean,
   start: string | null,
   end: string | null,
+  days: readonly string[],
 ) {
   const notesSheet = getWorkbookSheets(workbookPackage)
     .find((sheet) => sheet.name.toLowerCase() === 'notes')
@@ -172,12 +195,16 @@ function populateHappyHourNotesSheet(
     const startTime = splitHappyHourTime(start)
     const endTime = splitHappyHourTime(end)
 
-    for (let rowNumber = 20; rowNumber <= 26; rowNumber += 1) {
+    const selectedDays = normalizeHappyHourDays(days)
+
+    HAPPY_HOUR_NOTE_ROWS.forEach(({ day, rowNumber }) => {
+      if (!selectedDays.has(day)) return
+
       writeCellValue(sheetDoc, 5, rowNumber, startTime.time, rowNumber)
       writeCellValue(sheetDoc, 6, rowNumber, startTime.meridiem, rowNumber)
       writeCellValue(sheetDoc, 8, rowNumber, endTime.time, rowNumber)
       writeCellValue(sheetDoc, 9, rowNumber, endTime.meridiem, rowNumber)
-    }
+    })
   }
 
   workbookPackage.files[notesSheet.path] = strToU8(serializeXml(sheetDoc))
@@ -188,6 +215,7 @@ function validateHappyHourNotesSheet(
   enabled: boolean,
   start: string | null,
   end: string | null,
+  days: readonly string[],
 ) {
   const notesSheet = getWorkbookSheets(workbookPackage)
     .find((sheet) => sheet.name.toLowerCase() === 'notes')
@@ -200,8 +228,16 @@ function validateHappyHourNotesSheet(
   const expectedStart = enabled && start ? splitHappyHourTime(start) : null
   const expectedEnd = enabled && end ? splitHappyHourTime(end) : null
 
-  for (let rowNumber = 20; rowNumber <= 26; rowNumber += 1) {
-    const expected = expectedStart && expectedEnd
+  const selectedDays = normalizeHappyHourDays(days)
+
+  HAPPY_HOUR_NOTE_ROWS.forEach(({ day, rowNumber }) => {
+    const dayEnabled =
+      enabled &&
+      selectedDays.has(day) &&
+      expectedStart !== null &&
+      expectedEnd !== null
+
+    const expected = dayEnabled
       ? [
           [5, expectedStart.time],
           [6, expectedStart.meridiem],
@@ -234,9 +270,18 @@ function validateHappyHourNotesSheet(
         issues.push('Notes Happy Hour Time Range 2 should be blank')
       }
     })
-  }
+  })
 
   return { valid: issues.length === 0, issues: [...new Set(issues)] }
+}
+
+function normalizeHappyHourDays(days: readonly string[]) {
+  const allowed = new Set<string>(DEFAULT_HAPPY_HOUR_DAYS)
+  return new Set(
+    days
+      .map((day) => day.toLowerCase())
+      .filter((day) => allowed.has(day)),
+  )
 }
 
 function splitHappyHourTime(value: string) {
