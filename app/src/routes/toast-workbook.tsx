@@ -14,7 +14,10 @@ import {
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
 import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
-import { buildPopulatedToastTemplateWorkbookWithLiquorAsync } from '#/features/menu-import/toast-template-liquor-workbook'
+import {
+  buildPopulatedToastTemplateWorkbookWithLiquorAsync,
+  validatePopulatedToastTemplateWorkbookWithLiquor,
+} from '#/features/menu-import/toast-template-liquor-workbook'
 import {
   buildToastWorkbookFilename,
   buildToastWorkbookZip,
@@ -68,6 +71,12 @@ function ToastWorkbook() {
   const [workbook, setWorkbook] = useState<WorkbookState | null>(null)
   const [workbookError, setWorkbookError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [workbookValidation, setWorkbookValidation] = useState<{
+    draftRows: number
+    canRows: number
+    bottleSlotRows: number
+    liquorRows: number
+  } | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const beerExportItemCount = items.filter((item) => item.exportIncluded && item.toastCategory === 'Beer').length
@@ -215,11 +224,34 @@ function ToastWorkbook() {
   async function buildPopulatedWorkbook() {
     if (!workbook) throw new Error('Toast source template is not loaded')
 
-    return buildPopulatedToastTemplateWorkbookWithLiquorAsync({
+    const happyHourEnabled = organizationConfig?.happyHourEnabled === true
+    const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
       templateArrayBuffer: workbook.arrayBuffer.slice(0),
       items,
-      happyHourEnabled: organizationConfig?.happyHourEnabled === true,
+      happyHourEnabled,
     })
+    const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
+    const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
+      workbookArrayBuffer: populatedWorkbookArrayBuffer,
+      items,
+      happyHourEnabled,
+    })
+
+    if (!validation.valid) {
+      setWorkbookValidation(null)
+      throw new Error(
+        `Generated Toast workbook validation failed: ${validation.issues.slice(0, 3).join('; ')}`,
+      )
+    }
+
+    setWorkbookValidation({
+      draftRows: validation.beer.draftRows,
+      canRows: validation.beer.canRows,
+      bottleSlotRows: validation.beer.bottleSlotRows,
+      liquorRows: validation.liquorRows,
+    })
+
+    return populatedWorkbook
   }
 
   async function handleDownloadWorkbook() {
@@ -377,6 +409,24 @@ function ToastWorkbook() {
             The XLSX is ready for review, while the ZIP contains that same populated workbook
             packaged for sending to the Toast representative.
           </p>
+
+          {workbookValidation ? (
+            <div className="inventory-workbook-validation is-valid">
+              <strong>Workbook validated</strong>
+              <span>
+                {workbookValidation.draftRows} draft rows · {workbookValidation.canRows} can rows ·{' '}
+                {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows
+              </span>
+            </div>
+          ) : (
+            <div className="inventory-workbook-validation">
+              <strong>Automatic validation</strong>
+              <span>
+                Beer/Liquor values, Happy Hour cells, and 24oz cans are checked before download.
+              </span>
+            </div>
+          )}
+
 
           <div className="inventory-upload-stack">
             <button
