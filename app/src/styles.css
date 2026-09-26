@@ -1585,6 +1585,16 @@ select {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+
+.inventory-toast-summary-grid .inventory-summary-card span {
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+}
+
+.inventory-toast-summary-grid .inventory-summary-card {
+  min-width: 0;
+}
+
 .inventory-template-inspection {
   padding: 1rem;
 }
@@ -1679,13 +1689,14 @@ select {
 }
 
 .inventory-export-context {
-  max-width: 32rem;
+  max-width: 36rem;
   color: #6b7280 !important;
   font-size: 0.86rem !important;
   font-weight: 600 !important;
   letter-spacing: 0 !important;
   line-height: 1.45;
   text-transform: none !important;
+  text-wrap: balance;
 }
 
 .inventory-toast-export-panel > p {
