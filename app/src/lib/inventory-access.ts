@@ -102,6 +102,8 @@ export type InventoryOrganizationConfig = {
   draft24ActualSizeOz: number | null
   pitcherEnabled: boolean
   pitcherActualSizeOz: number | null
+  tallBoyCanEnabled: boolean
+  tallBoyCanLabel: string
 }
 
 type OrganizationConfigResponse = {
@@ -288,6 +290,8 @@ export async function getInventoryOrganizationConfig(
     draft24ActualSizeOz: null,
     pitcherEnabled: false,
     pitcherActualSizeOz: null,
+    tallBoyCanEnabled: false,
+    tallBoyCanLabel: "Tall Boy Can",
   }
 }
 
@@ -309,6 +313,8 @@ export async function updateInventoryOrganizationConfig(input: {
   draft24ActualSizeOz: number | null
   pitcherEnabled: boolean
   pitcherActualSizeOz: number | null
+  tallBoyCanEnabled: boolean
+  tallBoyCanLabel: string
 }) {
   const response = await fetch(
     authEndpoint("/api/auth/inventory/organization-config"),
