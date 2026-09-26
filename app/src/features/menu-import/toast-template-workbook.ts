@@ -96,12 +96,14 @@ export function inspectToastTemplateWorkbook(arrayBuffer: ArrayBuffer, fileName:
 export function buildPopulatedToastTemplateWorkbook({
   templateArrayBuffer,
   items,
+  happyHourEnabled = true,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
+  happyHourEnabled?: boolean
 }) {
   const workbookPackage = readWorkbookPackage(templateArrayBuffer)
-  populateBeerSheet(workbookPackage, items)
+  populateBeerSheet(workbookPackage, items, happyHourEnabled)
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
 
@@ -155,21 +157,28 @@ export function buildToastWorkbookFilename(organizationName: string, now = new D
   ].join('-') + '.xlsx'
 }
 
-function populateBeerSheet(workbookPackage: WorkbookPackage, items: NormalizedMenuItem[]) {
+function populateBeerSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+) {
   const mapping = getBeerTemplateMapping(workbookPackage)
   const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
   const sheetDoc = parseXml(sheetXml)
-  const beerRows = buildWorkbookBeerRows(items)
+  const beerRows = buildWorkbookBeerRows(items, happyHourEnabled)
   const writtenRowCount = writeBeerRowsToSheet(sheetDoc, mapping, beerRows)
 
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
   workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
 }
 
-function buildWorkbookBeerRows(items: NormalizedMenuItem[]) {
+function buildWorkbookBeerRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+) {
   const merged = new Map<string, BeerTabPreviewRow>()
 
-  buildBeerTabPreviewRows(items)
+  buildBeerTabPreviewRows(items, happyHourEnabled)
     .filter((row) => hasAnyBeerPrice(row) && !isOmittedWorkbookBeer(row.beerName))
     .forEach((row) => {
       const key = workbookBeerKey(row.beerName)
