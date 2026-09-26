@@ -232,6 +232,7 @@ function ToastWorkbook() {
       happyHourEnabled,
       happyHourStart: organizationConfig?.happyHourStart ?? null,
       happyHourEnd: organizationConfig?.happyHourEnd ?? null,
+      happyHourDays: organizationConfig?.happyHourDays,
     })
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
@@ -240,6 +241,7 @@ function ToastWorkbook() {
       happyHourEnabled,
       happyHourStart: organizationConfig?.happyHourStart ?? null,
       happyHourEnd: organizationConfig?.happyHourEnd ?? null,
+      happyHourDays: organizationConfig?.happyHourDays,
     })
 
     if (!validation.valid) {
@@ -465,7 +467,23 @@ function formatHappyHourSetting(
   config: InventoryOrganizationConfig | null,
 ) {
   if (!config?.happyHourEnabled) return 'Disabled'
-  return formatHappyHourWindow(config)
+  return `${formatHappyHourDays(config.happyHourDays)} · ${formatHappyHourWindow(config)}`
+}
+
+function formatHappyHourDays(days: readonly string[]) {
+  if (days.length === 7) return 'Daily'
+
+  const labels: Record<string, string> = {
+    mon: 'Mon',
+    tue: 'Tue',
+    wed: 'Wed',
+    thu: 'Thu',
+    fri: 'Fri',
+    sat: 'Sat',
+    sun: 'Sun',
+  }
+
+  return days.map((day) => labels[day] ?? day).join(', ')
 }
 
 function formatHappyHourWindow(config: InventoryOrganizationConfig) {
