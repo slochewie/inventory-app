@@ -90,6 +90,14 @@ export type InventoryOrganizationConfig = {
   happyHourStart: string | null
   happyHourEnd: string | null
   happyHourDays: HappyHourDay[]
+  draft8Enabled: boolean
+  draft8ActualSizeOz: number | null
+  draft16Enabled: boolean
+  draft16ActualSizeOz: number | null
+  draft24Enabled: boolean
+  draft24ActualSizeOz: number | null
+  pitcherEnabled: boolean
+  pitcherActualSizeOz: number | null
 }
 
 type OrganizationConfigResponse = {
@@ -264,6 +272,14 @@ export async function getInventoryOrganizationConfig(
     happyHourStart: null,
     happyHourEnd: null,
     happyHourDays: [...ALL_HAPPY_HOUR_DAYS],
+    draft8Enabled: false,
+    draft8ActualSizeOz: null,
+    draft16Enabled: false,
+    draft16ActualSizeOz: null,
+    draft24Enabled: false,
+    draft24ActualSizeOz: null,
+    pitcherEnabled: false,
+    pitcherActualSizeOz: null,
   }
 }
 
@@ -273,6 +289,14 @@ export async function updateInventoryOrganizationConfig(input: {
   happyHourStart: string | null
   happyHourEnd: string | null
   happyHourDays: HappyHourDay[]
+  draft8Enabled: boolean
+  draft8ActualSizeOz: number | null
+  draft16Enabled: boolean
+  draft16ActualSizeOz: number | null
+  draft24Enabled: boolean
+  draft24ActualSizeOz: number | null
+  pitcherEnabled: boolean
+  pitcherActualSizeOz: number | null
 }) {
   const response = await fetch(
     authEndpoint("/api/auth/inventory/organization-config"),
