@@ -136,6 +136,28 @@ export function validatePopulatedBeerWorkbook({
   const beerRows = buildWorkbookBeerRows(items, happyHourEnabled, draftSlotMappings)
   const issues: string[] = []
 
+  draftSlotMappings.forEach((draftMapping) => {
+    if (draftMapping.toastSizeOz === null) return
+
+    const toastSlot = findDraftSlot(mapping, draftMapping.toastSizeOz)
+    if (!toastSlot) {
+      issues.push(
+        `Toast Beer tab is missing configured draft slot ${formatToastDraftSlot(draftMapping.toastSizeOz)}`,
+      )
+      return
+    }
+
+    validateCellValue(
+      issues,
+      sheetDoc,
+      workbookPackage.sharedStrings,
+      toastSlot.priceCol,
+      mapping.headerRow,
+      `${draftMapping.actualSizeOz}oz`,
+      `Toast ${formatToastDraftSlot(draftMapping.toastSizeOz)} draft header`,
+    )
+  })
+
   const draftRows = beerRows.filter((row) => hasConfiguredDraftBeerPrice(row, draftSlotMappings))
   const canRows = beerRows.filter((row) => row.canPrice !== null)
   const bottleRows = [
@@ -399,6 +421,7 @@ function populateBeerSheet(
     draftSlotMappings,
   )
 
+  writeDraftSizeHeaders(sheetDoc, mapping, draftSlotMappings)
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
   workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
 }
@@ -572,6 +595,27 @@ function writeDraftBeerRow(
   })
 }
 
+function writeDraftSizeHeaders(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+) {
+  draftSlotMappings.forEach((draftMapping) => {
+    if (draftMapping.toastSizeOz === null) return
+
+    const toastSlot = findDraftSlot(mapping, draftMapping.toastSizeOz)
+    if (!toastSlot) return
+
+    writeCellValue(
+      sheetDoc,
+      toastSlot.priceCol,
+      mapping.headerRow,
+      `${draftMapping.actualSizeOz}oz`,
+      mapping.headerRow,
+    )
+  })
+}
+
 function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
   const canSlot = findPackagedSlot(mapping, 'can')
   if (!canSlot || beerRow.canPrice === null) return
@@ -729,13 +773,23 @@ function getDraftSizeSlots(rowValues: { col: number, value: string }[], draftNam
 
       slots.push({
         label: cell.value,
-        sizeOz: sizeMatch ? Number(sizeMatch[1]) : null,
+        sizeOz: getToastDraftSlotSizeOz(cell.col, cell.value),
         priceCol: cell.col,
         happyHourCol,
       })
     })
 
   return slots
+}
+
+function getToastDraftSlotSizeOz(column: number, label: string) {
+  if (column === 2) return 8
+  if (column === 4) return 16
+  if (column === 6) return 24
+  if (/^pitcher$/i.test(label)) return null
+
+  const sizeMatch = label.match(/(\d+)\s*oz/i)
+  return sizeMatch ? Number(sizeMatch[1]) : null
 }
 
 function getPackagedGroupSlots(rowValues: { col: number, value: string }[]): PackagedGroupSlot[] {
