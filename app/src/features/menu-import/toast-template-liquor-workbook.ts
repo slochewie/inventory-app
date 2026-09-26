@@ -453,6 +453,28 @@ function updateWorksheetDimension(sheetDoc: Document, mapping: LiquorTemplateMap
   dimension.setAttribute('ref', `A1:${numberToColumnLetters(maxColumn)}${endRow}`)
 }
 
+function validateLiquorCell(
+  issues: string[],
+  sheetDoc: Document,
+  sharedStrings: string[],
+  column: number,
+  rowNumber: number,
+  expected: string | number | null,
+  label: string,
+) {
+  const cell = findCell(sheetDoc, column, rowNumber)
+  const actual = cell ? getCellDisplayValue(cell, sharedStrings) : ''
+  const expectedText =
+    expected === null || expected === ''
+      ? ''
+      : typeof expected === 'number'
+        ? formatNumberForCell(expected)
+        : String(expected)
+
+  if (actual !== expectedText) {
+    issues.push(label + ': workbook value does not match expected export value')
+  }
+}
 function getLastWorksheetRow(sheetDoc: Document) {
   return Math.max(
     1,
