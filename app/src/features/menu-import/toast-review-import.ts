@@ -4,7 +4,6 @@ const REQUIRED_REVIEW_HEADERS = [
   'Source Kind',
   'Source Item #',
   'Item Name',
-  'Aloha Category',
   'Toast Category',
   'Toast Destination',
   'Base Price ($)',
@@ -22,7 +21,14 @@ export function isToastExportReviewCsv(text: string) {
   if (!headerRow) return false
 
   const headers = new Set(headerRow.map((header) => normalizeHeader(header)))
-  return REQUIRED_REVIEW_HEADERS.every((header) => headers.has(normalizeHeader(header)))
+  const hasSourceCategory =
+    headers.has(normalizeHeader('Source Category')) ||
+    headers.has(normalizeHeader('Aloha Category'))
+
+  return (
+    hasSourceCategory &&
+    REQUIRED_REVIEW_HEADERS.every((header) => headers.has(normalizeHeader(header)))
+  )
 }
 
 export function parseToastExportReviewCsv(text: string, sourceName: string): {
@@ -38,6 +44,15 @@ export function parseToastExportReviewCsv(text: string, sourceName: string): {
 
   const headerIndex = new Map(headers.map((header, index) => [normalizeHeader(header), index]))
   const missingHeaders = REQUIRED_REVIEW_HEADERS.filter((header) => !headerIndex.has(normalizeHeader(header)))
+  const sourceCategoryHeader = headerIndex.has(normalizeHeader('Source Category'))
+    ? 'Source Category'
+    : headerIndex.has(normalizeHeader('Aloha Category'))
+      ? 'Aloha Category'
+      : null
+
+  if (!sourceCategoryHeader) {
+    missingHeaders.push('Source Category')
+  }
 
   if (missingHeaders.length > 0) {
     throw new Error(`Toast export review CSV is missing: ${missingHeaders.join(', ')}`)
@@ -53,8 +68,10 @@ export function parseToastExportReviewCsv(text: string, sourceName: string): {
     const sourceKind = getCell(row, headerIndex, 'Source Kind') || 'aloha-csv'
     const sourceItemNumber = blankToUndefined(getCell(row, headerIndex, 'Source Item #'))
     const itemName = getCell(row, headerIndex, 'Item Name')
-    const alohaCategory = blankToUndefined(getCell(row, headerIndex, 'Aloha Category'))
-    const toastCategory = getCell(row, headerIndex, 'Toast Category') || alohaCategory || 'Uncategorized'
+    const sourceCategory = blankToUndefined(
+      getCell(row, headerIndex, sourceCategoryHeader),
+    )
+    const toastCategory = getCell(row, headerIndex, 'Toast Category') || sourceCategory || 'Uncategorized'
     const toastDestination = getCell(row, headerIndex, 'Toast Destination') || toastCategory
     const basePriceCents = parseMoney(getCell(row, headerIndex, 'Base Price ($)'))
     const happyHourPriceCents = parseMoney(getCell(row, headerIndex, 'Happy Hour $'))
@@ -73,7 +90,7 @@ export function parseToastExportReviewCsv(text: string, sourceName: string): {
       sourceKind: sourceKind === 'aloha-csv' ? 'aloha-csv' : 'aloha-csv',
       sourceItemNumber,
       name: itemName,
-      category: alohaCategory,
+      category: sourceCategory,
       toastCategory,
       toastDestination,
       basePriceCents,
