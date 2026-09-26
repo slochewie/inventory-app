@@ -107,6 +107,184 @@ export function buildPopulatedToastTemplateWorkbook({
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
 
+export function validatePopulatedBeerWorkbook({
+  workbookArrayBuffer,
+  items,
+  happyHourEnabled = true,
+}: {
+  workbookArrayBuffer: ArrayBuffer
+  items: NormalizedMenuItem[]
+  happyHourEnabled?: boolean
+}) {
+  const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
+  const mapping = getBeerTemplateMapping(workbookPackage)
+  const sheetDoc = parseXml(getTextFile(workbookPackage.files, mapping.sheetPath))
+  const beerRows = buildWorkbookBeerRows(items, happyHourEnabled)
+  const issues: string[] = []
+
+  const draftRows = beerRows.filter(hasDraftBeerPrice)
+  const canRows = beerRows.filter((row) => row.canPrice !== null)
+  const bottleRows = [
+    ...beerRows
+      .filter((row) => row.can24ozPrice !== null)
+      .map((row) => ({ row, kind: '24oz can' as const })),
+    ...beerRows
+      .filter((row) => row.bottlePrice !== null)
+      .map((row) => ({ row, kind: 'bottle' as const })),
+  ]
+
+  draftRows.forEach((row, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    if (mapping.draftNameCol !== null) {
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        mapping.draftNameCol,
+        rowNumber,
+        row.beerName,
+        `${row.beerName} draft name`,
+      )
+    }
+
+    const tenOunceSlot = findDraftSlot(mapping, 10)
+    if (tenOunceSlot) {
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        tenOunceSlot.priceCol,
+        rowNumber,
+        centsToDollars(row.draft10ozPrice),
+        `${row.beerName} 10oz price in Toast ${tenOunceSlot.label} slot`,
+      )
+      if (tenOunceSlot.happyHourCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          tenOunceSlot.happyHourCol,
+          rowNumber,
+          centsToDollars(row.draft10ozHappyHour),
+          `${row.beerName} 10oz Happy Hour`,
+        )
+      }
+    }
+
+    const sixteenOunceSlot = findDraftSlot(mapping, 16)
+    if (sixteenOunceSlot) {
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        sixteenOunceSlot.priceCol,
+        rowNumber,
+        centsToDollars(row.draft16ozPrice),
+        `${row.beerName} 16oz price`,
+      )
+      if (sixteenOunceSlot.happyHourCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          sixteenOunceSlot.happyHourCol,
+          rowNumber,
+          centsToDollars(row.draft16ozHappyHour),
+          `${row.beerName} 16oz Happy Hour`,
+        )
+      }
+    }
+  })
+
+  const canSlot = findPackagedSlot(mapping, 'can')
+  if (canSlot) {
+    canRows.forEach((row, index) => {
+      const rowNumber = mapping.dataStartRow + index
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        canSlot.nameCol,
+        rowNumber,
+        row.beerName,
+        `${row.beerName} can name`,
+      )
+      if (canSlot.priceCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          canSlot.priceCol,
+          rowNumber,
+          centsToDollars(row.canPrice),
+          `${row.beerName} can price`,
+        )
+      }
+      if (canSlot.happyHourCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          canSlot.happyHourCol,
+          rowNumber,
+          centsToDollars(row.canHappyHour),
+          `${row.beerName} can Happy Hour`,
+        )
+      }
+    })
+  }
+
+  const bottleSlot = findPackagedSlot(mapping, 'bottle')
+  if (bottleSlot) {
+    bottleRows.forEach(({ row, kind }, index) => {
+      const rowNumber = mapping.dataStartRow + index
+      const price = kind === '24oz can' ? row.can24ozPrice : row.bottlePrice
+      const happyHour =
+        kind === '24oz can' ? row.can24ozHappyHour : row.bottleHappyHour
+
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        bottleSlot.nameCol,
+        rowNumber,
+        row.beerName,
+        `${row.beerName} ${kind} name in Bottle slot`,
+      )
+      if (bottleSlot.priceCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          bottleSlot.priceCol,
+          rowNumber,
+          centsToDollars(price),
+          `${row.beerName} ${kind} price in Bottle slot`,
+        )
+      }
+      if (bottleSlot.happyHourCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          bottleSlot.happyHourCol,
+          rowNumber,
+          centsToDollars(happyHour),
+          `${row.beerName} ${kind} Happy Hour in Bottle slot`,
+        )
+      }
+    })
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    draftRows: draftRows.length,
+    canRows: canRows.length,
+    bottleSlotRows: bottleRows.length,
+  }
+}
+
 export async function buildToastWorkbookZip(filename: string, workbook: Blob) {
   const bytes = new Uint8Array(await workbook.arrayBuffer())
   return new Blob(
@@ -778,6 +956,31 @@ function numberToColumnLetters(input: number) {
   }
 
   return output
+}
+
+function validateCellValue(
+  issues: string[],
+  sheetDoc: Document,
+  sharedStrings: string[],
+  column: number,
+  rowNumber: number,
+  expected: string | number | null,
+  label: string,
+) {
+  const cell = findCell(sheetDoc, column, rowNumber)
+  const actual = cell ? getCellDisplayValue(cell, sharedStrings) : ''
+  const expectedText =
+    expected === null || expected === ''
+      ? ''
+      : typeof expected === 'number'
+        ? formatNumberForCell(expected)
+        : String(expected)
+
+  if (actual !== expectedText) {
+    issues.push(
+      `${label}: expected "${expectedText || 'blank'}" but found "${actual || 'blank'}"`,
+    )
+  }
 }
 
 function hasAnyBeerPrice(row: BeerTabPreviewRow) {
