@@ -198,6 +198,7 @@ function CatalogPage() {
           ? caught.message
           : 'Unable to save the Inventory item.',
       )
+      throw caught
     } finally {
       setSavingVariantId(null)
     }
@@ -399,6 +400,14 @@ function CatalogDrawer({
   onMerge: (sourceGroup: CatalogGroup, targetItemId: string) => Promise<void>
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const [draftItems, setDraftItems] = useState(() =>
+    group.items.map((item) => ({ ...item })),
+  )
+  const [updating, setUpdating] = useState(false)
+
+  useEffect(() => {
+    setDraftItems(group.items.map((item) => ({ ...item })))
+  }, [group.id])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -409,11 +418,81 @@ function CatalogDrawer({
     }
   }, [])
 
-  const carriedCount = group.items.filter(
+  const carriedCount = draftItems.filter(
     (item) => item.organizationEnabled === true,
   ).length
   const [mergeTargetId, setMergeTargetId] = useState('')
   const mergeCandidates = allGroups.filter((candidate) => candidate.id !== group.id)
+  const hasChanges = draftItems.some((draftItem) => {
+    const original = group.items.find((item) => item.id === draftItem.id)
+    if (!original) return true
+
+    return (
+      draftItem.name !== original.name ||
+      draftItem.organizationEnabled !== original.organizationEnabled ||
+      draftItem.exportToToast !== original.exportToToast ||
+      draftItem.basePriceCents !== original.basePriceCents ||
+      draftItem.happyHourPriceCents !== original.happyHourPriceCents
+    )
+  })
+
+  function updateDraft(
+    itemId: string,
+    patch: Partial<NormalizedMenuItem>,
+  ) {
+    setDraftItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              ...patch,
+              exportIncluded:
+                (patch.organizationEnabled ?? item.organizationEnabled) === true &&
+                (patch.exportToToast ?? item.exportToToast) === true,
+            }
+          : item,
+      ),
+    )
+  }
+
+  async function saveDraft() {
+    if (!canEdit || !hasChanges || updating || savingVariantId) return
+
+    setUpdating(true)
+
+    try {
+      for (const draftItem of draftItems) {
+        const original = group.items.find((item) => item.id === draftItem.id)
+        if (!original) continue
+
+        const patch: Partial<NormalizedMenuItem> = {}
+
+        if (draftItem.name !== original.name) {
+          patch.name = draftItem.name
+        }
+        if (draftItem.organizationEnabled !== original.organizationEnabled) {
+          patch.organizationEnabled = draftItem.organizationEnabled
+        }
+        if (draftItem.exportToToast !== original.exportToToast) {
+          patch.exportToToast = draftItem.exportToToast
+        }
+        if (draftItem.basePriceCents !== original.basePriceCents) {
+          patch.basePriceCents = draftItem.basePriceCents
+        }
+        if (draftItem.happyHourPriceCents !== original.happyHourPriceCents) {
+          patch.happyHourPriceCents = draftItem.happyHourPriceCents
+        }
+
+        if (Object.keys(patch).length > 0) {
+          await onUpdate(original, patch)
+        }
+      }
+
+      onClose()
+    } finally {
+      setUpdating(false)
+    }
+  }
 
   return (
     <dialog
@@ -449,7 +528,7 @@ function CatalogDrawer({
         </div>
 
         <div className="inventory-catalog-variants">
-          {group.items.map((item) => {
+          {draftItems.map((item) => {
             const saving = savingVariantId === item.id
 
             return (
@@ -466,10 +545,13 @@ function CatalogDrawer({
                       <input
                         type="checkbox"
                         checked={item.organizationEnabled === true}
-                        disabled={!canEdit || saving}
+                        disabled={!canEdit || saving || updating}
                         onChange={(event) =>
-                          void onUpdate(item, {
+                          updateDraft(item.id, {
                             organizationEnabled: event.target.checked,
+                            exportToToast: event.target.checked
+                              ? item.exportToToast
+                              : false,
                           })
                         }
                       />
@@ -487,10 +569,11 @@ function CatalogDrawer({
                         disabled={
                           !canEdit ||
                           saving ||
+                          updating ||
                           item.organizationEnabled !== true
                         }
                         onChange={(event) =>
-                          void onUpdate(item, {
+                          updateDraft(item.id, {
                             exportToToast: event.target.checked,
                           })
                         }
@@ -503,23 +586,23 @@ function CatalogDrawer({
                 <NameField
                   value={item.name}
                   masterName={item.masterName ?? item.name}
-                  disabled={!canEdit || saving}
-                  onCommit={(value) => void onUpdate(item, { name: value })}
+                  disabled={!canEdit || saving || updating}
+                  onCommit={(value) => updateDraft(item.id, { name: value })}
                 />
 
                 <div className="inventory-catalog-price-grid">
                   <MoneyField
                     label="Price"
                     value={item.basePriceCents}
-                    disabled={!canEdit || saving}
-                    onCommit={(value) => void onUpdate(item, { basePriceCents: value })}
+                    disabled={!canEdit || saving || updating}
+                    onCommit={(value) => updateDraft(item.id, { basePriceCents: value })}
                   />
                   <MoneyField
                     label="Happy hour"
                     value={item.happyHourPriceCents}
-                    disabled={!canEdit || saving}
+                    disabled={!canEdit || saving || updating}
                     onCommit={(value) =>
-                      void onUpdate(item, { happyHourPriceCents: value })
+                      updateDraft(item.id, { happyHourPriceCents: value })
                     }
                   />
                 </div>
@@ -550,7 +633,7 @@ function CatalogDrawer({
             <span>Keep this master item</span>
             <select
               value={mergeTargetId}
-              disabled={merging}
+              disabled={merging || hasChanges || updating}
               onChange={(event) => setMergeTargetId(event.target.value)}
             >
               <option value="">Choose master item…</option>
@@ -564,7 +647,7 @@ function CatalogDrawer({
           <button
             type="button"
             className="inventory-danger-button"
-            disabled={!mergeTargetId || merging}
+            disabled={!mergeTargetId || merging || hasChanges || updating}
             onClick={() => {
               if (!mergeTargetId) return
               const target = mergeCandidates.find((candidate) => candidate.id === mergeTargetId)
@@ -585,6 +668,33 @@ function CatalogDrawer({
             {merging ? 'Merging…' : 'Merge items'}
           </button>
         </section>
+      ) : null}
+
+      {canMerge && hasChanges ? (
+        <p className="inventory-drawer-pending-note">
+          Update or cancel your edits before merging this item.
+        </p>
+      ) : null}
+
+      {canEdit ? (
+        <footer className="inventory-drawer-actions">
+          <button
+            type="button"
+            className="inventory-secondary-button"
+            disabled={updating || savingVariantId !== null}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="inventory-primary-button"
+            disabled={!hasChanges || updating || savingVariantId !== null}
+            onClick={() => void saveDraft()}
+          >
+            {updating || savingVariantId !== null ? 'Updating…' : 'Update'}
+          </button>
+        </footer>
       ) : null}
 
       <section className="inventory-drawer-section inventory-drawer-help">
