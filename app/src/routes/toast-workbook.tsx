@@ -76,6 +76,7 @@ function ToastWorkbook() {
     canRows: number
     bottleSlotRows: number
     liquorRows: number
+    happyHourNotes: boolean
   } | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
@@ -229,12 +230,16 @@ function ToastWorkbook() {
       templateArrayBuffer: workbook.arrayBuffer.slice(0),
       items,
       happyHourEnabled,
+      happyHourStart: organizationConfig?.happyHourStart ?? null,
+      happyHourEnd: organizationConfig?.happyHourEnd ?? null,
     })
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
       workbookArrayBuffer: populatedWorkbookArrayBuffer,
       items,
       happyHourEnabled,
+      happyHourStart: organizationConfig?.happyHourStart ?? null,
+      happyHourEnd: organizationConfig?.happyHourEnd ?? null,
     })
 
     if (!validation.valid) {
@@ -249,6 +254,7 @@ function ToastWorkbook() {
       canRows: validation.beer.canRows,
       bottleSlotRows: validation.beer.bottleSlotRows,
       liquorRows: validation.liquorRows,
+      happyHourNotes: validation.happyHourNotes,
     })
 
     return populatedWorkbook
@@ -415,14 +421,15 @@ function ToastWorkbook() {
               <strong>Workbook validated</strong>
               <span>
                 {workbookValidation.draftRows} draft rows · {workbookValidation.canRows} can rows ·{' '}
-                {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows
+                {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows ·{' '}
+                Notes schedule checked
               </span>
             </div>
           ) : (
             <div className="inventory-workbook-validation">
               <strong>Automatic validation</strong>
               <span>
-                Beer/Liquor values, Happy Hour cells, and 24oz cans are checked before download.
+                Beer/Liquor values, Happy Hour cells, 24oz cans, and the Notes-tab schedule are checked before download.
               </span>
             </div>
           )}
