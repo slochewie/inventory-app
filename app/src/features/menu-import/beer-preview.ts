@@ -73,11 +73,13 @@ function applyBeerSlot(
     return
   }
 
+  const destinationCanSizeOz = getCanSizeOz(item.toastDestination)
+
   if (
     (variantKind === 'can' &&
       typeof item.variantSizeOz === 'number' &&
       item.variantSizeOz >= 24) ||
-    /\b(?:24|25)\s*oz\s*can\b/i.test(item.toastDestination)
+    (destinationCanSizeOz !== null && destinationCanSizeOz >= 24)
   ) {
     row.can24ozPrice = item.basePriceCents
     row.can24ozHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
@@ -104,6 +106,14 @@ export function getDraftBeerPrice(
   actualSizeOz: number,
 ) {
   return row.draftBySizeOz[draftSizeKey(actualSizeOz)] ?? null
+}
+
+function getCanSizeOz(value: string) {
+  const match = value.match(/\b(\d+(?:\.\d+)?)\s*oz\s*can\b/i)
+  if (!match) return null
+
+  const parsed = Number(match[1])
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
 function getDraftSizeOz(item: NormalizedMenuItem) {
