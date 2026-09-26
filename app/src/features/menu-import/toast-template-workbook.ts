@@ -294,15 +294,20 @@ export async function buildToastWorkbookZip(filename: string, workbook: Blob) {
 }
 
 export function downloadToastWorkbookFile(filename: string, blob: Blob) {
+  const file = new File([blob], filename, {
+    type: blob.type || 'application/octet-stream',
+  })
   const link = document.createElement('a')
-  const url = URL.createObjectURL(blob)
+  const url = URL.createObjectURL(file)
 
   link.href = url
-  link.download = filename
+  link.download = file.name
+  link.setAttribute('download', file.name)
   document.body.appendChild(link)
   link.click()
   link.remove()
-  URL.revokeObjectURL(url)
+
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 export function buildToastWorkbookFilename(organizationName: string, now = new Date()) {
