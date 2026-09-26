@@ -206,7 +206,7 @@ function normalizeLiquorKind(value: string) {
   if (key.includes('GIN')) return 'GIN'
   if (key.includes('RUM')) return 'RUM'
   if (key.includes('TEQUILA')) return 'TEQUILA'
-  if (key.includes('WHISKEY') || key.includes('BOURBON') || key === 'BOURB WHISK') return 'WHISKEY/BOURBON'
+  if (key.includes('WHISKEY') || key.includes('BOURBON')) return 'WHISKEY/BOURBON'
   if (key.includes('SCOTCH')) return 'SCOTCH'
   if (key.includes('LIQUEUR') || key.includes('CORDIAL')) return 'LIQUEURS/CORDIALS'
   if (key.includes('BRANDY') || key.includes('COGNAC')) return 'BRANDY/COGNAC'
