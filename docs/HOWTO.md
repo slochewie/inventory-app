@@ -281,7 +281,7 @@ Current behavior:
 
 The Export to Toast page also displays the selected days and time window so the schedule can be reviewed before generating the workbook.
 
-## 13. Understand Beer variants and Toast's fixed workbook
+## 13. Understand Beer variants and Toast's workbook structure
 
 Inventory stores the actual product/serving format as variant data.
 
@@ -290,26 +290,30 @@ Examples:
 - 10oz Draft
 - 16oz Draft
 - standard Can
-- 24oz Can
+- 24oz Can / Tall Boy
 - Bottle
 
-Toast's supplied workbook has fixed headers. Inventory does not rename those headers or create custom package columns during export.
+Toast's supplied workbook structure remains the source template. Inventory does not add custom Beer columns; it maps organization formats into existing Toast slots.
 
 Current mapping:
 
 | Inventory variant | Toast workbook slot |
 | --- | --- |
-| 10oz Draft | existing 8oz draft slot |
-| 16oz Draft | existing 16oz draft slot |
+| organization-configured draft size | configured existing Toast draft slot |
 | standard Can | existing Can slot |
-| 24oz Can | existing Bottle slot |
+| Tall Boy / oversized can | first existing Optional Beer Category slot when enabled |
 | Bottle | existing Bottle slot |
 
-A standard can and a 24oz can remain separate variants/items even when their cleaned names are similar.
+The organization settings control whether the Tall Boy Can slot is enabled and what label it uses. When enabled, export:
 
-If a location carries both 24oz cans and bottles, both remain separate Inventory variants even though Toast's fixed workbook places them in the same existing Bottle section.
+1. unhides the first Optional Beer Category,
+2. renames its package header cell (P14) to the configured organization label,
+3. writes Tall Boy names into that optional section, and
+4. writes its normal and Happy Hour prices into the paired price cells.
 
-Do not modify Toast's fixed template headers to make the source workbook match the venue's package sizes. Explain size differences to the Toast representative where needed.
+Tall Boy cans are not written into Bottle when this feature is enabled. Bottles continue using the Bottle section.
+
+A standard can, Tall Boy can, and bottle remain separate Inventory variants/items even when their cleaned names are similar. Reusing the existing Optional Beer Category preserves Toast's workbook structure while giving the venue a dedicated Tall Boy package slot.
 
 ## 14. Canonical categories
 
@@ -463,11 +467,11 @@ Check both organization controls:
 
 Also verify the variant is active and has a valid Toast category/destination for its export path.
 
-### A 24oz can does not appear where expected
+### A Tall Boy / oversized can does not appear where expected
 
-Verify the variant/destination is classified as a 24oz can.
+Verify the item is classified as an oversized can and that the organization's **Tall Boy Can** setting is enabled.
 
-The writer intentionally uses Toast's existing Bottle section for 24oz cans rather than changing the workbook header.
+When enabled, the writer uses the first existing Optional Beer Category, unhides it, and applies the configured organization label to P14. Tall Boy cans should not appear in Bottle.
 
 ### An import creates or maps to the wrong product
 

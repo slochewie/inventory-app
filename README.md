@@ -135,19 +135,20 @@ Time Range 2 is intentionally left blank. The exporter validates the Notes sched
 
 ### Beer workbook behavior
 
-Toast's workbook is treated as a fixed template. The exporter writes values into existing cells without renaming headers or adding custom columns.
+Toast's workbook structure is treated as fixed: the exporter uses the template's existing rows/columns rather than inserting custom Beer columns.
 
 Current beer mapping includes:
 
-- 10oz draft → existing Toast 8oz draft slot
-- 16oz draft → existing Toast 16oz draft slot
+- organization-configured draft sizes → selected existing Toast draft slots
 - standard can → existing Can slot
-- 24oz can → existing Bottle slot
+- Tall Boy / oversized can → first existing **Optional Beer Category** slot when Tall Boy Can is enabled
 - bottle → existing Bottle slot
 
-Standard cans, 24oz cans, and bottles remain separate Inventory variants/source items even when multiple formats share a fixed Toast section.
+When Tall Boy Can is enabled for the organization, the exporter unhides the first Optional Beer Category, renames its package header cell (P14) to the configured organization label, and writes Tall Boy names, prices, and Happy Hour prices into that slot. It does not route those items into Bottle.
 
-Actual serving/package size remains Inventory data. Any mismatch with Toast's fixed labels should be explained to the Toast representative rather than changing the source template headers.
+Standard cans, Tall Boy cans, and bottles remain separate Inventory variants/source items. The optional category reuse is structural: it repurposes Toast's existing optional Beer slot without adding columns to the workbook.
+
+Actual serving/package size remains Inventory data. Organization draft mappings and the Tall Boy label allow the workbook presentation to reflect the venue's configured formats while preserving Toast's template structure.
 
 ## Repository layout
 
