@@ -163,19 +163,14 @@ function ImportReviewPage() {
   return (
     <AuthenticatedInventoryShell currentPath="/import-review">
       <section className="inventory-content inventory-import-review-page">
-        <header className="inventory-page-heading">
+        <header className="inventory-page-heading inventory-import-review-heading">
           <div>
             <p className="inventory-kicker">Import & Review</p>
-            <h1>Bring menu data in</h1>
+            <h1>Import & Review</h1>
             <p>
-              Upload an Aloha export, review only what needs attention, then save it to the shared catalog.
+              Bring menu data into the shared catalog, then review only what needs attention.
             </p>
           </div>
-          {workspace === 'new' && canImportExport ? (
-            <a className="inventory-secondary-link" href="/toast-template-import">
-              Import Toast workbook
-            </a>
-          ) : null}
         </header>
 
         <nav className="inventory-import-workspace-tabs" aria-label="Import and review workspace">
@@ -208,17 +203,31 @@ function ImportReviewPage() {
 
         {workspace === 'new' ? (
           <>
-                    <section className="inventory-import-drop-card">
-                      <div>
-                        <strong>Aloha CSV</strong>
-                        <p>Choose the menu-price export from Aloha. Nothing is saved until you approve the import.</p>
+                    <section className="inventory-import-source-card">
+                      <div className="inventory-import-source-option">
+                        <div>
+                          <strong>Aloha CSV</strong>
+                          <p>Choose the menu-price export from Aloha. Nothing is saved until you approve the import.</p>
+                        </div>
+                        {canImportExport ? (
+                          <label className="inventory-upload-control">
+                            <span>{importFile ? 'Choose another CSV' : 'Choose Aloha CSV'}</span>
+                            <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
+                          </label>
+                        ) : null}
                       </div>
-                      {canImportExport ? (
-                        <label className="inventory-upload-control">
-                          <span>{importFile ? 'Choose another CSV' : 'Choose Aloha CSV'}</span>
-                          <input type="file" accept=".csv,text/csv" onChange={handleAlohaCsvChange} />
-                        </label>
-                      ) : null}
+
+                      <div className="inventory-import-source-divider" aria-hidden="true" />
+
+                      <div className="inventory-import-source-option">
+                        <div>
+                          <strong>Toast workbook</strong>
+                          <p>Import menu data from a Toast workbook instead of an Aloha CSV.</p>
+                        </div>
+                        <a className="inventory-secondary-link" href="/toast-template-import">
+                          Import Toast workbook
+                        </a>
+                      </div>
                     </section>
             
                     {error ? <p className="inventory-error inventory-import-message">{error}</p> : null}
@@ -396,9 +405,9 @@ function ImportReviewPage() {
                         </section>
                       </>
                     ) : (
-                      <section className="inventory-empty-workflow">
+                      <section className="inventory-empty-workflow inventory-import-empty-workflow">
                         <strong>No import loaded</strong>
-                        <p>Choose an Aloha CSV above, or use Toast workbook import.</p>
+                        <p>Choose an import source above to begin.</p>
                       </section>
                     )}
             
