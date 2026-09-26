@@ -573,6 +573,31 @@ function CatalogPage() {
     )
   }
 
+  function removeOptionalBeerCategory(category: OptionalBeerCategoryConfig) {
+    if (items.some((item) => item.toastSlot === category.key)) {
+      setError(
+        `${category.label} is still assigned to catalog items. Reassign those items before removing it.`,
+      )
+      return
+    }
+
+    setError(null)
+    setOptionalBeerCategoryEdits((current) =>
+      current.map((candidate) =>
+        candidate.slot === category.slot
+          ? {
+              ...candidate,
+              enabled: false,
+              label: `Optional Beer Category ${candidate.slot}`,
+            }
+          : candidate,
+      ),
+    )
+    setVisibleOptionalBeerCategoryCount((current) =>
+      Math.max(0, current - 1),
+    )
+  }
+
   async function saveOptionalBeerCategorySettings() {
     if (
       !canEdit ||
@@ -1075,6 +1100,17 @@ function CatalogPage() {
                               placeholder={`Optional Beer Category ${category.slot}`}
                             />
                           </label>
+
+                          {category.slot === visibleOptionalBeerCategoryCount ? (
+                            <button
+                              type="button"
+                              className="inventory-secondary-button"
+                              disabled={savingOptionalBeerCategories}
+                              onClick={() => removeOptionalBeerCategory(category)}
+                            >
+                              Remove Optional Beer Category
+                            </button>
+                          ) : null}
                         </div>
                       ))}
                   </div>
@@ -1095,7 +1131,8 @@ function CatalogPage() {
                   </button>
                 ) : null}
 
-                {visibleOptionalBeerCategoryCount > 0 ? (
+                {optionalBeerCategoryUiHasChanges ||
+                visibleOptionalBeerCategoryCount > 0 ? (
                   <div className="inventory-draft-slots-actions">
                     <button
                       type="button"
