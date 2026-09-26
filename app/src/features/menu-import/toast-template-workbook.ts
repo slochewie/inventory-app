@@ -971,7 +971,7 @@ function getPackagedGroupSlots(rowValues: { col: number, value: string }[]): Pac
     if (!label) return []
     if (/^(draft\s+beer|price\s*\$?|happy\s*hour\s*\$?|\d+\s*oz|pitcher)$/i.test(label)) return []
 
-    const kind = getPackagedKind(label)
+    const kind = getPackagedKind(label) ?? getRenamedOptionalPackagedKind(rowValues, cell)
     if (!kind) return []
 
     if (kind === 'can') return getCanGroupSlots(rowValues, cell)
@@ -1027,6 +1027,24 @@ function getCanGroupSlots(rowValues: { col: number, value: string }[], canCell: 
   }
 
   return slots
+}
+
+function getRenamedOptionalPackagedKind(
+  rowValues: { col: number, value: string }[],
+  cell: { col: number, value: string },
+): PackagedGroupSlot['kind'] | null {
+  const hasEarlierPackagedSlot = rowValues.some((candidate) =>
+    candidate.col < cell.col && getPackagedKind(candidate.value) !== null,
+  )
+  if (!hasEarlierPackagedSlot) return null
+
+  const nextCells = rowValues.filter((candidate) =>
+    candidate.col > cell.col && candidate.col <= cell.col + 3,
+  )
+  const hasPriceCol = nextCells.some((candidate) => /price/i.test(candidate.value))
+  const hasHappyHourCol = nextCells.some((candidate) => /happy\s*hour/i.test(candidate.value))
+
+  return hasPriceCol || hasHappyHourCol ? 'optional' : null
 }
 
 function getPackagedKind(label: string): PackagedGroupSlot['kind'] | null {
