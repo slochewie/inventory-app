@@ -84,7 +84,11 @@ const WELL_LIQUOR_NAMES = new Set([
   'bourbon well', 'gin well', 'rum well', 'scotch well', 'tequila well', 'vodka well',
 ])
 
-export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportFile[] {
+export function buildToastExportFiles(
+  items: NormalizedMenuItem[],
+  options: { happyHourEnabled?: boolean } = {},
+): ToastExportFile[] {
+  const happyHourEnabled = options.happyHourEnabled ?? true
   if (items.length > 0) saveReviewedItems(items)
 
   const included = items.filter((item) => item.exportIncluded && item.status !== 'ignored')
@@ -92,8 +96,8 @@ export function buildToastExportFiles(items: NormalizedMenuItem[]): ToastExportF
   const liquorItems = included.filter((item) => isLiquorItem(item))
   const exportReviewRows = buildReviewRows(included)
   const auditRows = buildReviewRows(items)
-  const beerRows = buildBeerExportRows(beerItems)
-  const liquorRows = buildLiquorExportRows(liquorItems)
+  const beerRows = buildBeerExportRows(beerItems, happyHourEnabled)
+  const liquorRows = buildLiquorExportRows(liquorItems, happyHourEnabled)
 
   return [
     {
@@ -178,8 +182,11 @@ function buildReviewRows(items: NormalizedMenuItem[]) {
     ])
 }
 
-function buildBeerExportRows(items: NormalizedMenuItem[]) {
-  const rows = mergeBeerRows(buildBeerTabPreviewRows(items))
+function buildBeerExportRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+) {
+  const rows = mergeBeerRows(buildBeerTabPreviewRows(items, happyHourEnabled))
     .filter((row) => {
       const raw = clean(row.beerName).toLowerCase()
       const key = keyName(row.beerName)
@@ -250,7 +257,10 @@ function copyPriceFields(target: BeerTabPreviewRow, source: BeerTabPreviewRow) {
   if (source.bottleHappyHour !== null) target.bottleHappyHour = source.bottleHappyHour
 }
 
-function buildLiquorExportRows(items: NormalizedMenuItem[]) {
+function buildLiquorExportRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+) {
   const rows = new Map<string, { itemName: string, basePrice: string, happyHourPrice: string, liquorType: string }>()
 
   items.forEach((item) => {
@@ -262,9 +272,10 @@ function buildLiquorExportRows(items: NormalizedMenuItem[]) {
     const row = {
       itemName,
       basePrice: moneyBlank(item.basePriceCents),
-      happyHourPrice: WELL_LIQUOR_NAMES.has(itemName.toLowerCase())
-        ? moneyBlank(item.happyHourPriceCents ?? getOneDollarOff(item.basePriceCents))
-        : '',
+      happyHourPrice:
+        happyHourEnabled && WELL_LIQUOR_NAMES.has(itemName.toLowerCase())
+          ? moneyBlank(item.happyHourPriceCents ?? getOneDollarOff(item.basePriceCents))
+          : '',
       liquorType,
     }
     const key = `${liquorType}\u0000${itemName.toLowerCase()}`
