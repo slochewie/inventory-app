@@ -1,6 +1,9 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { buildToastExportFiles } from './toast-export'
-import { buildPopulatedToastTemplateWorkbook } from './toast-template-workbook'
+import {
+  buildPopulatedToastTemplateWorkbook,
+  validatePopulatedBeerWorkbook,
+} from './toast-template-workbook'
 import type { NormalizedMenuItem } from './types'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -69,6 +72,53 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   populateLiquorSheet(workbookPackage, items, happyHourEnabled)
 
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
+}
+
+export function validatePopulatedToastTemplateWorkbookWithLiquor({
+  workbookArrayBuffer,
+  items,
+  happyHourEnabled = true,
+}: {
+  workbookArrayBuffer: ArrayBuffer
+  items: NormalizedMenuItem[]
+  happyHourEnabled?: boolean
+}) {
+  const beer = validatePopulatedBeerWorkbook({
+    workbookArrayBuffer,
+    items,
+    happyHourEnabled,
+  })
+  const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
+  const mapping = getLiquorTemplateMapping(workbookPackage)
+  const sheetDoc = parseXml(getTextFile(workbookPackage.files, mapping.sheetPath))
+  const rowsByKind = groupLiquorRowsByKind(getLiquorRows(items, happyHourEnabled))
+  const issues = [...beer.issues]
+  let liquorRows = 0
+
+  mapping.slots.forEach((slot) => {
+    const rows = rowsByKind.get(slot.kind) ?? []
+    liquorRows += rows.length
+
+    rows.forEach((row, index) => {
+      const rowNumber = mapping.dataStartRow + index
+      validateLiquorCell(issues, sheetDoc, workbookPackage.sharedStrings, slot.nameCol, rowNumber, row.itemName, row.itemName + ' Liquor name')
+      validateLiquorCell(issues, sheetDoc, workbookPackage.sharedStrings, slot.priceCol, rowNumber, row.basePrice, row.itemName + ' Liquor price')
+      if (slot.happyHourCol) {
+        validateLiquorCell(issues, sheetDoc, workbookPackage.sharedStrings, slot.happyHourCol, rowNumber, row.happyHourPrice, row.itemName + ' Liquor Happy Hour')
+      }
+    })
+  })
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    beer: {
+      draftRows: beer.draftRows,
+      canRows: beer.canRows,
+      bottleSlotRows: beer.bottleSlotRows,
+    },
+    liquorRows,
+  }
 }
 
 function populateLiquorSheet(
