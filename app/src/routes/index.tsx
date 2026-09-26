@@ -262,11 +262,6 @@ function CatalogPage() {
               its prices, and what exports to Toast.
             </p>
           </div>
-          {canImportExport ? (
-            <a className="inventory-primary-link" href="/import-review">
-              Import menu
-            </a>
-          ) : null}
         </header>
 
         <section className="inventory-catalog-toolbar" aria-label="Catalog filters">
