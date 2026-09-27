@@ -10,6 +10,8 @@ const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
 const RELATIONSHIP_NS =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 
+export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '2'
+
 const TRUSTED_SOURCE_TABS = new Set([
   'beer',
   'liquor',
@@ -129,6 +131,7 @@ export function parseToastWorkbookForReview(
     meta: {
       source: 'toast-workbook-staging',
       stagingOnly: 'true',
+      parserVersion: TOAST_WORKBOOK_STAGING_PARSER_VERSION,
       sourceTabs: visibleTrustedSheets.map((sheet) => sheet.name).join(', '),
     },
   }

@@ -15,7 +15,10 @@ import {
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
 import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
-import { parseToastWorkbookForReview } from '#/features/menu-import/toast-workbook-import'
+import {
+  parseToastWorkbookForReview,
+  TOAST_WORKBOOK_STAGING_PARSER_VERSION,
+} from '#/features/menu-import/toast-workbook-import'
 import {
   buildPopulatedToastTemplateWorkbookWithLiquorAsync,
   validatePopulatedToastTemplateWorkbookWithLiquor,
@@ -64,7 +67,18 @@ function ToastWorkbookRoute() {
 }
 
 function ToastWorkbook() {
-  const savedReviewSession = useMemo(() => loadReviewSession(), [])
+  const savedReviewSession = useMemo(() => {
+    const saved = loadReviewSession()
+    if (
+      saved?.importFile?.meta?.source === 'toast-workbook-staging' &&
+      saved.importFile.meta.parserVersion !==
+        TOAST_WORKBOOK_STAGING_PARSER_VERSION
+    ) {
+      return null
+    }
+
+    return saved
+  }, [])
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(savedReviewSession?.importFile ?? null)
   const [items, setItems] = useState<NormalizedMenuItem[]>(savedReviewSession?.items ?? [])
