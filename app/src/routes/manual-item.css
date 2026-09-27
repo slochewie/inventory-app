@@ -15,7 +15,8 @@
   gap: 0.9rem;
 }
 
-.inventory-manual-combobox {
+.inventory-manual-combobox,
+.inventory-manual-money-field {
   position: relative;
   z-index: 1;
   isolation: isolate;
@@ -93,6 +94,58 @@
 .inventory-manual-combobox-option:hover,
 .inventory-manual-combobox-option.is-active {
   background: #f8fafc;
+}
+
+.inventory-manual-money-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #111827;
+  overflow: hidden;
+}
+
+.inventory-manual-money-control:focus-within {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgb(17 24 39 / 12%);
+}
+
+.inventory-manual-money-control > span {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  border-right: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color: #6b7280;
+  padding: 0 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.inventory-manual-money-control > input {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #111827;
+  padding: 0.5rem 0.6rem;
+  outline: none;
+}
+
+.inventory-manual-money-control > input:focus {
+  box-shadow: none;
+}
+
+.inventory-manual-money-control > input:disabled {
+  cursor: not-allowed;
+}
+
+.inventory-manual-money-control:has(input:disabled) {
+  opacity: 0.65;
 }
 
 .inventory-manual-item-footer {
