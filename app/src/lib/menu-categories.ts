@@ -12,7 +12,29 @@ export const MENU_CATEGORIES_CHANGED_EVENT = 'inventory-menu-categories-changed'
 const STORAGE_PREFIX = 'inventory-menu-categories'
 const STORAGE_VERSION = 1
 
-const MENU_CATEGORY_SUGGESTIONS = ['NA Bev', 'Retail', 'Cocktails']
+type MenuCategoryDefault = {
+  name: string
+  toastCategory: string
+  toastDestination: string
+}
+
+const MENU_CATEGORY_DEFAULTS: readonly MenuCategoryDefault[] = [
+  {
+    name: 'NA Bev',
+    toastCategory: 'NA Bev',
+    toastDestination: 'Toast NA Bev tab',
+  },
+  {
+    name: 'Retail',
+    toastCategory: 'Retail',
+    toastDestination: 'Toast Retail tab',
+  },
+  {
+    name: 'Cocktails',
+    toastCategory: 'Cocktails',
+    toastDestination: 'Toast Cocktails tab',
+  },
+]
 
 type StoredMenuCategories = {
   version?: number
@@ -20,7 +42,7 @@ type StoredMenuCategories = {
 }
 
 export function getMenuCategorySuggestions() {
-  return [...MENU_CATEGORY_SUGGESTIONS]
+  return MENU_CATEGORY_DEFAULTS.map((category) => category.name)
 }
 
 export function normalizeMenuCategoryName(value: string) {
@@ -35,18 +57,19 @@ export function listSavedMenuCategories(organizationId: string) {
   if (!canUseStorage() || !organizationId) return []
 
   const stored = window.localStorage.getItem(getStorageKey(organizationId))
-  if (!stored) return []
+  if (!stored) return withDefaultMenuCategories([])
 
   try {
     const parsed = JSON.parse(stored) as StoredMenuCategories
-    if (!Array.isArray(parsed.categories)) return []
+    const storedCategories = Array.isArray(parsed.categories)
+      ? parsed.categories
+          .map(normalizeStoredCategory)
+          .filter((category): category is InventoryMenuCategory => category !== null)
+      : []
 
-    return parsed.categories
-      .map(normalizeStoredCategory)
-      .filter((category): category is InventoryMenuCategory => category !== null)
-      .sort((left, right) => left.name.localeCompare(right.name))
+    return withDefaultMenuCategories(storedCategories)
   } catch (error) {
-    return []
+    return withDefaultMenuCategories([])
   }
 }
 
@@ -68,8 +91,11 @@ export function saveMenuCategory(
     throw new Error('Set a menu category name before saving.')
   }
 
-  const toastCategory = normalizeMenuCategoryName(input.toastCategory ?? '') || name
-  const toastDestination = normalizeMenuCategoryName(input.toastDestination ?? '')
+  const defaults = getDefaultMenuCategory(name)
+  const toastCategory =
+    normalizeMenuCategoryName(input.toastCategory ?? '') || defaults?.toastCategory || name
+  const toastDestination =
+    normalizeMenuCategoryName(input.toastDestination ?? '') || defaults?.toastDestination || ''
   const now = new Date().toISOString()
   const categories = listSavedMenuCategories(organizationId)
   const matchKey = normalizeMenuCategoryKey(name)
@@ -167,6 +193,7 @@ function normalizeStoredCategory(
   const name = normalizeMenuCategoryName(category.name ?? '')
   if (!name) return null
 
+  const defaults = getDefaultMenuCategory(name)
   const createdAt =
     typeof category.createdAt === 'string' && category.createdAt
       ? category.createdAt
@@ -178,14 +205,60 @@ function normalizeStoredCategory(
         ? category.id
         : `menu-category-${normalizeMenuCategoryKey(name).replace(/[^a-z0-9]+/g, '-')}`,
     name,
-    toastCategory: normalizeMenuCategoryName(category.toastCategory ?? '') || name,
-    toastDestination: normalizeMenuCategoryName(category.toastDestination ?? ''),
+    toastCategory:
+      normalizeMenuCategoryName(category.toastCategory ?? '') ||
+      defaults?.toastCategory ||
+      name,
+    toastDestination:
+      normalizeMenuCategoryName(category.toastDestination ?? '') ||
+      defaults?.toastDestination ||
+      '',
     createdAt,
     updatedAt:
       typeof category.updatedAt === 'string' && category.updatedAt
         ? category.updatedAt
         : createdAt,
   }
+}
+
+function withDefaultMenuCategories(
+  categories: InventoryMenuCategory[],
+): InventoryMenuCategory[] {
+  const now = new Date().toISOString()
+  const byKey = new Map<string, InventoryMenuCategory>()
+
+  MENU_CATEGORY_DEFAULTS.forEach((category) => {
+    const key = normalizeMenuCategoryKey(category.name)
+    byKey.set(key, {
+      id: `menu-category-${key.replace(/[^a-z0-9]+/g, '-')}`,
+      name: category.name,
+      toastCategory: category.toastCategory,
+      toastDestination: category.toastDestination,
+      createdAt: now,
+      updatedAt: now,
+    })
+  })
+
+  categories.forEach((category) => {
+    const key = normalizeMenuCategoryKey(category.name)
+    if (!key) return
+
+    const defaults = getDefaultMenuCategory(category.name)
+    byKey.set(key, {
+      ...category,
+      toastCategory: category.toastCategory || defaults?.toastCategory || category.name,
+      toastDestination: category.toastDestination || defaults?.toastDestination || '',
+    })
+  })
+
+  return [...byKey.values()].sort((left, right) => left.name.localeCompare(right.name))
+}
+
+function getDefaultMenuCategory(value: string) {
+  const key = normalizeMenuCategoryKey(value)
+  return MENU_CATEGORY_DEFAULTS.find(
+    (category) => normalizeMenuCategoryKey(category.name) === key,
+  ) ?? null
 }
 
 function notifyMenuCategoriesChanged(organizationId: string) {
