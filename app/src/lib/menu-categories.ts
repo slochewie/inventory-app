@@ -272,7 +272,8 @@ export function normalizeToastDestination(value?: string | null) {
 
   if (
     /^(?:toast\s+)?(?:beer|liquor|cocktails?|na\s*bev|retail)\s+tab\b/i.test(normalized) ||
-    /^beer\s+tab\s*·/i.test(normalized)
+    /^beer\s+tab\s*·/i.test(normalized) ||
+    /^(?:beer|liquor|cocktails?|na\s*bev|retail)$/i.test(normalized)
   ) {
     return ''
   }
