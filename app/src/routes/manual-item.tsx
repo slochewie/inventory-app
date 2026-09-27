@@ -18,6 +18,13 @@ import {
   updateInventoryOrganizationVariant,
   type OptionalBeerCategoryConfig,
 } from '#/lib/inventory-access'
+import {
+  MENU_CATEGORIES_CHANGED_EVENT,
+  findSavedMenuCategory,
+  listSavedMenuCategories,
+  mergeCategoryOptions,
+  type InventoryMenuCategory,
+} from '#/lib/menu-categories'
 import './manual-item.css'
 
 export const Route = createFileRoute('/manual-item')({ component: ManualItemPage })
@@ -49,8 +56,9 @@ const EMPTY_DRAFT: ManualItemDraft = {
 function ManualItemPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [draft, setDraft] = useState<ManualItemDraft>(EMPTY_DRAFT)
-  const [categoryOptions, setCategoryOptions] = useState<string[]>([])
+  const [catalogCategoryOptions, setCatalogCategoryOptions] = useState<string[]>([])
   const [destinationOptions, setDestinationOptions] = useState<string[]>([])
+  const [menuCategories, setMenuCategories] = useState<InventoryMenuCategory[]>([])
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryConfig[]>([])
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -59,7 +67,43 @@ function ManualItemPage() {
 
   useEffect(() => {
     if (!activeOrganization?.id) {
-      setCategoryOptions([])
+      setCatalogCategoryOptions([])
+      setDestinationOptions([])
+      setMenuCategories([])
+      setOptionalBeerCategories([])
+      return
+    }
+
+    function loadSavedMenuCategories() {
+      if (!activeOrganization?.id) return
+      setMenuCategories(listSavedMenuCategories(activeOrganization.id))
+    }
+
+    loadSavedMenuCategories()
+
+    function reloadForCategoryEvent(event: Event) {
+      if (!(event instanceof CustomEvent)) return
+      if (event.detail?.organizationId !== activeOrganization?.id) return
+      loadSavedMenuCategories()
+    }
+
+    function reloadForStorageEvent(event: StorageEvent) {
+      if (!event.key?.includes(activeOrganization?.id ?? '')) return
+      loadSavedMenuCategories()
+    }
+
+    window.addEventListener(MENU_CATEGORIES_CHANGED_EVENT, reloadForCategoryEvent)
+    window.addEventListener('storage', reloadForStorageEvent)
+
+    return () => {
+      window.removeEventListener(MENU_CATEGORIES_CHANGED_EVENT, reloadForCategoryEvent)
+      window.removeEventListener('storage', reloadForStorageEvent)
+    }
+  }, [activeOrganization?.id])
+
+  useEffect(() => {
+    if (!activeOrganization?.id) {
+      setCatalogCategoryOptions([])
       setDestinationOptions([])
       setOptionalBeerCategories([])
       return
@@ -87,7 +131,7 @@ function ManualItemPage() {
           if (destination?.trim()) destinations.add(destination.trim())
         })
 
-        setCategoryOptions([...categories].sort((left, right) => left.localeCompare(right)))
+        setCatalogCategoryOptions([...categories].sort((left, right) => left.localeCompare(right)))
         setDestinationOptions([...destinations].sort((left, right) => left.localeCompare(right)))
         setOptionalBeerCategories(getOptionalBeerCategories(organizationConfig))
       })
@@ -105,6 +149,22 @@ function ManualItemPage() {
 
     return () => controller.abort()
   }, [activeOrganization?.id])
+
+  const categoryOptions = useMemo(() => {
+    const savedCategoryOptions = menuCategories.flatMap((category) => [
+      category.name,
+      category.toastCategory,
+    ])
+
+    return mergeCategoryOptions(catalogCategoryOptions, savedCategoryOptions)
+  }, [catalogCategoryOptions, menuCategories])
+
+  const allDestinationOptions = useMemo(() => {
+    return mergeCategoryOptions(
+      destinationOptions,
+      menuCategories.map((category) => category.toastDestination),
+    )
+  }, [destinationOptions, menuCategories])
 
   const enabledOptionalBeerCategories = useMemo(
     () => optionalBeerCategories.filter((category) => category.enabled),
@@ -125,13 +185,19 @@ function ManualItemPage() {
   }
 
   function updateCategory(category: string) {
+    const menuCategory = findSavedMenuCategory(menuCategories, category)
+
     setDraft((current) => ({
       ...current,
       category,
       toastCategory:
         !current.toastCategory.trim() || current.toastCategory === current.category
-          ? category
+          ? menuCategory?.toastCategory || category
           : current.toastCategory,
+      toastDestination:
+        !current.toastDestination.trim() && menuCategory?.toastDestination
+          ? menuCategory.toastDestination
+          : current.toastDestination,
     }))
     setSuccess(null)
   }
@@ -249,9 +315,14 @@ function ManualItemPage() {
               Add a catalog item for {activeOrganization?.name ?? 'the selected organization'} without uploading a POS export.
             </p>
           </div>
-          <a className="inventory-secondary-link" href="/">
-            Back to Catalog
-          </a>
+          <div className="inventory-page-heading-actions">
+            <a className="inventory-secondary-link" href="/menu-categories">
+              Menu Categories
+            </a>
+            <a className="inventory-secondary-link" href="/">
+              Back to Catalog
+            </a>
+          </div>
         </header>
 
         <section className="inventory-card">
@@ -302,7 +373,7 @@ function ManualItemPage() {
               <ManualCombobox
                 label="Toast destination"
                 value={draft.toastDestination}
-                options={destinationOptions}
+                options={allDestinationOptions}
                 disabled={saving}
                 placeholder="Bar"
                 onChange={(value) => updateDraft({ toastDestination: value })}
