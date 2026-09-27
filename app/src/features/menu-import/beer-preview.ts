@@ -1,4 +1,5 @@
 import type { NormalizedMenuItem } from './types'
+import { getToastWorkbookCategory } from './workbook-routing'
 
 export type DraftBeerPrice = {
   price: number | null
@@ -25,9 +26,12 @@ export function buildBeerTabPreviewRows(
   const rows = new Map<string, BeerTabPreviewRow>()
 
   items
-    .filter((item) => item.exportIncluded && item.toastCategory === 'Beer')
+    .filter(
+      (item) =>
+        item.exportIncluded && getToastWorkbookCategory(item) === 'Beer',
+    )
     .forEach((item) => {
-      const beerName = getBeerName(item.name, item.toastDestination)
+      const beerName = getBeerName(item.name)
       const row = rows.get(beerName) ?? createBeerTabPreviewRow(beerName)
 
       applyBeerSlot(row, item, happyHourEnabled)
@@ -57,10 +61,9 @@ function applyBeerSlot(
   item: NormalizedMenuItem,
   happyHourEnabled: boolean,
 ) {
-  const destination = item.toastDestination.toLowerCase()
-  const variantKind = item.variantKind?.toLowerCase()
+  const variantKind = getBeerVariantKind(item)
 
-  if (variantKind === 'draft' || destination.includes('draft')) {
+  if (variantKind === 'draft') {
     const sizeOz = getDraftSizeOz(item)
 
     if (sizeOz !== null) {
@@ -83,32 +86,27 @@ function applyBeerSlot(
     return
   }
 
-  const destinationCanSizeOz = getCanSizeOz(item.toastDestination)
+  const canSizeOz = getCanSizeOz(item)
 
-  if (
-    (variantKind === 'can' &&
-      typeof item.variantSizeOz === 'number' &&
-      item.variantSizeOz >= 24) ||
-    (destinationCanSizeOz !== null && destinationCanSizeOz >= 24)
-  ) {
+  if (variantKind === 'can' && canSizeOz !== null && canSizeOz >= 24) {
     row.can24ozPrice = item.basePriceCents
     row.can24ozHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
     return
   }
 
-  if (variantKind === 'bottle' || destination.includes('bottle')) {
+  if (variantKind === 'bottle') {
     row.bottlePrice = item.basePriceCents
     row.bottleHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
     return
   }
 
-  if (variantKind === 'can' || destination.includes('can')) {
+  if (variantKind === 'can') {
     row.canPrice = item.basePriceCents
     row.canHappyHour = happyHourEnabled ? item.happyHourPriceCents : null
     return
   }
 
-  row.reviewNotes.push(`${item.name}: ${item.toastDestination}`)
+  row.reviewNotes.push(`${item.name}: beer format is unknown`)
 }
 
 export function getDraftBeerPrice(
@@ -118,12 +116,20 @@ export function getDraftBeerPrice(
   return row.draftBySizeOz[draftSizeKey(actualSizeOz)] ?? null
 }
 
-function getCanSizeOz(value: string) {
-  const match = value.match(/\b(\d+(?:\.\d+)?)\s*oz\s*can\b/i)
-  if (!match) return null
+function getCanSizeOz(item: NormalizedMenuItem) {
+  if (
+    typeof item.variantSizeOz === 'number' &&
+    Number.isFinite(item.variantSizeOz) &&
+    item.variantSizeOz > 0
+  ) {
+    return item.variantSizeOz
+  }
 
-  const parsed = Number(match[1])
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+  return (
+    extractSizeOz(item.category ?? '') ??
+    extractSizeOz(item.variantLabel ?? '') ??
+    extractSizeOz(item.name)
+  )
 }
 
 function getDraftSizeOz(item: NormalizedMenuItem) {
@@ -135,10 +141,15 @@ function getDraftSizeOz(item: NormalizedMenuItem) {
     return item.variantSizeOz
   }
 
-  const destinationSize = extractSizeOz(item.toastDestination)
-  if (destinationSize !== null) return destinationSize
+  const category = (item.category ?? '').trim()
+  if (/draft\s+reg\s+pint/i.test(category)) return 16
+  if (/draft\s+imp\s+pint/i.test(category)) return 20
 
-  return extractSizeOz(item.name)
+  return (
+    extractSizeOz(category) ??
+    extractSizeOz(item.variantLabel ?? '') ??
+    extractSizeOz(item.name)
+  )
 }
 
 function extractSizeOz(value: string) {
@@ -153,20 +164,46 @@ function draftSizeKey(sizeOz: number) {
   return String(Number(sizeOz))
 }
 
-function getBeerName(name: string, toastDestination: string) {
-  const destination = toastDestination.toLowerCase()
-  let normalized = name
+function getBeerName(name: string) {
+  const normalized = name
     .replace(/\b\d+(?:\.\d+)?\s*oz\b/gi, '')
     .replace(/\b(draft|pint|imperial|imp|reg|regular|can|bottle|btl|tall)\b/gi, '')
     .replace(/[\s_-]+/g, ' ')
     .trim()
 
-  if (!normalized && destination.includes('draft')) {
-    normalized = name.replace(/\b\d+(?:\.\d+)?\s*oz\b/gi, '').trim()
-  }
-  if (!normalized) normalized = name.trim()
+  return normalized || name.trim() || 'Unknown beer'
+}
 
-  return normalized || 'Unknown beer'
+function getBeerVariantKind(
+  item: NormalizedMenuItem,
+): 'draft' | 'can' | 'bottle' | null {
+  const variantKind = item.variantKind?.trim().toLowerCase()
+  if (
+    variantKind === 'draft' ||
+    variantKind === 'can' ||
+    variantKind === 'bottle'
+  ) {
+    return variantKind
+  }
+
+  const category = (item.category ?? '').toLowerCase()
+  const itemName = item.name.toLowerCase()
+
+  if (category.includes('draft')) return 'draft'
+  if (
+    category.includes('bottle') ||
+    /\b(?:bottle|btl)\b/.test(itemName)
+  ) {
+    return 'bottle'
+  }
+  if (
+    category.includes('can') ||
+    /\b(?:can|tall|24\s*oz|24oz)\b/.test(itemName)
+  ) {
+    return 'can'
+  }
+
+  return null
 }
 
 

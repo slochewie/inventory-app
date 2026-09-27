@@ -10,7 +10,7 @@ const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
 const RELATIONSHIP_NS =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 
-export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '4'
+export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '5'
 
 const TRUSTED_SOURCE_TABS = new Set([
   'beer',
@@ -44,6 +44,7 @@ type ItemInput = {
   category: string
   toastCategory: string
   toastDestination: string
+  variantLabel?: string
   toastSlot?: string | null
   price: string
   happyHourPrice?: string
@@ -326,7 +327,8 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
           name: itemName,
           category: 'Beer',
           toastCategory: 'Beer',
-          toastDestination: slot.destination,
+          toastDestination: '',
+          variantLabel: slot.destination,
           toastSlot: slot.toastSlot,
           price,
           happyHourPrice,
@@ -436,7 +438,7 @@ function parseLiquorSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
             `[Review ${sheet.name} ${category} row ${rowNumber}]`,
           category,
           toastCategory: normalizeLiquorCategory(category),
-          toastDestination: category,
+          toastDestination: '',
           price,
           happyHourPrice,
           variantKind: 'standard',
@@ -700,7 +702,7 @@ function createItem(input: ItemInput): NormalizedMenuItem {
 
   return {
     id: input.id,
-    variantLabel: input.toastDestination || 'Standard',
+    variantLabel: input.variantLabel || 'Standard',
     variantKind: input.variantKind ?? 'standard',
     variantSizeOz: input.variantSizeOz ?? null,
     variantPackageType: input.variantPackageType ?? null,
