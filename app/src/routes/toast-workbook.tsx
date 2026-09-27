@@ -13,7 +13,11 @@ import {
   type InventoryOrganizationConfig,
 } from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
-import { loadReviewSession, saveReviewSession } from '#/features/menu-import/review-session'
+import {
+  clearReviewSession,
+  loadReviewSession,
+  saveReviewSession,
+} from '#/features/menu-import/review-session'
 import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
 import {
   parseToastWorkbookForReview,
@@ -237,11 +241,7 @@ function ToastWorkbook() {
       .then(([catalog, config]) => {
         setOrganizationConfig(config)
 
-        if (
-          savedReviewSession?.items.length &&
-          savedReviewSession.importFile?.meta?.source ===
-            'toast-workbook-staging'
-        ) {
+        if (reviewSource === 'toast-workbook') {
           return
         }
 
@@ -280,7 +280,7 @@ function ToastWorkbook() {
   }, [
     activeOrganization?.id,
     activeOrganization?.name,
-    savedReviewSession,
+    reviewSource,
   ])
 
   useEffect(() => {
@@ -323,6 +323,64 @@ function ToastWorkbook() {
       cancelled = true
     }
   }, [])
+
+  async function handleClearStagedImport() {
+    clearReviewSession()
+    setSelectedStagedItemId(null)
+    setStagedReviewQuery('')
+    setStagedReviewStatus('review')
+    setStagedReviewCategory('all')
+    setStagedReviewPage(1)
+    setWorkbookValidation(null)
+    setDownloadError(null)
+    setAlohaError(null)
+
+    if (!activeOrganization?.id) {
+      setImportFile(null)
+      setItems([])
+      setReviewSource(null)
+      setReviewSavedAt(null)
+      return
+    }
+
+    setCatalogLoading(true)
+
+    try {
+      const [catalog, config] = await Promise.all([
+        listInventoryCatalog(activeOrganization.id),
+        getInventoryOrganizationConfig(activeOrganization.id),
+      ])
+      const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
+
+      setOrganizationConfig(config)
+      setImportFile({
+        sourceKind: 'toast-template-sheet',
+        sourceName: 'Persistent Inventory catalog',
+        rows: [],
+        warnings: [],
+        meta: {
+          store: activeOrganization.name,
+          organizationId: activeOrganization.id,
+          source: 'inventory-catalog',
+        },
+      })
+      setItems(persistentItems)
+      setReviewSource('catalog')
+      setReviewSavedAt(null)
+    } catch (error) {
+      setImportFile(null)
+      setItems([])
+      setReviewSource(null)
+      setReviewSavedAt(null)
+      setAlohaError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to reload the persistent Inventory catalog',
+      )
+    } finally {
+      setCatalogLoading(false)
+    }
+  }
 
   async function handleAlohaCsvChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -613,10 +671,19 @@ function ToastWorkbook() {
                 Using saved reviewed state{reviewSavedAt ? ` from ${new Date(reviewSavedAt).toLocaleString()}` : ''}.
               </p>
             ) : reviewSource === 'toast-workbook' ? (
-              <p>
-                <strong>Staged Toast workbook — not saved to Inventory.</strong>{' '}
-                Review and normalize this source before any future master import.
-              </p>
+              <div>
+                <p>
+                  <strong>Staged Toast workbook — not saved to Inventory.</strong>{' '}
+                  Review and normalize this source before any future master import.
+                </p>
+                <button
+                  type="button"
+                  className="inventory-secondary-button"
+                  onClick={() => void handleClearStagedImport()}
+                >
+                  Clear staged import
+                </button>
+              </div>
             ) : reviewSource === 'review-csv' ? (
               <p>Using an advanced review CSV override for this export session.</p>
             ) : reviewSource === 'uploaded' ? (
