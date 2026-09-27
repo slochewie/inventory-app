@@ -227,6 +227,7 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       )
 
       if (!hasMeaningfulInput(name, price, happyHourPrice)) return
+      if (isToastTemplateInstruction(name)) return
 
       const raw = {
         sheet: sheet.name,
@@ -242,7 +243,7 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       const notes: string[] = []
       if (numericName && isPositiveMoney(price)) {
         notes.push(
-          `${sheet.name} row ${rowNumber}: price exists but the item-name cell is numeric or missing.`,
+          `${sheet.name} row ${rowNumber}: numeric-only item name "${clean(name)}" was preserved for review.`,
         )
       }
       if (clean(name) && !isPositiveMoney(price)) {
@@ -252,9 +253,7 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       }
 
       const itemName =
-        !numericName && clean(name)
-          ? clean(name)
-          : `[Review ${sheet.name} row ${rowNumber}]`
+        clean(name) || `[Review ${sheet.name} row ${rowNumber}]`
 
       items.push(
         createItem({
@@ -335,6 +334,7 @@ function parseLiquorSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       )
 
       if (!hasMeaningfulInput(name, price, happyHourPrice)) continue
+      if (isToastTemplateInstruction(name)) continue
 
       rows.push({
         sheet: sheet.name,
@@ -349,7 +349,7 @@ function parseLiquorSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       const notes: string[] = []
       if (numericName && isPositiveMoney(price)) {
         notes.push(
-          `${sheet.name} row ${rowNumber}: ${category} has a price but no usable item name.`,
+          `${sheet.name} row ${rowNumber}: numeric-only item name "${clean(name)}" in ${category} was preserved for review.`,
         )
       }
       if (clean(name) && !isPositiveMoney(price)) {
@@ -367,9 +367,8 @@ function parseLiquorSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
         createItem({
           id: `toast-workbook:liquor:${rowNumber}:${nameCol}`,
           name:
-            !numericName && clean(name)
-              ? clean(name)
-              : `[Review ${sheet.name} ${category} row ${rowNumber}]`,
+            clean(name) ||
+            `[Review ${sheet.name} ${category} row ${rowNumber}]`,
           category,
           toastCategory: normalizeLiquorCategory(category),
           toastDestination: category,
@@ -430,6 +429,7 @@ function parseCocktailsSheet(
     )
 
     if (!hasMeaningfulInput(name, price, happyHourPrice)) continue
+    if (isToastTemplateInstruction(name)) continue
     if (isNumericOnly(name) && !isPositiveMoney(price)) continue
 
     rows.push({
@@ -467,9 +467,7 @@ function parseCocktailsSheet(
       createItem({
         id: `toast-workbook:cocktail:${rowNumber}`,
         name:
-          !isNumericOnly(name) && clean(name)
-            ? clean(name)
-            : `[Review ${sheet.name} row ${rowNumber}]`,
+          clean(name) || `[Review ${sheet.name} row ${rowNumber}]`,
         category: clean(menuGroup) || 'Cocktails',
         toastCategory: clean(menuGroup) || 'Cocktails',
         toastDestination: 'Cocktails',
@@ -523,6 +521,7 @@ function parseRetailSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
     )
 
     if (!hasMeaningfulInput(name, price)) continue
+    if (isToastTemplateInstruction(name)) continue
     if (isNumericOnly(name) && !clean(price)) continue
 
     rows.push({
@@ -551,9 +550,7 @@ function parseRetailSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       createItem({
         id: `toast-workbook:retail:${rowNumber}`,
         name:
-          !isNumericOnly(name) && clean(name)
-            ? clean(name)
-            : `[Review ${sheet.name} row ${rowNumber}]`,
+          clean(name) || `[Review ${sheet.name} row ${rowNumber}]`,
         category: clean(group) || 'Retail',
         toastCategory: clean(group) || 'Retail',
         toastDestination: 'Retail',
@@ -594,7 +591,13 @@ function inspectMenuBuild(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       workbook.sharedStrings,
     )
 
-    if (!clean(name) || isNumericOnly(name) && !isPositiveMoney(price)) continue
+    if (
+      !clean(name) ||
+      isToastTemplateInstruction(name) ||
+      (isNumericOnly(name) && !isPositiveMoney(price))
+    ) {
+      continue
+    }
 
     if (!clean(menuGroup)) {
       warnings.push(
@@ -825,6 +828,16 @@ function moneyToCents(value: string) {
 
 function isPositiveMoney(value: string) {
   return moneyToCents(value) !== null
+}
+
+function isToastTemplateInstruction(value: string) {
+  const normalized = clean(value).toLowerCase()
+
+  return (
+    normalized.startsWith('need more space?') ||
+    normalized.includes('menu onboarding consultant via the "notes" tab') ||
+    normalized.includes("menu onboarding consultant via the 'notes' tab")
+  )
 }
 
 function isNumericOnly(value: string) {
