@@ -57,7 +57,7 @@ The app will:
 2. remove/ignore structural report noise,
 3. normalize menu items and variants,
 4. detect base and Happy Hour pricing,
-5. classify Toast category/destination data,
+5. classify Menu Category data for internal Toast workbook routing,
 6. flag rows that need review, and
 7. stage the resulting rows for approval.
 
@@ -70,13 +70,13 @@ The review table supports these main filters:
 - **Excluded**
 - **All**
 
-Search can match item name, Aloha item number, source category, Toast category, and notes.
+Search can match item name, Aloha item number, Menu Category, Toast destination, and notes.
 
 For an individual staged row you can review/edit:
 
 - item name,
-- Toast category,
-- Toast destination,
+- Menu Category,
+- Toast destination (only when the item has a real Toast destination such as Bar, Dining Room, or Patio),
 - base price,
 - Happy Hour price,
 - whether the row is included in the import.
@@ -133,6 +133,8 @@ The importer currently reads common menu tabs including:
 - NA Bev
 - Retail
 
+Imported rows retain a user-facing Menu Category that the exporter uses internally to select the workbook worksheet. Worksheet names are not stored as Toast destinations.
+
 Retail rows can also be recovered from NA Bev when the row Group is Retail.
 
 After parsing, choose **Save to Inventory** to persist the detected items/variants for the selected organization.
@@ -154,7 +156,7 @@ It loads the selected organization's persistent catalog from the Inventory API a
 You can:
 
 - search items,
-- filter by canonical Toast category,
+- filter by Menu Category,
 - filter by availability:
   - **Carried here**
   - **Not carried here**
@@ -463,7 +465,7 @@ Check both organization controls:
 1. **Available here** must be enabled.
 2. **Export to Toast** must be enabled.
 
-Also verify the variant is active and has a valid Toast category/destination for its export path.
+Also verify the variant is active, has the correct Menu Category for workbook routing, and has a valid price. Toast Destination does not select a workbook worksheet.
 
 ### An Optional Beer Category item does not appear where expected
 
