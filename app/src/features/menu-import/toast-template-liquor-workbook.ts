@@ -341,6 +341,8 @@ function getSimpleSheetMapping(
   let headerRow: number | null = null
   let headerValues: { col: number, value: string }[] = []
 
+  const isCocktails = sheetName.toLowerCase() === 'cocktails'
+
   for (let rowNumber = 1; rowNumber <= 30; rowNumber += 1) {
     const values = getRowValues(
       sheetDoc,
@@ -348,10 +350,14 @@ function getSimpleSheetMapping(
       workbookPackage.sharedStrings,
     )
     const normalized = values.map((cell) => normalizeHeader(cell.value))
-    if (
-      normalized.includes('item name') &&
-      normalized.some((value) => value.startsWith('price'))
-    ) {
+    const hasNameHeader = isCocktails
+      ? normalized.some((value) => value.includes('cocktail'))
+      : normalized.includes('item name')
+    const hasPriceHeader = normalized.some((value) =>
+      value.startsWith('price'),
+    )
+
+    if (hasNameHeader && hasPriceHeader) {
       headerRow = rowNumber
       headerValues = values
       break
@@ -360,13 +366,19 @@ function getSimpleSheetMapping(
 
   if (headerRow === null) {
     throw new Error(
-      `${sheetName} tab is missing the expected Item Name / Price header`,
+      isCocktails
+        ? 'Cocktails tab is missing the expected Cocktail / Price header'
+        : `${sheetName} tab is missing the expected Item Name / Price header`,
     )
   }
 
   const nameCol =
-    headerValues.find((cell) => normalizeHeader(cell.value) === 'item name')
-      ?.col ?? 1
+    headerValues.find((cell) => {
+      const header = normalizeHeader(cell.value)
+      return isCocktails
+        ? header.includes('cocktail')
+        : header === 'item name'
+    })?.col ?? 1
   const priceCol =
     headerValues.find((cell) => normalizeHeader(cell.value).startsWith('price'))
       ?.col ?? 2
