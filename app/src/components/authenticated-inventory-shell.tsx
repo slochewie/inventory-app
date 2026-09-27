@@ -314,7 +314,7 @@ export function AuthenticatedInventoryShell({
       <SidebarProvider defaultOpen={sidebarDefaultOpen}>
         <InventorySidebar
           currentPath={currentPath}
-          canImportExport={canImportExport && inventoryRole !== "viewer"}
+          canImportExport={canImportExport || inventoryRole === "viewer"}
           canEdit={canEdit}
           canManageAssignments={canManageAssignments}
         />
