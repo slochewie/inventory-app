@@ -725,7 +725,10 @@ function ToastWorkbook() {
           <>
             <section className="inventory-summary-grid inventory-toast-summary-grid" aria-label="Toast export summary">
               <SummaryCard label="Source rows" value={summary.rawRows} />
-              <SummaryCard label="Normalized items" value={summary.normalizedItems} />
+              <SummaryCard
+                label={reviewSource === 'catalog' ? 'Catalog variants' : 'Normalized items'}
+                value={summary.normalizedItems}
+              />
               <SummaryCard label="Exporting" value={summary.exportItems} />
               <SummaryCard label="Beer export items" value={beerExportItemCount} />
               <SummaryCard label="Liquor export items" value={liquorExportItemCount} />
