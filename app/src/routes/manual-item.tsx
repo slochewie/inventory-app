@@ -3,9 +3,10 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
@@ -421,8 +422,34 @@ function ManualCombobox({
 }: ManualComboboxProps) {
   const inputId = useId()
   const listboxId = `${inputId}-options`
+  const comboboxRef = useRef<HTMLLabelElement>(null)
   const [open, setOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(0)
+
+  useEffect(() => {
+    if (!open) return
+
+    function closeOnOutsidePointerDown(event: PointerEvent) {
+      const target = event.target
+      if (!(target instanceof Node)) return
+
+      if (!comboboxRef.current?.contains(target)) {
+        setOpen(false)
+      }
+    }
+
+    function closeOnEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown)
+    document.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [open])
 
   const filteredOptions = useMemo(() => {
     const normalizedValue = value.trim().toLowerCase()
@@ -442,7 +469,7 @@ function ManualCombobox({
     setHighlightedIndex(0)
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (disabled) return
 
     if (event.key === 'ArrowDown') {
@@ -473,7 +500,7 @@ function ManualCombobox({
   }
 
   return (
-    <label className="inventory-search-control inventory-manual-combobox">
+    <label ref={comboboxRef} className="inventory-search-control inventory-manual-combobox">
       <span>{label}</span>
       <input
         id={inputId}
