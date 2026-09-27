@@ -1,0 +1,51 @@
+.inventory-manual-item-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.inventory-manual-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+}
+
+.inventory-manual-item-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.inventory-manual-item-toggles .inventory-inline-toggle {
+  width: auto;
+}
+
+.inventory-manual-item-actions {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.inventory-manual-item-actions > button {
+  min-width: 7rem;
+}
+
+@media (max-width: 700px) {
+  .inventory-manual-item-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inventory-manual-item-actions {
+    width: 100%;
+  }
+
+  .inventory-manual-item-actions > button {
+    flex: 1;
+  }
+}
