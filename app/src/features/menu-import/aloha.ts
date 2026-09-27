@@ -115,6 +115,7 @@ function normalizeAlohaGroup(rows: RawMenuRow[]): NormalizedMenuItem {
   const toastDestination = getToastDestination({
     sourceCategory,
     itemName: name,
+    toastCategory,
   })
 
   if (status !== 'ignored' && toastDestination.note) {

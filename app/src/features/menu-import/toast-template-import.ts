@@ -137,13 +137,14 @@ function parseBeerSheet(workbookPackage: WorkbookPackage, sheet: WorkbookSheet) 
       if (!name || price === null) continue
       if (isLikelyInstructionRow(name)) continue
 
+      const destination = getBeerDestination(slot)
       const row = buildRawRow(sheet.name, rowNumber, slot.label, name, price, happyHour)
       items.push(createItem({
         id: `toast-xlsx:beer:${slot.kind}:${slot.priceCol}:${rowNumber}`,
         name: slot.kind === 'draft' ? `${name} ${slot.label}` : name,
         category: getBeerCategory(slot),
         toastCategory: 'Beer',
-        toastDestination: '',
+        toastDestination: destination,
         basePriceCents: price,
         happyHourPriceCents: happyHour,
         rawRow: row,
@@ -268,7 +269,7 @@ function parseLiquorSheet(workbookPackage: WorkbookPackage, sheet: WorkbookSheet
         name,
         category: liquorType,
         toastCategory: liquorType,
-        toastDestination: '',
+        toastDestination: `Toast Liquor tab: ${liquorType}`,
         basePriceCents: price,
         happyHourPriceCents: happyHour,
         rawRow: row,
@@ -309,9 +310,9 @@ function parseGenericSheet(workbookPackage: WorkbookPackage, sheet: WorkbookShee
     items.push(createItem({
       id: `toast-xlsx:${sheet.name}:${nameCol}:${rowNumber}`,
       name,
-      category: config.toastCategory,
+      category: toastCategory,
       toastCategory,
-      toastDestination: '',
+      toastDestination: `Toast ${sheet.name} tab${group ? `: ${group}` : ''}`,
       basePriceCents: price,
       happyHourPriceCents: happyHour,
       rawRow: row,
@@ -358,6 +359,13 @@ function createItem({
     notes: ['Imported from populated Toast template workbook'],
     rawRows: [rawRow],
   }
+}
+
+function getBeerDestination(slot: BeerSlot) {
+  if (slot.kind === 'draft') return `Toast Beer tab: Draft Beer ${slot.label}`
+  if (slot.kind === 'can24oz') return 'Toast Beer tab: 24oz Can'
+  if (slot.kind === 'bottle') return 'Toast Beer tab: Bottle'
+  return 'Toast Beer tab: Can'
 }
 
 function getBeerCategory(slot: BeerSlot) {

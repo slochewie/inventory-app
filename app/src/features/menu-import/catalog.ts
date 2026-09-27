@@ -1,5 +1,4 @@
 import type { InventoryCatalogRow } from '#/lib/inventory-access'
-import { normalizeToastDestination } from '#/lib/menu-categories'
 import type { NormalizedMenuItem } from './types'
 
 export function catalogRowToNormalizedItem(
@@ -27,9 +26,7 @@ export function catalogRowToNormalizedItem(
     name: row.organization.toastNameOverride ?? row.name,
     category: categoryName,
     toastCategory,
-    toastDestination: normalizeToastDestination(
-      row.organization.toastDestinationOverride,
-    ),
+    toastDestination: row.organization.toastDestinationOverride ?? '',
     toastSlot: row.organization.toastSlot,
     basePriceCents: row.effectivePriceCents,
     happyHourPriceCents: row.organization.happyHourPriceCents,

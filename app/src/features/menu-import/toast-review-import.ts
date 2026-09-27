@@ -1,4 +1,3 @@
-import { normalizeToastDestination } from '#/lib/menu-categories'
 import type { NormalizedMenuItem, ParsedMenuImport, RawMenuRow } from './types'
 
 const REQUIRED_REVIEW_HEADERS = [
@@ -75,9 +74,7 @@ export function parseToastExportReviewCsv(text: string, sourceName: string): {
       getCell(row, headerIndex, sourceCategoryHeader),
     )
     const toastCategory = getCell(row, headerIndex, 'Toast Category') || sourceCategory || 'Uncategorized'
-    const toastDestination = normalizeToastDestination(
-      getCell(row, headerIndex, 'Toast Destination'),
-    )
+    const toastDestination = getCell(row, headerIndex, 'Toast Destination') || toastCategory
     const basePriceCents = parseMoney(getCell(row, headerIndex, 'Base Price ($)'))
     const happyHourPriceCents = parseMoney(getCell(row, headerIndex, 'Happy Hour $'))
     const happyHourWindow = blankToUndefined(getCell(row, headerIndex, 'Happy Hour Window'))
