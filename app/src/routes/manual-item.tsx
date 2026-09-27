@@ -23,8 +23,8 @@ import {
   findSavedMenuCategory,
   getBuiltInMenuCategories,
   listSavedMenuCategories,
+  getMenuCategoryDestination,
   mergeCategoryOptions,
-  normalizeToastDestination,
   type InventoryMenuCategory,
 } from '#/lib/menu-categories'
 import './manual-item.css'
@@ -127,10 +127,8 @@ function ManualItemPage() {
             row.category?.toastCategory
           if (category?.trim()) categories.add(category.trim())
 
-          const destination = normalizeToastDestination(
-            row.organization.toastDestinationOverride,
-          )
-          if (destination) destinations.add(destination)
+          const destination = row.organization.toastDestinationOverride
+          if (destination?.trim()) destinations.add(destination.trim())
         })
 
         setCatalogCategoryOptions([...categories].sort((left, right) => left.localeCompare(right)))
@@ -165,9 +163,7 @@ function ManualItemPage() {
   const allDestinationOptions = useMemo(() => {
     return mergeCategoryOptions(
       destinationOptions,
-      menuCategories
-        .map((category) => normalizeToastDestination(category.toastDestination))
-        .filter(Boolean),
+      menuCategories.map((category) => category.toastDestination),
     )
   }, [destinationOptions, menuCategories])
 
@@ -196,13 +192,15 @@ function ManualItemPage() {
 
   function updateCategory(category: string) {
     const menuCategory = findSavedMenuCategory(menuCategories, category)
+    const defaultDestination =
+      menuCategory?.toastDestination || getMenuCategoryDestination(category)
 
     setDraft((current) => ({
       ...current,
       category,
       toastDestination:
-        !current.toastDestination.trim() && menuCategory?.toastDestination
-          ? normalizeToastDestination(menuCategory.toastDestination)
+        !current.toastDestination.trim() && defaultDestination
+          ? defaultDestination
           : current.toastDestination,
     }))
     setSuccess(null)
@@ -233,7 +231,7 @@ function ManualItemPage() {
 
     const sourceId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const category = normalizedCategory || workbookCategory
-    const toastDestination = normalizeToastDestination(draft.toastDestination)
+    const toastDestination = draft.toastDestination.trim()
     const toastSlot = showToastBeerSlot ? draft.toastSlot || null : null
 
     setSaving(true)

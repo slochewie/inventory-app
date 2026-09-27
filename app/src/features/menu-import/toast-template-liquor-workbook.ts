@@ -7,10 +7,6 @@ import {
   type ToastDraftSlotMapping,
 } from './toast-template-workbook'
 import type { NormalizedMenuItem } from './types'
-import {
-  getToastWorkbookCategory,
-  normalizeToastWorkbookCategory,
-} from './workbook-routing'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const WORKBOOK_PATH = 'xl/workbook.xml'
@@ -303,7 +299,10 @@ function getCocktailRows(
       (item) =>
         item.exportIncluded &&
         item.basePriceCents !== null &&
-        getToastWorkbookCategory(item) === 'Cocktails',
+        (
+          /cocktail/i.test(clean(item.toastDestination)) ||
+          /cocktail/i.test(clean(item.toastCategory))
+        ),
     )
     .map((item) => ({
       itemName: clean(item.name),
@@ -336,7 +335,7 @@ function getSimpleCategoryRows(
       (item) =>
         item.exportIncluded &&
         item.basePriceCents !== null &&
-        getToastWorkbookCategory(item) === workbookCategory,
+        matchesSimpleWorkbookDestination(item, workbookCategory),
     )
     .map((item) => ({
       itemName: clean(item.name),
@@ -368,7 +367,7 @@ function getSimpleMenuGroup(
   const visibleCategory = clean(item.category)
   if (
     visibleCategory &&
-    normalizeToastWorkbookCategory(visibleCategory) !== workbookCategory
+    !matchesWorkbookCategoryLabel(visibleCategory, workbookCategory)
   ) {
     return visibleCategory
   }
@@ -376,12 +375,47 @@ function getSimpleMenuGroup(
   const toastCategory = clean(item.toastCategory)
   if (
     toastCategory &&
-    normalizeToastWorkbookCategory(toastCategory) !== workbookCategory
+    !matchesWorkbookCategoryLabel(toastCategory, workbookCategory)
   ) {
     return toastCategory
   }
 
   return workbookCategory
+}
+
+function matchesSimpleWorkbookDestination(
+  item: NormalizedMenuItem,
+  workbookCategory: 'NA Bev' | 'Retail',
+) {
+  const destination = clean(item.toastDestination)
+
+  if (workbookCategory === 'NA Bev') {
+    return /^(?:toast\s+)?na\s*bev(?:\s+tab)?(?:\b|:)/i.test(destination)
+      || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
+  }
+
+  return /^(?:toast\s+)?retail(?:\s+tab)?(?:\b|:)/i.test(destination)
+    || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
+}
+
+function matchesWorkbookCategoryLabel(
+  value: string,
+  workbookCategory: 'Cocktails' | 'NA Bev' | 'Retail',
+) {
+  const normalized = value.toLowerCase().replace(/\s+/g, ' ').trim()
+
+  if (workbookCategory === 'Cocktails') {
+    return normalized === 'cocktail' || normalized === 'cocktails'
+  }
+  if (workbookCategory === 'NA Bev') {
+    return (
+      normalized === 'na bev' ||
+      normalized === 'na beverage' ||
+      normalized === 'na beverages'
+    )
+  }
+
+  return normalized === 'retail'
 }
 
 function getSimpleSheetMapping(

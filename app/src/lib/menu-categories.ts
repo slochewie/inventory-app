@@ -24,7 +24,7 @@ const MENU_CATEGORY_DEFAULTS: readonly MenuCategoryDefault[] = [
   {
     name: 'Retail',
     toastCategory: 'Retail',
-    toastDestination: '',
+    toastDestination: 'Retail',
   },
 ]
 
@@ -102,9 +102,13 @@ export function saveMenuCategory(
     existingCategory?.toastCategory ||
     defaults?.toastCategory ||
     name
-  const toastDestination = normalizeToastDestination(
-    input.toastDestination ?? existingCategory?.toastDestination ?? defaults?.toastDestination ?? '',
-  )
+  const toastDestination =
+    normalizeMenuCategoryName(
+      input.toastDestination ??
+        existingCategory?.toastDestination ??
+        defaults?.toastDestination ??
+        '',
+    )
 
   const nextCategory: InventoryMenuCategory = {
     id:
@@ -212,9 +216,10 @@ function normalizeStoredCategory(
       normalizeMenuCategoryName(category.toastCategory ?? '') ||
       defaults?.toastCategory ||
       name,
-    toastDestination: normalizeToastDestination(
-      category.toastDestination ?? defaults?.toastDestination ?? '',
-    ),
+    toastDestination:
+      normalizeMenuCategoryName(category.toastDestination ?? '') ||
+      defaults?.toastDestination ||
+      '',
     createdAt,
     updatedAt:
       typeof category.updatedAt === 'string' && category.updatedAt
@@ -236,28 +241,30 @@ function withDefaultMenuCategories(
     byKey.set(key, {
       ...category,
       toastCategory: category.toastCategory || defaults?.toastCategory || category.name,
-      toastDestination: normalizeToastDestination(
-        category.toastDestination || defaults?.toastDestination || '',
-      ),
+      toastDestination:
+        category.toastDestination ||
+        defaults?.toastDestination ||
+        '',
     })
   })
 
   return [...byKey.values()].sort((left, right) => left.name.localeCompare(right.name))
 }
 
-export function normalizeToastDestination(value?: string | null) {
-  const normalized = normalizeMenuCategoryName(value ?? '')
-  if (!normalized) return ''
+export function getMenuCategoryDestination(value: string) {
+  const key = normalizeMenuCategoryKey(value)
 
+  if (key === 'cocktail' || key === 'cocktails') return 'Cocktails'
   if (
-    /^(?:toast\s+)?(?:beer|liquor|cocktails?|na\s*bev|retail)\s+tab\b/i.test(normalized) ||
-    /^beer\s+tab\s*·/i.test(normalized) ||
-    /^(?:beer|liquor|cocktails?|na\s*bev|retail)$/i.test(normalized)
+    key === 'na bev' ||
+    key === 'na beverage' ||
+    key === 'na beverages'
   ) {
-    return ''
+    return 'NA Bev'
   }
+  if (key === 'retail') return 'Retail'
 
-  return normalized
+  return ''
 }
 
 function isBuiltInMenuCategory(value: string) {

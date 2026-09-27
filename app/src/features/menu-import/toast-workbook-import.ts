@@ -10,7 +10,7 @@ const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
 const RELATIONSHIP_NS =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 
-export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '5'
+export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '6'
 
 const TRUSTED_SOURCE_TABS = new Set([
   'beer',
@@ -327,7 +327,7 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
           name: itemName,
           category: 'Beer',
           toastCategory: 'Beer',
-          toastDestination: '',
+          toastDestination: slot.destination,
           variantLabel: slot.destination,
           toastSlot: slot.toastSlot,
           price,
@@ -438,7 +438,7 @@ function parseLiquorSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
             `[Review ${sheet.name} ${category} row ${rowNumber}]`,
           category,
           toastCategory: normalizeLiquorCategory(category),
-          toastDestination: '',
+          toastDestination: category,
           price,
           happyHourPrice,
           variantKind: 'standard',
@@ -538,7 +538,7 @@ function parseCocktailsSheet(
           `[Review ${sheet.name} row ${rowNumber}]`,
         category: 'Cocktails',
         toastCategory: clean(menuGroup) || 'Cocktails',
-        toastDestination: '',
+        toastDestination: 'Cocktails',
         price,
         happyHourPrice,
         variantKind: 'standard',
@@ -627,7 +627,7 @@ function parseSimpleMenuSheet(
           `[Review ${sheet.name} row ${rowNumber}]`,
         category: workbookCategory,
         toastCategory: clean(group) || workbookCategory,
-        toastDestination: '',
+        toastDestination: workbookCategory,
         price,
         variantKind: 'standard',
         variantPackageType: null,
@@ -702,7 +702,7 @@ function createItem(input: ItemInput): NormalizedMenuItem {
 
   return {
     id: input.id,
-    variantLabel: input.variantLabel || 'Standard',
+    variantLabel: input.variantLabel || input.toastDestination || 'Standard',
     variantKind: input.variantKind ?? 'standard',
     variantSizeOz: input.variantSizeOz ?? null,
     variantPackageType: input.variantPackageType ?? null,
