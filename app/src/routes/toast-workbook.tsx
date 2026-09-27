@@ -375,6 +375,31 @@ function ToastWorkbook() {
     })
   }
 
+  function approveStagedItem(itemId: string) {
+    setItems((current) => {
+      const next = current.map((item) => {
+        if (item.id !== itemId) return item
+        if (
+          !item.name.trim() ||
+          /^\[Review /i.test(item.name) ||
+          item.basePriceCents === null
+        ) {
+          return item
+        }
+
+        return {
+          ...item,
+          status: 'ready' as const,
+          exportToToast: true,
+          exportIncluded: true,
+        }
+      })
+
+      saveReviewSession(importFile, next)
+      return next
+    })
+  }
+
   function toggleStagedItemIncluded(itemId: string, included: boolean) {
     setItems((current) => {
       const next = current.map((item) =>
@@ -820,6 +845,9 @@ function ToastWorkbook() {
                     onUpdate={(patch) =>
                       updateStagedItem(selectedStagedItem.id, patch)
                     }
+                    onApprove={() =>
+                      approveStagedItem(selectedStagedItem.id)
+                    }
                     onToggleIncluded={(included) =>
                       toggleStagedItemIncluded(
                         selectedStagedItem.id,
@@ -927,11 +955,13 @@ function StagedItemDrawer({
   item,
   onClose,
   onUpdate,
+  onApprove,
   onToggleIncluded,
 }: {
   item: NormalizedMenuItem
   onClose: () => void
   onUpdate: (patch: Partial<NormalizedMenuItem>) => void
+  onApprove: () => void
   onToggleIncluded: (included: boolean) => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -1064,6 +1094,19 @@ function StagedItemDrawer({
           />
           <span>Include in staged Toast export</span>
         </label>
+
+        {item.status === 'review' &&
+        item.name.trim() &&
+        !/^\[Review /i.test(item.name) &&
+        item.basePriceCents !== null ? (
+          <button
+            type="button"
+            className="inventory-primary-button"
+            onClick={onApprove}
+          >
+            Approve as-is
+          </button>
+        ) : null}
       </section>
     </dialog>
   )
