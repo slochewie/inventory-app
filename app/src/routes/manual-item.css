@@ -1,4 +1,16 @@
+.inventory-auth-header {
+  z-index: 80;
+  background: #fff;
+  backdrop-filter: none;
+}
+
+.inventory-card:has(.inventory-manual-item-form) {
+  overflow: visible;
+}
+
 .inventory-manual-item-form {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 0.9rem;
 }
@@ -6,10 +18,12 @@
 .inventory-manual-combobox {
   position: relative;
   z-index: 1;
+  isolation: isolate;
 }
 
-.inventory-manual-combobox:focus-within {
-  z-index: 10;
+.inventory-manual-combobox:focus-within,
+.inventory-manual-combobox:has(.inventory-manual-combobox-list) {
+  z-index: 200;
 }
 
 .inventory-manual-combobox > input {
@@ -20,6 +34,7 @@
   position: absolute;
   right: 0.35rem;
   bottom: 0.35rem;
+  z-index: 2;
   display: inline-flex;
   width: 2rem;
   height: 2rem;
@@ -49,12 +64,13 @@
   top: calc(100% + 0.25rem);
   right: 0;
   left: 0;
-  z-index: 30;
-  overflow: hidden;
+  z-index: 999;
+  max-height: min(22rem, 55vh);
+  overflow: auto;
   border: 1px solid #d1d5db;
   border-radius: 0.75rem;
   background: #fff;
-  box-shadow: 0 14px 28px rgb(15 23 42 / 14%);
+  box-shadow: 0 18px 40px rgb(15 23 42 / 18%);
 }
 
 .inventory-manual-combobox-option {
