@@ -16,6 +16,7 @@ const TRUSTED_SOURCE_TABS = new Set([
   'beer',
   'liquor',
   'cocktails',
+  'na bev',
   'retail',
   'menu build',
 ])
@@ -104,9 +105,17 @@ export function parseToastWorkbookForReview(
     warnings.push(...parsed.warnings)
   }
 
+  const naBevSheet = findSheet(visibleTrustedSheets, 'NA Bev')
+  if (naBevSheet) {
+    const parsed = parseSimpleMenuSheet(workbook, naBevSheet, 'NA Bev', 'na-bev')
+    rows.push(...parsed.rows)
+    items.push(...parsed.items)
+    warnings.push(...parsed.warnings)
+  }
+
   const retailSheet = findSheet(visibleTrustedSheets, 'Retail')
   if (retailSheet) {
-    const parsed = parseRetailSheet(workbook, retailSheet)
+    const parsed = parseSimpleMenuSheet(workbook, retailSheet, 'Retail', 'retail')
     rows.push(...parsed.rows)
     items.push(...parsed.items)
     warnings.push(...parsed.warnings)
@@ -525,9 +534,9 @@ function parseCocktailsSheet(
         name:
           normalizeItemName(name) ||
           `[Review ${sheet.name} row ${rowNumber}]`,
-        category: clean(menuGroup) || 'Cocktails',
+        category: 'Cocktails',
         toastCategory: clean(menuGroup) || 'Cocktails',
-        toastDestination: 'Cocktails',
+        toastDestination: '',
         price,
         happyHourPrice,
         variantKind: 'standard',
@@ -546,7 +555,12 @@ function parseCocktailsSheet(
   return { rows, items, warnings }
 }
 
-function parseRetailSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
+function parseSimpleMenuSheet(
+  workbook: ParsedWorkbook,
+  sheet: WorkbookSheet,
+  workbookCategory: 'NA Bev' | 'Retail',
+  idPrefix: 'na-bev' | 'retail',
+) {
   const sheetDoc = parseXml(getTextFile(workbook.files, sheet.path))
   const headerRow = findRowWithValues(
     sheetDoc,
@@ -605,13 +619,13 @@ function parseRetailSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
 
     items.push(
       createItem({
-        id: `toast-workbook:retail:${rowNumber}`,
+        id: `toast-workbook:${idPrefix}:${rowNumber}`,
         name:
           normalizeItemName(name) ||
           `[Review ${sheet.name} row ${rowNumber}]`,
-        category: clean(group) || 'Retail',
-        toastCategory: clean(group) || 'Retail',
-        toastDestination: 'Retail',
+        category: workbookCategory,
+        toastCategory: clean(group) || workbookCategory,
+        toastDestination: '',
         price,
         variantKind: 'standard',
         variantPackageType: null,
