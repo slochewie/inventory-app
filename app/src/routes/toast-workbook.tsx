@@ -77,6 +77,46 @@ function ToastWorkbook() {
       return null
     }
 
+    if (
+      saved?.importFile?.meta?.source === 'toast-workbook-staging' &&
+      saved.items.length
+    ) {
+      const repairedItems = saved.items.map((item) => {
+        const validReadyItem =
+          item.status === 'ready' &&
+          item.name.trim() !== '' &&
+          !/^\[Review /i.test(item.name) &&
+          item.basePriceCents !== null
+
+        if (
+          !validReadyItem ||
+          item.stagingExplicitlyExcluded === true ||
+          (item.exportIncluded && item.exportToToast !== false)
+        ) {
+          return item
+        }
+
+        return {
+          ...item,
+          exportToToast: true,
+          exportIncluded: true,
+          stagingExplicitlyExcluded: false,
+        }
+      })
+
+      const changed = repairedItems.some(
+        (item, index) => item !== saved.items[index],
+      )
+
+      if (changed) {
+        saveReviewSession(saved.importFile, repairedItems)
+        return {
+          ...saved,
+          items: repairedItems,
+        }
+      }
+    }
+
     return saved
   }, [])
   const { data: activeOrganization } = authClient.useActiveOrganization()
@@ -373,6 +413,9 @@ function ToastWorkbook() {
           exportIncluded: becameReady
             ? true
             : ready && updated.exportIncluded !== false,
+          stagingExplicitlyExcluded: becameReady
+            ? false
+            : updated.stagingExplicitlyExcluded,
         } satisfies NormalizedMenuItem
       })
 
@@ -414,6 +457,7 @@ function ToastWorkbook() {
               ...item,
               exportToToast: included,
               exportIncluded: included,
+              stagingExplicitlyExcluded: !included,
             }
           : item,
       )

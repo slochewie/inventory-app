@@ -37,6 +37,7 @@ export type NormalizedMenuItem = {
   organizationEnabled?: boolean
   exportToToast?: boolean
   exportIncluded: boolean
+  stagingExplicitlyExcluded?: boolean
   notes: string[]
   rawRows: RawMenuRow[]
 }
