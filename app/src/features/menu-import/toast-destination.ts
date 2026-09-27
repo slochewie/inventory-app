@@ -46,11 +46,9 @@ const BEER_DESTINATIONS = new Map<string, ToastDestination>([
 export function getToastDestination({
   sourceCategory,
   itemName,
-  toastCategory,
 }: {
   sourceCategory?: string
   itemName: string
-  toastCategory: string
 }) {
   const sourceKey = normalizeCategoryKey(sourceCategory)
   const beerDestination = BEER_DESTINATIONS.get(sourceKey)
