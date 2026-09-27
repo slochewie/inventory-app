@@ -10,7 +10,7 @@ const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
 const RELATIONSHIP_NS =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 
-export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '3'
+export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '4'
 
 const TRUSTED_SOURCE_TABS = new Set([
   'beer',
@@ -289,9 +289,14 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       }
       rows.push(raw)
 
+      const missingName = clean(name) === ''
       const numericName = isNumericOnly(name)
       const notes: string[] = []
-      if (numericName && isPositiveMoney(price)) {
+      if (missingName && isPositiveMoney(price)) {
+        notes.push(
+          `${sheet.name} row ${rowNumber}: price exists but the item name is blank.`,
+        )
+      } else if (numericName && isPositiveMoney(price)) {
         notes.push(
           `${sheet.name} row ${rowNumber}: numeric-only item name "${clean(name)}" was preserved for review.`,
         )
@@ -323,7 +328,7 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
           sheet: sheet.name,
           rowNumber,
           notes,
-          forceReview: numericName,
+          forceReview: missingName || numericName,
         }),
       )
     })
