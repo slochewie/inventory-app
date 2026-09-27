@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import {
@@ -111,7 +111,7 @@ function ManualItemPage() {
     setSuccess(null)
   }
 
-  async function submitManualItem(event: React.FormEvent<HTMLFormElement>) {
+  async function submitManualItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (!activeOrganization?.id || saving) return
