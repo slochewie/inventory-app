@@ -9,35 +9,35 @@ const BEER_DESTINATIONS = new Map<string, ToastDestination>([
   [
     'BEER CAN',
     {
-      label: 'Beer tab · Can / 24oz Can',
+      label: '',
       note: 'Toast Beer tab: Can or 24oz Can by item size',
     },
   ],
   [
     'Beer Mods',
     {
-      label: 'Beer tab · Modifiers',
+      label: '',
       note: 'Toast Beer tab: beer modifier/review',
     },
   ],
   [
     'DRAFT 10OZ',
     {
-      label: 'Beer tab · Draft Beer 10oz',
+      label: '',
       note: 'Toast Beer tab: Draft Beer 10oz',
     },
   ],
   [
     'DRAFT REG PINT',
     {
-      label: 'Beer tab · Draft Beer 16oz',
+      label: '',
       note: 'Toast Beer tab: Draft Beer 16oz',
     },
   ],
   [
     'DRAFT IMP PINT',
     {
-      label: 'Beer tab · obsolete 20oz review',
+      label: '',
       note: 'Toast Beer tab: obsolete 20oz draft review only',
     },
   ],
@@ -54,12 +54,12 @@ export function getToastDestination({
 }) {
   const sourceKey = normalizeCategoryKey(sourceCategory)
   const beerDestination = BEER_DESTINATIONS.get(sourceKey)
-  if (!beerDestination) return { label: toastCategory }
+  if (!beerDestination) return { label: '' }
 
   if (sourceKey === 'BEER CAN') {
     const packagedSlot = getPackagedBeerSlot(itemName)
     return {
-      label: `Beer tab · ${packagedSlot}`,
+      label: '',
       note: `Toast Beer tab: ${packagedSlot}`,
     }
   }
