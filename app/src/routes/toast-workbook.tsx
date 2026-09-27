@@ -172,9 +172,13 @@ function ToastWorkbook() {
   const organizationName = importFile?.meta?.store?.trim() || 'Organization'
   const stagedReviewCategories = useMemo(
     () =>
-      [...new Set(items.map((item) => item.toastCategory).filter(Boolean))].sort(
-        (left, right) => left.localeCompare(right),
-      ),
+      [
+        ...new Set(
+          items
+            .map((item) => item.category || item.toastCategory)
+            .filter(Boolean),
+        ),
+      ].sort((left, right) => left.localeCompare(right)),
     [items],
   )
   const filteredStagedItems = useMemo(() => {
@@ -190,7 +194,7 @@ function ToastWorkbook() {
 
       if (
         stagedReviewCategory !== 'all' &&
-        item.toastCategory !== stagedReviewCategory
+        (item.category || item.toastCategory) !== stagedReviewCategory
       ) {
         return false
       }
@@ -199,6 +203,7 @@ function ToastWorkbook() {
 
       return [
         item.name,
+        item.category || '',
         item.toastCategory,
         item.toastDestination,
         item.variantLabel ?? '',
@@ -1175,7 +1180,7 @@ function StagedItemDrawer({
           <span>Menu Category</span>
           <input
             type="text"
-            value={item.toastCategory}
+            value={item.category || item.toastCategory}
             onChange={(event) =>
               onUpdate({
                 category: event.target.value,
