@@ -261,15 +261,22 @@ bash ./bash-scripts/test-all.sh
 
 When an existing Toast workbook is staged for review, Inventory preserves the structural draft-slot mapping from the source Beer tab. For example, if Toast's first structural draft slot is labeled **12oz**, staging records that as **Toast 8oz slot → actual 12oz** and uses that mapping when regenerating the workbook. Staged Toast imports read all four draft price slots rather than assuming only the first draft size.
 
-## Toast Cocktails and Retail workbook output
+## Menu Category workbook routing
 
-Toast workbook generation now supports the existing **Cocktails** tab and an optional **Retail** tab.
+Workbook-sheet selection is internal. Users choose a **Menu Category**; they do not choose or see worksheet targets.
 
-- Cocktails are written to the template's existing Item Name, Price, Description, Menu Group, and Happy Hour columns.
-- Retail is created only when exportable Retail items exist.
-- To create Retail, Inventory duplicates the pristine template's **NA Bev** worksheet inside the XLSX package and renames the duplicate **Retail**, preserving the source sheet layout and formatting.
-- Retail values are then written into the duplicated Item Name, Price, and Group columns.
-- Generated workbook validation checks Cocktails and Retail rows before download.
+Current routing includes:
+
+- **Beer** → Beer worksheet
+- **Cocktails** → Cocktails worksheet
+- **NA Bev** → NA Bev worksheet
+- **Retail** → Retail worksheet
+
+**Toast Destination** is separate from workbook routing and is reserved for real Toast destinations such as Bar, Dining Room, or Patio. Legacy values that described workbook tabs are normalized away.
+
+Cocktails are written to the template's existing Item Name, Price, Description, Menu Group, and Happy Hour columns. NA Bev uses the existing NA Bev worksheet. Retail is created only when exportable Retail items exist by duplicating the pristine NA Bev worksheet and renaming the duplicate Retail, preserving the source layout and formatting.
+
+Generated workbook validation checks Cocktails, NA Bev, and Retail rows before download.
 
 ## Toast workbook staging review
 
@@ -277,7 +284,7 @@ The authenticated **Export to Toast** page can stage an existing Toast XLSX for 
 
 The staging importer:
 
-- reads only visible source tabs: **Beer**, **Liquor**, **Cocktails**, **Retail**, and **Menu Build** for warnings;
+- reads only visible source tabs: **Beer**, **Liquor**, **Cocktails**, **NA Bev**, **Retail**, and **Menu Build** for warnings;
 - ignores hidden/generated Toast helper tabs such as **Compiled Bev**, **Beverage Import**, **Size Pricing**, **MOC**, and similar calculation sheets;
 - stores staged normalized rows only in the browser review session;
 - marks suspicious rows as **Review** and excludes them from generated exports until corrected;
