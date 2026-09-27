@@ -149,13 +149,13 @@ function ManualItemPage() {
 
     const basePrice = parseMoneyToCents(draft.price)
     if (basePrice.kind === 'invalid') {
-      setError('Enter a valid price, such as 8 or 8.50.')
+      setError('Enter a valid dollar amount for price, such as 8 or 8.50.')
       return
     }
 
     const happyHourPrice = parseMoneyToCents(draft.happyHourPrice)
     if (happyHourPrice.kind === 'invalid') {
-      setError('Enter a valid Happy Hour price, such as 7 or 7.50.')
+      setError('Enter a valid dollar amount for Happy Hour price, such as 7 or 7.50.')
       return
     }
 
@@ -308,27 +308,21 @@ function ManualItemPage() {
                 onChange={(value) => updateDraft({ toastDestination: value })}
               />
 
-              <label className="inventory-search-control">
-                <span>Price</span>
-                <input
-                  value={draft.price}
-                  disabled={saving}
-                  onChange={(event) => updateDraft({ price: event.target.value })}
-                  inputMode="decimal"
-                  placeholder="8.00"
-                />
-              </label>
+              <ManualMoneyField
+                label="Price"
+                value={draft.price}
+                disabled={saving}
+                placeholder="0.00"
+                onChange={(value) => updateDraft({ price: value })}
+              />
 
-              <label className="inventory-search-control">
-                <span>Happy Hour price</span>
-                <input
-                  value={draft.happyHourPrice}
-                  disabled={saving}
-                  onChange={(event) => updateDraft({ happyHourPrice: event.target.value })}
-                  inputMode="decimal"
-                  placeholder="Optional"
-                />
-              </label>
+              <ManualMoneyField
+                label="Happy Hour price"
+                value={draft.happyHourPrice}
+                disabled={saving}
+                placeholder="Optional"
+                onChange={(value) => updateDraft({ happyHourPrice: value })}
+              />
             </div>
 
             {showToastBeerSlot ? (
@@ -400,6 +394,48 @@ function ManualItemPage() {
         </section>
       </section>
     </AuthenticatedInventoryShell>
+  )
+}
+
+type ManualMoneyFieldProps = {
+  label: string
+  value: string
+  placeholder?: string
+  disabled?: boolean
+  onChange: (value: string) => void
+}
+
+function ManualMoneyField({
+  label,
+  value,
+  placeholder,
+  disabled = false,
+  onChange,
+}: ManualMoneyFieldProps) {
+  function formatOnBlur() {
+    const parsed = parseMoneyToCents(value)
+    if (parsed.kind !== 'valid') return
+
+    onChange(parsed.value === null ? '' : (parsed.value / 100).toFixed(2))
+  }
+
+  return (
+    <label className="inventory-search-control inventory-manual-money-field">
+      <span>{label}</span>
+      <div className="inventory-manual-money-control">
+        <span aria-hidden="true">$</span>
+        <input
+          type="text"
+          value={value}
+          disabled={disabled}
+          inputMode="decimal"
+          pattern="[0-9]*[.]?[0-9]{0,2}"
+          placeholder={placeholder}
+          onBlur={formatOnBlur}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+    </label>
   )
 }
 
