@@ -39,6 +39,9 @@ function getSidebarDefaultOpen() {
 export function useInventoryAccessRole() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [role, setRole] = useState<InventoryRole | null>(null)
+  const isToastWorkbookPage =
+    typeof window !== "undefined" &&
+    window.location.pathname === "/toast-workbook"
 
   useEffect(() => {
     if (!activeOrganization?.id) {
@@ -63,7 +66,8 @@ export function useInventoryAccessRole() {
   return {
     role,
     loading: role === null,
-    canImportExport: role !== null && role !== "viewer",
+    canImportExport:
+      role !== null && (role !== "viewer" || isToastWorkbookPage),
     canEdit: role === "manager" || role === "admin",
     canManageAssignments: role === "admin",
   }
@@ -282,6 +286,8 @@ export function AuthenticatedInventoryShell({
           : true
 
   const displayName = session.user.name || session.user.email
+  const isToastWorkbookViewer =
+    currentPath === "/toast-workbook" && inventoryRole === "viewer"
 
   async function switchAccount(sessionToken: string, userId: string) {
     if (userId === session.user.id || switchingToken) return
@@ -308,7 +314,7 @@ export function AuthenticatedInventoryShell({
       <SidebarProvider defaultOpen={sidebarDefaultOpen}>
         <InventorySidebar
           currentPath={currentPath}
-          canImportExport={canImportExport}
+          canImportExport={canImportExport && inventoryRole !== "viewer"}
           canEdit={canEdit}
           canManageAssignments={canManageAssignments}
         />
@@ -433,7 +439,34 @@ export function AuthenticatedInventoryShell({
 
         <div className="inventory-authenticated-content">
           {accessState === "allowed" && inventoryRole && routeAllowed ? (
-            children
+            isToastWorkbookViewer ? (
+              <>
+                <section className="inventory-auth-state">
+                  <h1>Viewer read-only access</h1>
+                  <p>
+                    You can review the Export to Toast page for this organization,
+                    but downloads, uploads, review edits, and other page controls are disabled.
+                  </p>
+                </section>
+                <fieldset
+                  disabled
+                  style={{ border: 0, margin: 0, padding: 0 }}
+                  onClickCapture={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                  }}
+                  onKeyDownCapture={(event) => {
+                    if (event.key === "Tab") return
+                    event.preventDefault()
+                    event.stopPropagation()
+                  }}
+                >
+                  {children}
+                </fieldset>
+              </>
+            ) : (
+              children
+            )
           ) : accessState === "allowed" && inventoryRole && !routeAllowed ? (
             <section className="inventory-auth-state">
               <h1>Inventory role required</h1>
