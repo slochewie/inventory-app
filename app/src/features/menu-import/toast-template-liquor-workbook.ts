@@ -359,6 +359,7 @@ function getSimpleMenuGroup(
   const rawGroup = clean(
     item.rawRows[0]?.Group ??
       item.rawRows[0]?.group ??
+      item.rawRows[0]?.menuGroup ??
       item.rawRows[0]?.['Menu Group'] ??
       item.rawRows[0]?.['Menu Group Name'],
   )
@@ -370,6 +371,14 @@ function getSimpleMenuGroup(
     normalizeToastWorkbookCategory(visibleCategory) !== workbookCategory
   ) {
     return visibleCategory
+  }
+
+  const toastCategory = clean(item.toastCategory)
+  if (
+    toastCategory &&
+    normalizeToastWorkbookCategory(toastCategory) !== workbookCategory
+  ) {
+    return toastCategory
   }
 
   return workbookCategory
