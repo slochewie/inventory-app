@@ -226,20 +226,7 @@ function normalizeStoredCategory(
 function withDefaultMenuCategories(
   categories: InventoryMenuCategory[],
 ): InventoryMenuCategory[] {
-  const now = new Date().toISOString()
   const byKey = new Map<string, InventoryMenuCategory>()
-
-  MENU_CATEGORY_DEFAULTS.forEach((category) => {
-    const key = normalizeMenuCategoryKey(category.name)
-    byKey.set(key, {
-      id: `menu-category-${key.replace(/[^a-z0-9]+/g, '-')}`,
-      name: category.name,
-      toastCategory: category.toastCategory,
-      toastDestination: category.toastDestination,
-      createdAt: now,
-      updatedAt: now,
-    })
-  })
 
   categories.forEach((category) => {
     const key = normalizeMenuCategoryKey(category.name)

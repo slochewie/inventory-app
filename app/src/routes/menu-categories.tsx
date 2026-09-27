@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import {
@@ -15,29 +15,15 @@ export const Route = createFileRoute('/menu-categories')({
   component: MenuCategoriesPage,
 })
 
-type MenuCategoryDraft = {
-  id: string | null
-  name: string
-  toastDestination: string
-}
-
-const EMPTY_DRAFT: MenuCategoryDraft = {
-  id: null,
-  name: '',
-  toastDestination: '',
-}
-
 function MenuCategoriesPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [categories, setCategories] = useState<InventoryMenuCategory[]>([])
-  const [draft, setDraft] = useState<MenuCategoryDraft>(EMPTY_DRAFT)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     if (!activeOrganization?.id) {
       setCategories([])
-      setDraft(EMPTY_DRAFT)
       return
     }
 
@@ -59,22 +45,6 @@ function MenuCategoriesPage() {
     setCategories(listSavedMenuCategories(activeOrganization.id))
   }
 
-  function updateDraft(patch: Partial<MenuCategoryDraft>) {
-    setDraft((current) => ({ ...current, ...patch }))
-    setError(null)
-    setSuccess(null)
-  }
-
-  function editCategory(category: InventoryMenuCategory) {
-    setDraft({
-      id: category.id,
-      name: category.name,
-      toastDestination: category.toastDestination,
-    })
-    setError(null)
-    setSuccess(null)
-  }
-
   function addSuggestion(name: string) {
     if (!activeOrganization?.id) return
 
@@ -92,27 +62,6 @@ function MenuCategoriesPage() {
     }
   }
 
-  function submitCategory(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!activeOrganization?.id) return
-
-    try {
-      const category = saveMenuCategory(activeOrganization.id, {
-        id: draft.id,
-        name: draft.name,
-        toastDestination: draft.toastDestination,
-      })
-      reloadCategories()
-      setDraft(EMPTY_DRAFT)
-      setSuccess(`${category.name} is now available in Add Item.`)
-      setError(null)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to save category.')
-      setSuccess(null)
-    }
-  }
-
   function removeCategory(category: InventoryMenuCategory) {
     if (!activeOrganization?.id) return
 
@@ -120,7 +69,6 @@ function MenuCategoriesPage() {
     if (!removed) return
 
     reloadCategories()
-    if (draft.id === category.id) setDraft(EMPTY_DRAFT)
     setSuccess(`Removed ${category.name}. Existing catalog items are unchanged.`)
     setError(null)
   }
@@ -133,7 +81,7 @@ function MenuCategoriesPage() {
             <p className="inventory-kicker">Catalog</p>
             <h1>Menu Categories</h1>
             <p>
-              Add organization-specific menu categories for {activeOrganization?.name ?? 'the selected organization'}. Beer, Cocktails, and NA Bev are built in and are always available in Add Item.
+              Manage optional menu categories for {activeOrganization?.name ?? 'the selected organization'}. Beer, Cocktails, and NA Bev are always available in Add Item.
             </p>
           </div>
           <a className="inventory-secondary-link" href="/manual-item">
@@ -144,9 +92,9 @@ function MenuCategoriesPage() {
         <section className="inventory-card inventory-menu-category-card">
           <div className="inventory-table-heading">
             <div>
-              <h2>{draft.id ? 'Edit category' : 'Add category'}</h2>
+              <h2>Optional categories</h2>
               <p>
-                Add only categories that are not already built into the Toast workbook. Retail can be added here when needed; Toast export creates its worksheet internally from the NA Bev template.
+                Add Retail when this organization needs it. Built-in categories are already available automatically.
               </p>
             </div>
           </div>
@@ -156,59 +104,22 @@ function MenuCategoriesPage() {
 
           {suggestions.length ? (
             <div className="inventory-menu-category-suggestions">
-              <span>Quick add</span>
               {suggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
-                  className="inventory-secondary-button"
+                  className="inventory-primary-button"
                   onClick={() => addSuggestion(suggestion)}
                 >
-                  {suggestion}
+                  Add {suggestion}
                 </button>
               ))}
             </div>
-          ) : null}
-
-          <form className="inventory-manual-item-form" onSubmit={submitCategory}>
-            <div className="inventory-catalog-price-grid">
-              <label className="inventory-search-control">
-                <span>Menu category</span>
-                <input
-                  value={draft.name}
-                  placeholder="Retail or another custom category…"
-                  onChange={(event) => updateDraft({ name: event.target.value })}
-                  required
-                />
-              </label>
-
-              <label className="inventory-search-control">
-                <span>Toast destination</span>
-                <input
-                  value={draft.toastDestination}
-                  placeholder="Optional, for example Bar"
-                  onChange={(event) => updateDraft({ toastDestination: event.target.value })}
-                />
-              </label>
-            </div>
-
-            <div className="inventory-manual-item-actions inventory-menu-category-form-actions">
-              <button
-                type="button"
-                className="inventory-secondary-button"
-                onClick={() => {
-                  setDraft(EMPTY_DRAFT)
-                  setError(null)
-                  setSuccess(null)
-                }}
-              >
-                Clear
-              </button>
-              <button type="submit" className="inventory-primary-button">
-                {draft.id ? 'Save category' : 'Add category'}
-              </button>
-            </div>
-          </form>
+          ) : (
+            <p className="inventory-empty-note">
+              All currently supported optional categories are already enabled.
+            </p>
+          )}
         </section>
 
         <section className="inventory-card inventory-menu-category-card">
@@ -227,18 +138,9 @@ function MenuCategoriesPage() {
                 <article key={category.id} className="inventory-menu-category-row">
                   <div>
                     <strong>{category.name}</strong>
-                    {category.toastDestination ? (
-                      <span>Destination: {category.toastDestination}</span>
-                    ) : null}
+
                   </div>
                   <div className="inventory-menu-category-row-actions">
-                    <button
-                      type="button"
-                      className="inventory-secondary-button"
-                      onClick={() => editCategory(category)}
-                    >
-                      Edit
-                    </button>
                     <button
                       type="button"
                       className="inventory-secondary-button"
@@ -252,7 +154,7 @@ function MenuCategoriesPage() {
             </div>
           ) : (
             <p className="inventory-empty-note">
-              No manual menu categories have been added yet. Beer, Cocktails, and NA Bev are already available in Add Item. Add Retail here when needed.
+              No optional menu categories are enabled. Beer, Cocktails, and NA Bev are already available in Add Item.
             </p>
           )}
         </section>
