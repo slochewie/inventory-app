@@ -10,6 +10,7 @@ import {
   updateInventoryOrganizationVariant,
   type OptionalBeerCategoryConfig,
 } from '#/lib/inventory-access'
+import './manual-item.css'
 
 export const Route = createFileRoute('/manual-item')({ component: ManualItemPage })
 
@@ -108,6 +109,7 @@ function ManualItemPage() {
   const isBeerItem = [normalizedCategory, normalizedToastCategory]
     .some((value) => value.toLowerCase().includes('beer'))
   const showToastBeerSlot = isBeerItem && enabledOptionalBeerCategories.length > 0
+  const exportToToast = draft.availableHere && draft.exportToToast
 
   function updateDraft(patch: Partial<ManualItemDraft>) {
     setDraft((current) => ({ ...current, ...patch }))
@@ -165,7 +167,7 @@ function ManualItemPage() {
             basePriceCents: basePrice.value,
             happyHourPriceCents: happyHourPrice.value,
             status: basePrice.value === null ? 'review' : 'ready',
-            exportIncluded: draft.availableHere && draft.exportToToast,
+            exportIncluded: exportToToast,
           },
         ],
       })
@@ -190,7 +192,7 @@ function ManualItemPage() {
           organizationId: activeOrganization.id,
           variantId: createdRow.variant.id,
           enabled: draft.availableHere,
-          exportToToast: draft.exportToToast,
+          exportToToast,
           priceOverrideCents: basePrice.value,
           happyHourPriceCents: happyHourPrice.value,
           toastCategoryOverride: normalizedToastCategory,
@@ -353,44 +355,52 @@ function ManualItemPage() {
               </label>
             ) : null}
 
-            <div className="inventory-variant-toggles">
-              <label className="inventory-inline-toggle">
-                <input
-                  type="checkbox"
-                  checked={draft.availableHere}
+            <div className="inventory-manual-item-footer">
+              <div className="inventory-manual-item-toggles">
+                <label className="inventory-inline-toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.availableHere}
+                    disabled={saving}
+                    onChange={(event) => {
+                      const availableHere = event.target.checked
+                      updateDraft({
+                        availableHere,
+                        exportToToast: availableHere ? draft.exportToToast : false,
+                      })
+                    }}
+                  />
+                  <span>Available here</span>
+                </label>
+
+                <label className="inventory-inline-toggle">
+                  <input
+                    type="checkbox"
+                    checked={exportToToast}
+                    disabled={saving || !draft.availableHere}
+                    onChange={(event) => updateDraft({ exportToToast: event.target.checked })}
+                  />
+                  <span>Export to Toast</span>
+                </label>
+              </div>
+
+              <div className="inventory-manual-item-actions">
+                <button
+                  type="button"
+                  className="inventory-secondary-button"
                   disabled={saving}
-                  onChange={(event) => updateDraft({ availableHere: event.target.checked })}
-                />
-                <span>Available here</span>
-              </label>
-
-              <label className="inventory-inline-toggle">
-                <input
-                  type="checkbox"
-                  checked={draft.exportToToast}
-                  disabled={saving || !draft.availableHere}
-                  onChange={(event) => updateDraft({ exportToToast: event.target.checked })}
-                />
-                <span>Export to Toast</span>
-              </label>
-            </div>
-
-            <div className="inventory-draft-slots-actions">
-              <button
-                type="button"
-                className="inventory-secondary-button"
-                disabled={saving}
-                onClick={() => {
-                  setDraft(EMPTY_DRAFT)
-                  setError(null)
-                  setSuccess(null)
-                }}
-              >
-                Clear
-              </button>
-              <button type="submit" className="inventory-primary-button" disabled={saving}>
-                {saving ? 'Adding…' : 'Add item'}
-              </button>
+                  onClick={() => {
+                    setDraft(EMPTY_DRAFT)
+                    setError(null)
+                    setSuccess(null)
+                  }}
+                >
+                  Clear
+                </button>
+                <button type="submit" className="inventory-primary-button" disabled={saving}>
+                  {saving ? 'Adding…' : 'Add item'}
+                </button>
+              </div>
             </div>
           </form>
         </section>
