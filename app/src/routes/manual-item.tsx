@@ -162,7 +162,7 @@ function ManualItemPage() {
 
   const allDestinationOptions = useMemo(() => {
     return mergeCategoryOptions(
-      ['Cocktails', 'NA Bev', 'Retail'],
+      ['Cocktails', 'NA Bev'],
       mergeCategoryOptions(
         destinationOptions,
         menuCategories.map((category) => category.toastDestination),
