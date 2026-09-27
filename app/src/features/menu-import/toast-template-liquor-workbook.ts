@@ -20,6 +20,10 @@ const WORKSHEET_RELATIONSHIP_TYPE =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet'
 const WORKSHEET_CONTENT_TYPE =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml'
+const DRAWING_RELATIONSHIP_TYPE =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing'
+const DRAWING_CONTENT_TYPE =
+  'application/vnd.openxmlformats-officedocument.drawing+xml'
 const DATA_ROW_BUFFER = 20
 
 const DEFAULT_HAPPY_HOUR_DAYS = [
@@ -578,15 +582,68 @@ function ensureRetailSheet(workbookPackage: WorkbookPackage) {
   workbookPackage.files[newSheetPath] =
     workbookPackage.files[source.path].slice()
 
+  const clonedParts: { path: string; contentType: string }[] = []
   const sourceNumber = source.path.match(/sheet(\d+)\.xml$/)?.[1]
   if (sourceNumber) {
     const sourceRelsPath =
       `xl/worksheets/_rels/sheet${sourceNumber}.xml.rels`
     const sourceRels = workbookPackage.files[sourceRelsPath]
     if (sourceRels) {
+      const relsDoc = parseXml(strFromU8(sourceRels))
+
+      Array.from(relsDoc.getElementsByTagName('Relationship')).forEach(
+        (relationship) => {
+          if (
+            relationship.getAttribute('Type') !== DRAWING_RELATIONSHIP_TYPE
+          ) {
+            return
+          }
+
+          const target = relationship.getAttribute('Target')
+          if (!target) return
+
+          const sourceDrawingPath = resolveXlsxPath(source.path, target)
+          const sourceDrawing = workbookPackage.files[sourceDrawingPath]
+          if (!sourceDrawing) return
+
+          const drawingNumbers = Object.keys(workbookPackage.files).flatMap(
+            (filePath) => {
+              const match = filePath.match(/^xl\/drawings\/drawing(\d+)\.xml$/)
+              return match ? [Number(match[1])] : []
+            },
+          )
+          const nextDrawingNumber = Math.max(0, ...drawingNumbers) + 1
+          const newDrawingPath =
+            `xl/drawings/drawing${nextDrawingNumber}.xml`
+          workbookPackage.files[newDrawingPath] = sourceDrawing.slice()
+          relationship.setAttribute(
+            'Target',
+            `../drawings/drawing${nextDrawingNumber}.xml`,
+          )
+          clonedParts.push({
+            path: newDrawingPath,
+            contentType: DRAWING_CONTENT_TYPE,
+          })
+
+          const sourceDrawingNumber =
+            sourceDrawingPath.match(/drawing(\d+)\.xml$/)?.[1]
+          if (sourceDrawingNumber) {
+            const sourceDrawingRelsPath =
+              `xl/drawings/_rels/drawing${sourceDrawingNumber}.xml.rels`
+            const sourceDrawingRels =
+              workbookPackage.files[sourceDrawingRelsPath]
+            if (sourceDrawingRels) {
+              workbookPackage.files[
+                `xl/drawings/_rels/drawing${nextDrawingNumber}.xml.rels`
+              ] = sourceDrawingRels.slice()
+            }
+          }
+        },
+      )
+
       workbookPackage.files[
         `xl/worksheets/_rels/sheet${nextWorksheetNumber}.xml.rels`
-      ] = sourceRels.slice()
+      ] = strToU8(serializeXml(relsDoc))
     }
   }
 
@@ -645,6 +702,16 @@ function ensureRetailSheet(workbookPackage: WorkbookPackage) {
   override.setAttribute('PartName', `/${newSheetPath}`)
   override.setAttribute('ContentType', WORKSHEET_CONTENT_TYPE)
   contentTypes.documentElement.appendChild(override)
+
+  clonedParts.forEach((part) => {
+    const partOverride = contentTypes.createElementNS(
+      CONTENT_TYPES_NS,
+      'Override',
+    )
+    partOverride.setAttribute('PartName', `/${part.path}`)
+    partOverride.setAttribute('ContentType', part.contentType)
+    contentTypes.documentElement.appendChild(partOverride)
+  })
 
   workbookPackage.files[WORKBOOK_PATH] = strToU8(
     serializeXml(workbookPackage.workbook),
