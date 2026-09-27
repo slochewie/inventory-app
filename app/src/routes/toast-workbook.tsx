@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AuthenticatedInventoryShell,
   useInventoryAccessRole,
@@ -29,6 +29,7 @@ import {
   type ToastTemplateWorkbookInfo,
 } from '#/features/menu-import/toast-template-workbook'
 import {
+  formatCurrency,
   summarizeMenuItems,
   type NormalizedMenuItem,
   type ParsedMenuImport,
@@ -44,6 +45,10 @@ type WorkbookState = {
   arrayBuffer: ArrayBuffer
   info: ToastTemplateWorkbookInfo
 }
+
+type StagedReviewStatus = 'review' | 'ready' | 'all'
+
+const STAGED_REVIEW_PAGE_SIZE = 25
 
 function ToastWorkbookRoute() {
   const { canImportExport } = useInventoryAccessRole()
@@ -89,11 +94,79 @@ function ToastWorkbook() {
     liquorRows: number
     happyHourNotes: boolean
   } | null>(null)
+  const [stagedReviewQuery, setStagedReviewQuery] = useState('')
+  const [stagedReviewStatus, setStagedReviewStatus] =
+    useState<StagedReviewStatus>('review')
+  const [stagedReviewCategory, setStagedReviewCategory] = useState('all')
+  const [stagedReviewPage, setStagedReviewPage] = useState(1)
+  const [selectedStagedItemId, setSelectedStagedItemId] =
+    useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const beerExportItemCount = items.filter((item) => item.exportIncluded && item.toastCategory === 'Beer').length
   const liquorExportItemCount = items.filter((item) => item.exportIncluded && isLiquorItem(item)).length
   const organizationName = importFile?.meta?.store?.trim() || 'Organization'
+  const stagedReviewCategories = useMemo(
+    () =>
+      [...new Set(items.map((item) => item.toastCategory).filter(Boolean))].sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [items],
+  )
+  const filteredStagedItems = useMemo(() => {
+    const query = stagedReviewQuery.trim().toLowerCase()
+
+    return items.filter((item) => {
+      if (
+        stagedReviewStatus !== 'all' &&
+        item.status !== stagedReviewStatus
+      ) {
+        return false
+      }
+
+      if (
+        stagedReviewCategory !== 'all' &&
+        item.toastCategory !== stagedReviewCategory
+      ) {
+        return false
+      }
+
+      if (!query) return true
+
+      return [
+        item.name,
+        item.toastCategory,
+        item.toastDestination,
+        item.variantLabel ?? '',
+        ...item.notes,
+      ].some((value) => value.toLowerCase().includes(query))
+    })
+  }, [
+    items,
+    stagedReviewCategory,
+    stagedReviewQuery,
+    stagedReviewStatus,
+  ])
+  const stagedReviewPageCount = Math.max(
+    1,
+    Math.ceil(filteredStagedItems.length / STAGED_REVIEW_PAGE_SIZE),
+  )
+  const stagedReviewClampedPage = Math.min(
+    stagedReviewPage,
+    stagedReviewPageCount,
+  )
+  const stagedReviewPageStart =
+    (stagedReviewClampedPage - 1) * STAGED_REVIEW_PAGE_SIZE
+  const stagedReviewPageItems = filteredStagedItems.slice(
+    stagedReviewPageStart,
+    stagedReviewPageStart + STAGED_REVIEW_PAGE_SIZE,
+  )
+  const selectedStagedItem =
+    items.find((item) => item.id === selectedStagedItemId) ?? null
+
+  useEffect(() => {
+    setStagedReviewPage(1)
+  }, [stagedReviewCategory, stagedReviewQuery, stagedReviewStatus])
 
   useEffect(() => {
     if (!activeOrganization?.id) return
@@ -524,141 +597,224 @@ function ToastWorkbook() {
             </section>
 
             {reviewSource === 'toast-workbook' ? (
-              <section className="inventory-card inventory-import-card">
-                <div className="inventory-table-heading">
-                  <div>
-                    <p className="inventory-kicker">Staging review</p>
-                    <h2>Normalized workbook rows</h2>
-                    <p>
-                      Browser-only staging. Editing these rows does not create or
-                      update master Inventory records.
-                    </p>
+              <>
+                <section
+                  className="inventory-catalog-toolbar"
+                  aria-label="Staged workbook review filters"
+                >
+                  <label className="inventory-search-control inventory-catalog-search">
+                    <span>Search</span>
+                    <input
+                      type="search"
+                      value={stagedReviewQuery}
+                      onChange={(event) =>
+                        setStagedReviewQuery(event.target.value)
+                      }
+                      placeholder="Search staged items…"
+                    />
+                  </label>
+
+                  <label className="inventory-search-control">
+                    <span>Status</span>
+                    <select
+                      value={stagedReviewStatus}
+                      onChange={(event) =>
+                        setStagedReviewStatus(
+                          event.target.value as StagedReviewStatus,
+                        )
+                      }
+                    >
+                      <option value="review">
+                        Needs review ({summary.reviewItems})
+                      </option>
+                      <option value="ready">Ready</option>
+                      <option value="all">All staged items</option>
+                    </select>
+                  </label>
+
+                  <label className="inventory-search-control">
+                    <span>Category</span>
+                    <select
+                      value={stagedReviewCategory}
+                      onChange={(event) =>
+                        setStagedReviewCategory(event.target.value)
+                      }
+                    >
+                      <option value="all">All categories</option>
+                      {stagedReviewCategories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </section>
+
+                <section className="inventory-card inventory-catalog-card">
+                  <div className="inventory-table-heading">
+                    <div>
+                      <p className="inventory-kicker">Staging review</p>
+                      <h2>Normalized workbook rows</h2>
+                      <p className="inventory-catalog-subtitle">
+                        {filteredStagedItems.length === 0
+                          ? '0 items'
+                          : `Showing ${(
+                              stagedReviewPageStart + 1
+                            ).toLocaleString()}–${Math.min(
+                              stagedReviewPageStart +
+                                STAGED_REVIEW_PAGE_SIZE,
+                              filteredStagedItems.length,
+                            ).toLocaleString()} of ${filteredStagedItems.length.toLocaleString()} items`}
+                      </p>
+                    </div>
                   </div>
-                  <p>
-                    {summary.reviewItems.toLocaleString()} need review
-                  </p>
-                </div>
 
-                {importFile?.warnings.length ? (
-                  <details className="inventory-export-preview" open>
-                    <summary>
-                      <span>Workbook warnings</span>
-                      <strong>{importFile.warnings.length.toLocaleString()}</strong>
-                    </summary>
-                    <ul className="inventory-warning-list">
-                      {importFile.warnings.map((warning) => (
-                        <li key={warning}>{warning}</li>
-                      ))}
-                    </ul>
-                  </details>
-                ) : null}
+                  {importFile?.warnings.length ? (
+                    <details className="inventory-export-preview">
+                      <summary>
+                        <span>Workbook warnings</span>
+                        <strong>
+                          {importFile.warnings.length.toLocaleString()}
+                        </strong>
+                      </summary>
+                      <ul className="inventory-warning-list">
+                        {importFile.warnings.map((warning) => (
+                          <li key={warning}>{warning}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : null}
 
-                <div className="inventory-table-wrap">
-                  <table className="inventory-table">
-                    <thead>
-                      <tr>
-                        <th>Include</th>
-                        <th>Item</th>
-                        <th>Category</th>
-                        <th>Destination</th>
-                        <th>Price</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((item) => (
-                        <tr key={item.id}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={item.exportIncluded}
-                              disabled={item.basePriceCents === null}
-                              onChange={(event) =>
-                                toggleStagedItemIncluded(
-                                  item.id,
-                                  event.target.checked,
-                                )
-                              }
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="text"
-                              value={item.name}
-                              onChange={(event) =>
-                                updateStagedItem(item.id, {
-                                  name: event.target.value,
-                                })
-                              }
-                            />
-                            {item.notes.length ? (
-                              <small>{item.notes.join(' ')}</small>
-                            ) : null}
-                          </td>
-                          <td>
-                            <input
-                              type="text"
-                              value={item.toastCategory}
-                              onChange={(event) =>
-                                updateStagedItem(item.id, {
-                                  category: event.target.value,
-                                  toastCategory: event.target.value,
-                                })
-                              }
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="text"
-                              value={item.toastDestination}
-                              onChange={(event) =>
-                                updateStagedItem(item.id, {
-                                  toastDestination: event.target.value,
-                                })
-                              }
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={
-                                item.basePriceCents === null
-                                  ? ''
-                                  : (item.basePriceCents / 100).toFixed(2)
-                              }
-                              onChange={(event) => {
-                                const value = event.target.value.trim()
-                                const dollars = Number(value)
-                                updateStagedItem(item.id, {
-                                  basePriceCents:
-                                    value &&
-                                    Number.isFinite(dollars) &&
-                                    dollars > 0
-                                      ? Math.round(dollars * 100)
-                                      : null,
-                                })
+                  {filteredStagedItems.length === 0 ? (
+                    <p className="inventory-empty-state">
+                      No staged items match these filters.
+                    </p>
+                  ) : (
+                    <div className="inventory-table-wrap">
+                      <table className="inventory-table inventory-catalog-table">
+                        <thead>
+                          <tr>
+                            <th>Item</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stagedReviewPageItems.map((item) => (
+                            <tr
+                              key={item.id}
+                              className="inventory-catalog-row"
+                              tabIndex={0}
+                              onClick={() => setSelectedStagedItemId(item.id)}
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key === 'Enter' ||
+                                  event.key === ' '
+                                ) {
+                                  event.preventDefault()
+                                  setSelectedStagedItemId(item.id)
+                                }
                               }}
-                            />
-                          </td>
-                          <td>
-                            <span
-                              className={
-                                item.status === 'review'
-                                  ? 'inventory-carry-status'
-                                  : 'inventory-carry-status is-on'
-                              }
                             >
-                              {item.status === 'review' ? 'Review' : 'Ready'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                              <td>
+                                <div className="inventory-catalog-item-cell">
+                                  <strong>{item.name}</strong>
+                                  <span>{item.toastCategory}</span>
+                                  <div className="inventory-format-list">
+                                    <span>
+                                      {item.toastDestination ||
+                                        item.variantLabel ||
+                                        'Standard'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>{formatCurrency(item.basePriceCents)}</td>
+                              <td>
+                                <span
+                                  className={
+                                    item.status === 'review'
+                                      ? 'inventory-carry-status'
+                                      : 'inventory-carry-status is-on'
+                                  }
+                                >
+                                  {item.status === 'review'
+                                    ? 'Review'
+                                    : 'Ready'}
+                                </span>
+                              </td>
+                              <td
+                                className="inventory-catalog-action-cell"
+                                aria-hidden="true"
+                              >
+                                <span className="inventory-catalog-chevron">
+                                  ›
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {filteredStagedItems.length > STAGED_REVIEW_PAGE_SIZE ? (
+                    <div
+                      className="inventory-catalog-pagination"
+                      aria-label="Staged review pagination"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setStagedReviewPage((current) =>
+                            Math.max(1, current - 1),
+                          )
+                        }
+                        disabled={stagedReviewClampedPage <= 1}
+                      >
+                        Previous
+                      </button>
+                      <span>
+                        Page {stagedReviewClampedPage.toLocaleString()} of{' '}
+                        {stagedReviewPageCount.toLocaleString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setStagedReviewPage((current) =>
+                            Math.min(
+                              stagedReviewPageCount,
+                              current + 1,
+                            ),
+                          )
+                        }
+                        disabled={
+                          stagedReviewClampedPage >= stagedReviewPageCount
+                        }
+                      >
+                        Next
+                      </button>
+                    </div>
+                  ) : null}
+                </section>
+
+                {selectedStagedItem ? (
+                  <StagedItemDrawer
+                    item={selectedStagedItem}
+                    onClose={() => setSelectedStagedItemId(null)}
+                    onUpdate={(patch) =>
+                      updateStagedItem(selectedStagedItem.id, patch)
+                    }
+                    onToggleIncluded={(included) =>
+                      toggleStagedItemIncluded(
+                        selectedStagedItem.id,
+                        included,
+                      )
+                    }
+                  />
+                ) : null}
+              </>
             ) : null}
           </>
         ) : null}
@@ -750,6 +906,152 @@ function ToastWorkbook() {
           {downloadError ? <p className="inventory-error">{downloadError}</p> : null}
         </section>
       </section>
+  )
+}
+
+function StagedItemDrawer({
+  item,
+  onClose,
+  onUpdate,
+  onToggleIncluded,
+}: {
+  item: NormalizedMenuItem
+  onClose: () => void
+  onUpdate: (patch: Partial<NormalizedMenuItem>) => void
+  onToggleIncluded: (included: boolean) => void
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (!dialog.open) dialog.showModal()
+
+    return () => {
+      if (dialog.open) dialog.close()
+    }
+  }, [])
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="inventory-edit-drawer inventory-catalog-drawer"
+      aria-labelledby="staged-item-drawer-title"
+      onCancel={(event) => {
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div className="inventory-catalog-drawer-heading">
+        <div>
+          <p className="inventory-kicker">Staged Toast workbook</p>
+          <h2 id="staged-item-drawer-title">{item.name}</h2>
+          <p>
+            Browser-only review ·{' '}
+            {item.status === 'review' ? 'Needs review' : 'Ready'}
+          </p>
+        </div>
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      {item.notes.length ? (
+        <section className="inventory-drawer-section">
+          <div className="inventory-drawer-section-heading">
+            <div>
+              <p className="inventory-kicker">Source warnings</p>
+              <h3>Review notes</h3>
+            </div>
+          </div>
+          <ul className="inventory-warning-list">
+            {item.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <section className="inventory-drawer-section">
+        <div className="inventory-drawer-section-heading">
+          <div>
+            <p className="inventory-kicker">Normalized values</p>
+            <h3>Toast item</h3>
+          </div>
+        </div>
+
+        <label className="inventory-search-control">
+          <span>Item name</span>
+          <input
+            type="text"
+            value={item.name}
+            onChange={(event) => onUpdate({ name: event.target.value })}
+          />
+        </label>
+
+        <label className="inventory-search-control">
+          <span>Toast category</span>
+          <input
+            type="text"
+            value={item.toastCategory}
+            onChange={(event) =>
+              onUpdate({
+                category: event.target.value,
+                toastCategory: event.target.value,
+              })
+            }
+          />
+        </label>
+
+        <label className="inventory-search-control">
+          <span>Toast destination</span>
+          <input
+            type="text"
+            value={item.toastDestination}
+            onChange={(event) =>
+              onUpdate({ toastDestination: event.target.value })
+            }
+          />
+        </label>
+
+        <label className="inventory-search-control">
+          <span>Price</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={
+              item.basePriceCents === null
+                ? ''
+                : (item.basePriceCents / 100).toFixed(2)
+            }
+            onChange={(event) => {
+              const value = event.target.value.trim()
+              const dollars = Number(value)
+              onUpdate({
+                basePriceCents:
+                  value && Number.isFinite(dollars) && dollars > 0
+                    ? Math.round(dollars * 100)
+                    : null,
+              })
+            }}
+          />
+        </label>
+
+        <label className="inventory-inline-toggle">
+          <input
+            type="checkbox"
+            checked={item.exportIncluded}
+            disabled={item.basePriceCents === null}
+            onChange={(event) => onToggleIncluded(event.target.checked)}
+          />
+          <span>Include in staged Toast export</span>
+        </label>
+      </section>
+    </dialog>
   )
 }
 
