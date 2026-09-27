@@ -362,11 +362,17 @@ function ToastWorkbook() {
           !/^\[Review /i.test(updated.name) &&
           updated.basePriceCents !== null
 
+        const becameReady = item.status === 'review' && ready
+
         return {
           ...updated,
           status: ready ? 'ready' : 'review',
-          exportToToast: ready && updated.exportToToast !== false,
-          exportIncluded: ready && updated.exportIncluded !== false,
+          exportToToast: becameReady
+            ? true
+            : ready && updated.exportToToast !== false,
+          exportIncluded: becameReady
+            ? true
+            : ready && updated.exportIncluded !== false,
         } satisfies NormalizedMenuItem
       })
 
