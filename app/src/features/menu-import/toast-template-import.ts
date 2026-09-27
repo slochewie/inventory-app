@@ -137,14 +137,13 @@ function parseBeerSheet(workbookPackage: WorkbookPackage, sheet: WorkbookSheet) 
       if (!name || price === null) continue
       if (isLikelyInstructionRow(name)) continue
 
-      const destination = getBeerDestination(slot)
       const row = buildRawRow(sheet.name, rowNumber, slot.label, name, price, happyHour)
       items.push(createItem({
         id: `toast-xlsx:beer:${slot.kind}:${slot.priceCol}:${rowNumber}`,
         name: slot.kind === 'draft' ? `${name} ${slot.label}` : name,
         category: getBeerCategory(slot),
         toastCategory: 'Beer',
-        toastDestination: destination,
+        toastDestination: '',
         basePriceCents: price,
         happyHourPriceCents: happyHour,
         rawRow: row,
@@ -269,7 +268,7 @@ function parseLiquorSheet(workbookPackage: WorkbookPackage, sheet: WorkbookSheet
         name,
         category: liquorType,
         toastCategory: liquorType,
-        toastDestination: `Toast Liquor tab: ${liquorType}`,
+        toastDestination: '',
         basePriceCents: price,
         happyHourPriceCents: happyHour,
         rawRow: row,
@@ -310,9 +309,9 @@ function parseGenericSheet(workbookPackage: WorkbookPackage, sheet: WorkbookShee
     items.push(createItem({
       id: `toast-xlsx:${sheet.name}:${nameCol}:${rowNumber}`,
       name,
-      category: toastCategory,
+      category: config.toastCategory,
       toastCategory,
-      toastDestination: `Toast ${sheet.name} tab${group ? `: ${group}` : ''}`,
+      toastDestination: '',
       basePriceCents: price,
       happyHourPriceCents: happyHour,
       rawRow: row,
