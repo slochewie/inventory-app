@@ -23,6 +23,7 @@ import {
   parseToastWorkbookForReview,
   TOAST_WORKBOOK_STAGING_PARSER_VERSION,
 } from '#/features/menu-import/toast-workbook-import'
+import { getToastWorkbookCategory } from '#/features/menu-import/workbook-routing'
 import {
   buildPopulatedToastTemplateWorkbookWithLiquorAsync,
   validatePopulatedToastTemplateWorkbookWithLiquor,
@@ -151,6 +152,7 @@ function ToastWorkbook() {
     optionalBeerCategoryRows: number[]
     liquorRows: number
     cocktailRows: number
+    naBevRows: number
     retailRows: number
     happyHourNotes: boolean
   } | null>(null)
@@ -163,7 +165,9 @@ function ToastWorkbook() {
     useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
-  const beerExportItemCount = items.filter((item) => item.exportIncluded && item.toastCategory === 'Beer').length
+  const beerExportItemCount = items.filter(
+    (item) => item.exportIncluded && getToastWorkbookCategory(item) === 'Beer',
+  ).length
   const liquorExportItemCount = items.filter((item) => item.exportIncluded && isLiquorItem(item)).length
   const organizationName = importFile?.meta?.store?.trim() || 'Organization'
   const stagedReviewCategories = useMemo(
@@ -614,6 +618,7 @@ function ToastWorkbook() {
       optionalBeerCategoryRows: validation.beer.optionalBeerCategoryRows,
       liquorRows: validation.liquorRows,
       cocktailRows: validation.cocktailRows,
+      naBevRows: validation.naBevRows,
       retailRows: validation.retailRows,
       happyHourNotes: validation.happyHourNotes,
     })
@@ -890,12 +895,10 @@ function ToastWorkbook() {
                               <td>
                                 <div className="inventory-catalog-item-cell">
                                   <strong>{item.name}</strong>
-                                  <span>{item.toastCategory}</span>
+                                  <span>{item.category || item.toastCategory}</span>
                                   <div className="inventory-format-list">
                                     <span>
-                                      {item.toastDestination ||
-                                        item.variantLabel ||
-                                        'Standard'}
+                                      {item.variantLabel || 'Standard'}
                                     </span>
                                   </div>
                                 </div>
@@ -1043,15 +1046,15 @@ function ToastWorkbook() {
                   : '0 optional Beer rows'}
                 {' · '}
                 {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows ·{' '}
-                {workbookValidation.cocktailRows} cocktail rows · {workbookValidation.retailRows} retail rows ·{' '}
-                Notes schedule checked
+                {workbookValidation.cocktailRows} cocktail rows · {workbookValidation.naBevRows} NA Bev rows ·{' '}
+                {workbookValidation.retailRows} retail rows · Notes schedule checked
               </span>
             </div>
           ) : (
             <div className="inventory-workbook-validation">
               <strong>Automatic validation</strong>
               <span>
-                Beer, Liquor, Cocktails, Retail, Happy Hour cells, optional Beer categories, 24oz cans, and the Notes-tab schedule are checked before download.
+                Beer, Liquor, Cocktails, NA Bev, Retail, Happy Hour cells, optional Beer categories, 24oz cans, and the Notes schedule are checked before download.
               </span>
             </div>
           )}
@@ -1169,7 +1172,7 @@ function StagedItemDrawer({
         </label>
 
         <label className="inventory-search-control">
-          <span>Toast category</span>
+          <span>Menu Category</span>
           <input
             type="text"
             value={item.toastCategory}

@@ -1,6 +1,7 @@
 import { buildBeerTabPreviewRows, type BeerTabPreviewRow } from './beer-preview'
 import { saveReviewedItems } from './review-session'
 import type { NormalizedMenuItem } from './types'
+import { getToastWorkbookCategory } from './workbook-routing'
 
 export type ToastExportFile = {
   id: 'export-review' | 'beer-tab' | 'liquor' | 'audit'
@@ -92,7 +93,9 @@ export function buildToastExportFiles(
   if (items.length > 0) saveReviewedItems(items)
 
   const included = items.filter((item) => item.exportIncluded && item.status !== 'ignored')
-  const beerItems = included.filter((item) => item.toastCategory.toLowerCase() === 'beer')
+  const beerItems = included.filter(
+    (item) => getToastWorkbookCategory(item) === 'Beer',
+  )
   const liquorItems = included.filter((item) => isLiquorItem(item))
   const exportReviewRows = buildReviewRows(included)
   const auditRows = buildReviewRows(items)

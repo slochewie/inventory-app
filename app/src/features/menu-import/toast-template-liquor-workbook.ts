@@ -7,6 +7,10 @@ import {
   type ToastDraftSlotMapping,
 } from './toast-template-workbook'
 import type { NormalizedMenuItem } from './types'
+import {
+  getToastWorkbookCategory,
+  normalizeToastWorkbookCategory,
+} from './workbook-routing'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const WORKBOOK_PATH = 'xl/workbook.xml'
@@ -141,7 +145,10 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
 
   populateLiquorSheet(workbookPackage, items, happyHourEnabled)
   populateCocktailsSheet(workbookPackage, items, happyHourEnabled)
+  // Retail duplicates the pristine NA Bev sheet when needed, so create it
+  // before writing NA Bev rows into the source worksheet.
   populateRetailSheet(workbookPackage, items)
+  populateNaBevSheet(workbookPackage, items)
   populateHappyHourNotesSheet(
     workbookPackage,
     happyHourEnabled,
@@ -219,6 +226,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     issues,
   )
   const retail = validateRetailSheet(workbookPackage, items, issues)
+  const naBev = validateNaBevSheet(workbookPackage, items, issues)
 
   const happyHourNotes = validateHappyHourNotesSheet(
     workbookPackage,
@@ -245,6 +253,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     },
     liquorRows,
     cocktailRows: cocktails,
+    naBevRows: naBev,
     retailRows: retail,
     happyHourNotes: happyHourNotes.valid,
   }
@@ -259,6 +268,17 @@ function populateCocktailsSheet(
   if (rows.length === 0) return
 
   const mapping = getSimpleSheetMapping(workbookPackage, 'Cocktails')
+  writeSimpleMenuRows(workbookPackage, mapping, rows)
+}
+
+function populateNaBevSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+) {
+  const rows = getNaBevRows(items)
+  if (rows.length === 0) return
+
+  const mapping = getSimpleSheetMapping(workbookPackage, 'NA Bev')
   writeSimpleMenuRows(workbookPackage, mapping, rows)
 }
 
@@ -283,10 +303,7 @@ function getCocktailRows(
       (item) =>
         item.exportIncluded &&
         item.basePriceCents !== null &&
-        (
-          /cocktail/i.test(clean(item.toastDestination)) ||
-          /cocktail/i.test(clean(item.toastCategory))
-        ),
+        getToastWorkbookCategory(item) === 'Cocktails',
     )
     .map((item) => ({
       itemName: clean(item.name),
@@ -296,36 +313,66 @@ function getCocktailRows(
           ? item.happyHourPriceCents / 100
           : null,
       description: clean(item.rawRows[0]?.description),
-      menuGroup: clean(item.toastCategory) || 'Cocktails',
+      menuGroup: getSimpleMenuGroup(item, 'Cocktails'),
     }))
     .filter((row) => row.itemName)
     .sort((left, right) => left.itemName.localeCompare(right.itemName))
 }
 
+function getNaBevRows(items: NormalizedMenuItem[]): SimpleMenuRow[] {
+  return getSimpleCategoryRows(items, 'NA Bev')
+}
+
 function getRetailRows(items: NormalizedMenuItem[]): SimpleMenuRow[] {
+  return getSimpleCategoryRows(items, 'Retail')
+}
+
+function getSimpleCategoryRows(
+  items: NormalizedMenuItem[],
+  workbookCategory: 'NA Bev' | 'Retail',
+): SimpleMenuRow[] {
   return items
     .filter(
       (item) =>
         item.exportIncluded &&
         item.basePriceCents !== null &&
-        (
-          /^retail$/i.test(clean(item.toastDestination)) ||
-          /^retail$/i.test(clean(item.toastCategory))
-        ),
+        getToastWorkbookCategory(item) === workbookCategory,
     )
     .map((item) => ({
       itemName: clean(item.name),
       basePrice: item.basePriceCents! / 100,
       happyHourPrice: null,
-      description: clean(item.rawRows[0]?.description),
-      menuGroup:
-        clean(item.toastCategory) &&
-        !/^retail$/i.test(clean(item.toastCategory))
-          ? clean(item.toastCategory)
-          : 'Retail',
+      description: clean(
+        item.rawRows[0]?.description ??
+          item.rawRows[0]?.Description,
+      ),
+      menuGroup: getSimpleMenuGroup(item, workbookCategory),
     }))
     .filter((row) => row.itemName)
     .sort((left, right) => left.itemName.localeCompare(right.itemName))
+}
+
+function getSimpleMenuGroup(
+  item: NormalizedMenuItem,
+  workbookCategory: 'Cocktails' | 'NA Bev' | 'Retail',
+) {
+  const rawGroup = clean(
+    item.rawRows[0]?.Group ??
+      item.rawRows[0]?.group ??
+      item.rawRows[0]?.['Menu Group'] ??
+      item.rawRows[0]?.['Menu Group Name'],
+  )
+  if (rawGroup) return rawGroup
+
+  const visibleCategory = clean(item.category)
+  if (
+    visibleCategory &&
+    normalizeToastWorkbookCategory(visibleCategory) !== workbookCategory
+  ) {
+    return visibleCategory
+  }
+
+  return workbookCategory
 }
 
 function getSimpleSheetMapping(
@@ -495,6 +542,19 @@ function validateCocktailsSheet(
   if (rows.length === 0) return 0
 
   const mapping = getSimpleSheetMapping(workbookPackage, 'Cocktails')
+  validateSimpleMenuRows(workbookPackage, mapping, rows, issues)
+  return rows.length
+}
+
+function validateNaBevSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  issues: string[],
+) {
+  const rows = getNaBevRows(items)
+  if (rows.length === 0) return 0
+
+  const mapping = getSimpleSheetMapping(workbookPackage, 'NA Bev')
   validateSimpleMenuRows(workbookPackage, mapping, rows, issues)
   return rows.length
 }
