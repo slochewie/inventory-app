@@ -360,13 +360,6 @@ function createItem({
   }
 }
 
-function getBeerDestination(slot: BeerSlot) {
-  if (slot.kind === 'draft') return `Toast Beer tab: Draft Beer ${slot.label}`
-  if (slot.kind === 'can24oz') return 'Toast Beer tab: 24oz Can'
-  if (slot.kind === 'bottle') return 'Toast Beer tab: Bottle'
-  return 'Toast Beer tab: Can'
-}
-
 function getBeerCategory(slot: BeerSlot) {
   if (slot.kind === 'draft') return `DRAFT ${slot.label.toUpperCase()}`
   if (slot.kind === 'can24oz') return 'BEER CAN 24OZ'
