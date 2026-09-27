@@ -159,17 +159,13 @@ function ManualItemPage() {
   }, [catalogCategoryOptions, menuCategories])
 
   const allDestinationOptions = useMemo(() => {
-    const categoryKeys = new Set(
-      categoryOptions.map((option) => option.trim().toLowerCase()),
-    )
-
     return mergeCategoryOptions(
       destinationOptions,
       menuCategories
         .map((category) => normalizeToastDestination(category.toastDestination))
         .filter(Boolean),
-    ).filter((destination) => !categoryKeys.has(destination.toLowerCase()))
-  }, [categoryOptions, destinationOptions, menuCategories])
+    )
+  }, [destinationOptions, menuCategories])
 
   const enabledOptionalBeerCategories = useMemo(
     () => optionalBeerCategories.filter((category) => category.enabled),
