@@ -1,5 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import {
@@ -113,6 +120,18 @@ function ManualItemPage() {
 
   function updateDraft(patch: Partial<ManualItemDraft>) {
     setDraft((current) => ({ ...current, ...patch }))
+    setSuccess(null)
+  }
+
+  function updateCategory(category: string) {
+    setDraft((current) => ({
+      ...current,
+      category,
+      toastCategory:
+        !current.toastCategory.trim() || current.toastCategory === current.category
+          ? category
+          : current.toastCategory,
+    }))
     setSuccess(null)
   }
 
@@ -261,58 +280,32 @@ function ManualItemPage() {
                 />
               </label>
 
-              <label className="inventory-search-control">
-                <span>Menu group / category</span>
-                <input
-                  value={draft.category}
-                  disabled={saving}
-                  onChange={(event) =>
-                    updateDraft({
-                      category: event.target.value,
-                      toastCategory: draft.toastCategory || event.target.value,
-                    })
-                  }
-                  list="manual-item-categories"
-                  placeholder="Beer, Cocktails, Retail…"
-                />
-                <datalist id="manual-item-categories">
-                  {categoryOptions.map((option) => (
-                    <option key={option} value={option} />
-                  ))}
-                </datalist>
-              </label>
+              <ManualCombobox
+                label="Menu group / category"
+                value={draft.category}
+                options={categoryOptions}
+                disabled={saving}
+                placeholder="Beer, Cocktails, Retail…"
+                onChange={updateCategory}
+              />
 
-              <label className="inventory-search-control">
-                <span>Toast category</span>
-                <input
-                  value={draft.toastCategory}
-                  disabled={saving}
-                  onChange={(event) => updateDraft({ toastCategory: event.target.value })}
-                  list="manual-item-toast-categories"
-                  placeholder={normalizedToastCategory}
-                />
-                <datalist id="manual-item-toast-categories">
-                  {categoryOptions.map((option) => (
-                    <option key={option} value={option} />
-                  ))}
-                </datalist>
-              </label>
+              <ManualCombobox
+                label="Toast category"
+                value={draft.toastCategory}
+                options={categoryOptions}
+                disabled={saving}
+                placeholder={normalizedToastCategory}
+                onChange={(value) => updateDraft({ toastCategory: value })}
+              />
 
-              <label className="inventory-search-control">
-                <span>Toast destination</span>
-                <input
-                  value={draft.toastDestination}
-                  disabled={saving}
-                  onChange={(event) => updateDraft({ toastDestination: event.target.value })}
-                  list="manual-item-destinations"
-                  placeholder="Bar"
-                />
-                <datalist id="manual-item-destinations">
-                  {destinationOptions.map((option) => (
-                    <option key={option} value={option} />
-                  ))}
-                </datalist>
-              </label>
+              <ManualCombobox
+                label="Toast destination"
+                value={draft.toastDestination}
+                options={destinationOptions}
+                disabled={saving}
+                placeholder="Bar"
+                onChange={(value) => updateDraft({ toastDestination: value })}
+              />
 
               <label className="inventory-search-control">
                 <span>Price</span>
@@ -406,6 +399,140 @@ function ManualItemPage() {
         </section>
       </section>
     </AuthenticatedInventoryShell>
+  )
+}
+
+type ManualComboboxProps = {
+  label: string
+  value: string
+  options: string[]
+  placeholder?: string
+  disabled?: boolean
+  onChange: (value: string) => void
+}
+
+function ManualCombobox({
+  label,
+  value,
+  options,
+  placeholder,
+  disabled = false,
+  onChange,
+}: ManualComboboxProps) {
+  const inputId = useId()
+  const listboxId = `${inputId}-options`
+  const [open, setOpen] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
+
+  const filteredOptions = useMemo(() => {
+    const normalizedValue = value.trim().toLowerCase()
+    const filtered = normalizedValue
+      ? options.filter((option) => option.toLowerCase().includes(normalizedValue))
+      : options
+
+    return filtered.slice(0, 8)
+  }, [options, value])
+
+  const hasOptions = filteredOptions.length > 0
+  const showOptions = open && !disabled && hasOptions
+
+  function chooseOption(option: string) {
+    onChange(option)
+    setOpen(false)
+    setHighlightedIndex(0)
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (disabled) return
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setOpen(true)
+      setHighlightedIndex((current) =>
+        hasOptions ? Math.min(current + 1, filteredOptions.length - 1) : 0,
+      )
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setOpen(true)
+      setHighlightedIndex((current) => Math.max(current - 1, 0))
+      return
+    }
+
+    if (event.key === 'Enter' && open && hasOptions) {
+      event.preventDefault()
+      chooseOption(filteredOptions[highlightedIndex] ?? filteredOptions[0])
+      return
+    }
+
+    if (event.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+
+  return (
+    <label className="inventory-search-control inventory-manual-combobox">
+      <span>{label}</span>
+      <input
+        id={inputId}
+        type="text"
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={showOptions}
+        aria-controls={listboxId}
+        aria-activedescendant={
+          showOptions ? `${listboxId}-${highlightedIndex}` : undefined
+        }
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onChange={(event) => {
+          onChange(event.target.value)
+          setOpen(true)
+          setHighlightedIndex(0)
+        }}
+        onKeyDown={handleKeyDown}
+      />
+      <button
+        type="button"
+        className="inventory-manual-combobox-toggle"
+        disabled={disabled || options.length === 0}
+        aria-label={`Show ${label} suggestions`}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setOpen((current) => !current)}
+      >
+        ▾
+      </button>
+      {showOptions ? (
+        <div id={listboxId} className="inventory-manual-combobox-list" role="listbox">
+          {filteredOptions.map((option, index) => (
+            <button
+              key={option}
+              id={`${listboxId}-${index}`}
+              type="button"
+              role="option"
+              aria-selected={index === highlightedIndex}
+              className={
+                index === highlightedIndex
+                  ? 'inventory-manual-combobox-option is-active'
+                  : 'inventory-manual-combobox-option'
+              }
+              onMouseEnter={() => setHighlightedIndex(index)}
+              onMouseDown={(event) => {
+                event.preventDefault()
+                chooseOption(option)
+              }}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </label>
   )
 }
 
