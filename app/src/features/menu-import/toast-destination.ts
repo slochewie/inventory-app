@@ -5,6 +5,28 @@ export type ToastDestination = {
   note?: string
 }
 
+const BUILT_IN_TOAST_DESTINATIONS = [
+  'Beer tab · Draft Beer 10oz',
+  'Beer tab · Draft Beer 16oz',
+  'Beer tab · Can',
+  'Beer tab · 24oz Can',
+  'Beer tab · Bottle',
+  'Brandy/Cognac',
+  'Cocktails',
+  'Gin',
+  'Liqueurs',
+  'NA Bev',
+  'Rum',
+  'Scotch',
+  'Tequila',
+  'Vodka',
+  'Whiskey/Bourbon',
+] as const
+
+export function getBuiltInToastDestinations() {
+  return [...BUILT_IN_TOAST_DESTINATIONS]
+}
+
 const BEER_DESTINATIONS = new Map<string, ToastDestination>([
   [
     'BEER CAN',
