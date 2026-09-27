@@ -256,7 +256,8 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       }
 
       const itemName =
-        clean(name) || `[Review ${sheet.name} row ${rowNumber}]`
+        normalizeItemName(name) ||
+        `[Review ${sheet.name} row ${rowNumber}]`
 
       items.push(
         createItem({
@@ -370,7 +371,7 @@ function parseLiquorSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
         createItem({
           id: `toast-workbook:liquor:${rowNumber}:${nameCol}`,
           name:
-            clean(name) ||
+            normalizeItemName(name) ||
             `[Review ${sheet.name} ${category} row ${rowNumber}]`,
           category,
           toastCategory: normalizeLiquorCategory(category),
@@ -470,7 +471,8 @@ function parseCocktailsSheet(
       createItem({
         id: `toast-workbook:cocktail:${rowNumber}`,
         name:
-          clean(name) || `[Review ${sheet.name} row ${rowNumber}]`,
+          normalizeItemName(name) ||
+          `[Review ${sheet.name} row ${rowNumber}]`,
         category: clean(menuGroup) || 'Cocktails',
         toastCategory: clean(menuGroup) || 'Cocktails',
         toastDestination: 'Cocktails',
@@ -553,7 +555,8 @@ function parseRetailSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
       createItem({
         id: `toast-workbook:retail:${rowNumber}`,
         name:
-          clean(name) || `[Review ${sheet.name} row ${rowNumber}]`,
+          normalizeItemName(name) ||
+          `[Review ${sheet.name} row ${rowNumber}]`,
         category: clean(group) || 'Retail',
         toastCategory: clean(group) || 'Retail',
         toastDestination: 'Retail',
@@ -831,6 +834,17 @@ function moneyToCents(value: string) {
 
 function isPositiveMoney(value: string) {
   return moneyToCents(value) !== null
+}
+
+function normalizeItemName(value: string) {
+  const normalized = clean(value)
+  if (!normalized) return ''
+
+  if (/^-?\d+\.0+$/.test(normalized)) {
+    return normalized.replace(/\.0+$/, '')
+  }
+
+  return normalized
 }
 
 function isToastTemplateInstruction(value: string) {
