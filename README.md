@@ -257,6 +257,10 @@ Run its tests with:
 bash ./bash-scripts/test-all.sh
 ```
 
+## Staged Toast draft-slot preservation
+
+When an existing Toast workbook is staged for review, Inventory preserves the structural draft-slot mapping from the source Beer tab. For example, if Toast's first structural draft slot is labeled **12oz**, staging records that as **Toast 8oz slot → actual 12oz** and uses that mapping when regenerating the workbook. Staged Toast imports read all four draft price slots rather than assuming only the first draft size.
+
 ## Toast Cocktails and Retail workbook output
 
 Toast workbook generation now supports the existing **Cocktails** tab and an optional **Retail** tab.

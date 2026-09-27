@@ -497,7 +497,14 @@ function ToastWorkbook() {
     if (!workbook) throw new Error('Toast source template is not loaded')
 
     const happyHourEnabled = organizationConfig?.happyHourEnabled === true
-    const draftSlotMappings = getOrganizationDraftSlotMappings(organizationConfig)
+    const stagedDraftSlotMappings =
+      reviewSource === 'toast-workbook'
+        ? getStagedDraftSlotMappings(importFile)
+        : []
+    const draftSlotMappings =
+      stagedDraftSlotMappings.length > 0
+        ? stagedDraftSlotMappings
+        : getOrganizationDraftSlotMappings(organizationConfig)
     const optionalBeerCategories = organizationConfig
       ? getOptionalBeerCategories(organizationConfig).map(({ enabled, label }) => ({
           enabled,
@@ -1165,6 +1172,46 @@ function StagedItemDrawer({
       </section>
     </dialog>
   )
+}
+
+function getStagedDraftSlotMappings(
+  importFile: ParsedMenuImport | null,
+): ToastDraftSlotMapping[] {
+  const raw = importFile?.meta?.draftSlotMappings
+  if (!raw) return []
+
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+
+    return parsed.flatMap((mapping): ToastDraftSlotMapping[] => {
+      if (
+        !mapping ||
+        typeof mapping !== 'object' ||
+        !('toastSizeOz' in mapping) ||
+        !('actualSizeOz' in mapping)
+      ) {
+        return []
+      }
+
+      const toastSizeOz =
+        mapping.toastSizeOz === null ? null : Number(mapping.toastSizeOz)
+      const actualSizeOz = Number(mapping.actualSizeOz)
+
+      if (
+        (toastSizeOz !== null &&
+          ![8, 16, 24].includes(toastSizeOz)) ||
+        !Number.isFinite(actualSizeOz) ||
+        actualSizeOz <= 0
+      ) {
+        return []
+      }
+
+      return [{ toastSizeOz, actualSizeOz }]
+    })
+  } catch {
+    return []
+  }
 }
 
 function getOrganizationDraftSlotMappings(

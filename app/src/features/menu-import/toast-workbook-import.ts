@@ -10,7 +10,7 @@ const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
 const RELATIONSHIP_NS =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 
-export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '2'
+export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '3'
 
 const TRUSTED_SOURCE_TABS = new Set([
   'beer',
@@ -70,12 +70,18 @@ export function parseToastWorkbookForReview(
   const items: NormalizedMenuItem[] = []
   const warnings: string[] = []
 
+  let draftSlotMappings: Array<{
+    toastSizeOz: number | null
+    actualSizeOz: number
+  }> = []
+
   const beerSheet = findSheet(visibleTrustedSheets, 'Beer')
   if (beerSheet) {
     const parsed = parseBeerSheet(workbook, beerSheet)
     rows.push(...parsed.rows)
     items.push(...parsed.items)
     warnings.push(...parsed.warnings)
+    draftSlotMappings = parsed.draftSlotMappings
   } else {
     warnings.push('Visible Beer source tab was not found.')
   }
@@ -133,6 +139,7 @@ export function parseToastWorkbookForReview(
       stagingOnly: 'true',
       parserVersion: TOAST_WORKBOOK_STAGING_PARSER_VERSION,
       sourceTabs: visibleTrustedSheets.map((sheet) => sheet.name).join(', '),
+      draftSlotMappings: JSON.stringify(draftSlotMappings),
     },
   }
 
@@ -163,17 +170,57 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
     headerRow,
     workbook.sharedStrings,
   )
-  const draftSize = parseSizeOz(headerValues.get(2) ?? '') ?? null
-  const slots = [
-    {
-      kind: 'draft',
+  const structuralDraftSlots = [
+    { toastSizeOz: 8, priceCol: 2, happyHourCol: 3 },
+    { toastSizeOz: 16, priceCol: 4, happyHourCol: 5 },
+    { toastSizeOz: 24, priceCol: 6, happyHourCol: 7 },
+    { toastSizeOz: null, priceCol: 8, happyHourCol: 9 },
+  ] as const
+
+  const draftSlots = structuralDraftSlots.flatMap((slot) => {
+    const header = clean(headerValues.get(slot.priceCol))
+    const actualSizeOz = parseSizeOz(header)
+
+    if (slot.toastSizeOz === null) {
+      return /^pitcher$/i.test(header)
+        ? [{
+            kind: 'draft' as const,
+            nameCol: 1,
+            priceCol: slot.priceCol,
+            happyHourCol: slot.happyHourCol,
+            destination: 'Pitcher',
+            sizeOz: null,
+            toastSlot: null,
+            structuralToastSizeOz: null,
+          }]
+        : []
+    }
+
+    if (actualSizeOz === null) return []
+
+    return [{
+      kind: 'draft' as const,
       nameCol: 1,
-      priceCol: 2,
-      happyHourCol: 3,
-      destination: draftSize ? `${draftSize}oz Draft` : 'Draft',
-      sizeOz: draftSize,
+      priceCol: slot.priceCol,
+      happyHourCol: slot.happyHourCol,
+      destination: `${actualSizeOz}oz Draft`,
+      sizeOz: actualSizeOz,
       toastSlot: null,
-    },
+      structuralToastSizeOz: slot.toastSizeOz,
+    }]
+  })
+
+  const draftSlotMappings = draftSlots.flatMap((slot) =>
+    slot.structuralToastSizeOz !== null && slot.sizeOz !== null
+      ? [{
+          toastSizeOz: slot.structuralToastSizeOz,
+          actualSizeOz: slot.sizeOz,
+        }]
+      : [],
+  )
+
+  const slots = [
+    ...draftSlots,
     {
       kind: 'can',
       nameCol: 10,
@@ -261,7 +308,7 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
 
       items.push(
         createItem({
-          id: `toast-workbook:beer:${rowNumber}:${slot.nameCol}`,
+          id: `toast-workbook:beer:${rowNumber}:${slot.priceCol}`,
           name: itemName,
           category: 'Beer',
           toastCategory: 'Beer',
@@ -282,7 +329,7 @@ function parseBeerSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
     })
   }
 
-  return { rows, items, warnings }
+  return { rows, items, warnings, draftSlotMappings }
 }
 
 function parseLiquorSheet(workbook: ParsedWorkbook, sheet: WorkbookSheet) {
