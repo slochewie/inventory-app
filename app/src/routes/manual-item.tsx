@@ -23,6 +23,7 @@ import {
   findSavedMenuCategory,
   listSavedMenuCategories,
   mergeCategoryOptions,
+  normalizeToastDestination,
   type InventoryMenuCategory,
 } from '#/lib/menu-categories'
 import './manual-item.css'
@@ -32,7 +33,6 @@ export const Route = createFileRoute('/manual-item')({ component: ManualItemPage
 type ManualItemDraft = {
   name: string
   category: string
-  toastCategory: string
   toastDestination: string
   price: string
   happyHourPrice: string
@@ -44,7 +44,6 @@ type ManualItemDraft = {
 const EMPTY_DRAFT: ManualItemDraft = {
   name: '',
   category: '',
-  toastCategory: '',
   toastDestination: '',
   price: '',
   happyHourPrice: '',
@@ -122,13 +121,15 @@ function ManualItemPage() {
 
         catalog.items.forEach((row) => {
           const category =
+            row.category?.name ??
             row.organization.toastCategoryOverride ??
-            row.category?.toastCategory ??
-            row.category?.name
+            row.category?.toastCategory
           if (category?.trim()) categories.add(category.trim())
 
-          const destination = row.organization.toastDestinationOverride
-          if (destination?.trim()) destinations.add(destination.trim())
+          const destination = normalizeToastDestination(
+            row.organization.toastDestinationOverride,
+          )
+          if (destination) destinations.add(destination)
         })
 
         setCatalogCategoryOptions([...categories].sort((left, right) => left.localeCompare(right)))
@@ -151,18 +152,18 @@ function ManualItemPage() {
   }, [activeOrganization?.id])
 
   const categoryOptions = useMemo(() => {
-    const savedCategoryOptions = menuCategories.flatMap((category) => [
-      category.name,
-      category.toastCategory,
-    ])
-
-    return mergeCategoryOptions(catalogCategoryOptions, savedCategoryOptions)
+    return mergeCategoryOptions(
+      catalogCategoryOptions,
+      menuCategories.map((category) => category.name),
+    )
   }, [catalogCategoryOptions, menuCategories])
 
   const allDestinationOptions = useMemo(() => {
     return mergeCategoryOptions(
       destinationOptions,
-      menuCategories.map((category) => category.toastDestination),
+      menuCategories
+        .map((category) => normalizeToastDestination(category.toastDestination))
+        .filter(Boolean),
     )
   }, [destinationOptions, menuCategories])
 
@@ -172,10 +173,15 @@ function ManualItemPage() {
   )
 
   const normalizedCategory = draft.category.trim()
-  const normalizedToastCategory =
-    draft.toastCategory.trim() || normalizedCategory || 'Uncategorized'
-  const isBeerItem = [normalizedCategory, normalizedToastCategory]
-    .some((value) => value.toLowerCase().includes('beer'))
+  const selectedMenuCategory = findSavedMenuCategory(
+    menuCategories,
+    normalizedCategory,
+  )
+  const workbookCategory =
+    selectedMenuCategory?.toastCategory.trim() ||
+    normalizedCategory ||
+    'Uncategorized'
+  const isBeerItem = workbookCategory.toLowerCase() === 'beer'
   const showToastBeerSlot = isBeerItem && enabledOptionalBeerCategories.length > 0
   const exportToToast = draft.availableHere && draft.exportToToast
 
@@ -190,13 +196,9 @@ function ManualItemPage() {
     setDraft((current) => ({
       ...current,
       category,
-      toastCategory:
-        !current.toastCategory.trim() || current.toastCategory === current.category
-          ? menuCategory?.toastCategory || category
-          : current.toastCategory,
       toastDestination:
         !current.toastDestination.trim() && menuCategory?.toastDestination
-          ? menuCategory.toastDestination
+          ? normalizeToastDestination(menuCategory.toastDestination)
           : current.toastDestination,
     }))
     setSuccess(null)
@@ -226,8 +228,8 @@ function ManualItemPage() {
     }
 
     const sourceId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const category = normalizedCategory || normalizedToastCategory
-    const toastDestination = draft.toastDestination.trim()
+    const category = normalizedCategory || workbookCategory
+    const toastDestination = normalizeToastDestination(draft.toastDestination)
     const toastSlot = showToastBeerSlot ? draft.toastSlot || null : null
 
     setSaving(true)
@@ -248,7 +250,7 @@ function ManualItemPage() {
             sourceItemNumber: sourceId,
             name,
             category,
-            toastCategory: normalizedToastCategory,
+            toastCategory: workbookCategory,
             toastDestination,
             basePriceCents: basePrice.value,
             happyHourPriceCents: happyHourPrice.value,
@@ -269,7 +271,7 @@ function ManualItemPage() {
 
         return (
           rowName.trim().toLowerCase() === name.toLowerCase() &&
-          rowCategory.trim().toLowerCase() === normalizedToastCategory.toLowerCase()
+          rowCategory.trim().toLowerCase() === workbookCategory.toLowerCase()
         )
       })
 
@@ -281,7 +283,7 @@ function ManualItemPage() {
           exportToToast,
           priceOverrideCents: basePrice.value,
           happyHourPriceCents: happyHourPrice.value,
-          toastCategoryOverride: normalizedToastCategory,
+          toastCategoryOverride: workbookCategory,
           toastDestinationOverride: toastDestination || null,
           toastSlot,
         })
@@ -353,21 +355,12 @@ function ManualItemPage() {
               </label>
 
               <ManualCombobox
-                label="Menu group / category"
+                label="Menu Category"
                 value={draft.category}
                 options={categoryOptions}
                 disabled={saving}
                 placeholder="Beer, Cocktails, Retail…"
                 onChange={updateCategory}
-              />
-
-              <ManualCombobox
-                label="Toast category"
-                value={draft.toastCategory}
-                options={categoryOptions}
-                disabled={saving}
-                placeholder={normalizedToastCategory}
-                onChange={(value) => updateDraft({ toastCategory: value })}
               />
 
               <ManualCombobox

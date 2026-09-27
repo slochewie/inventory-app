@@ -18,14 +18,12 @@ export const Route = createFileRoute('/menu-categories')({
 type MenuCategoryDraft = {
   id: string | null
   name: string
-  toastCategory: string
   toastDestination: string
 }
 
 const EMPTY_DRAFT: MenuCategoryDraft = {
   id: null,
   name: '',
-  toastCategory: '',
   toastDestination: '',
 }
 
@@ -62,18 +60,7 @@ function MenuCategoriesPage() {
   }
 
   function updateDraft(patch: Partial<MenuCategoryDraft>) {
-    setDraft((current) => {
-      const next = { ...current, ...patch }
-
-      if (
-        typeof patch.name === 'string' &&
-        (!current.toastCategory.trim() || current.toastCategory === current.name)
-      ) {
-        next.toastCategory = patch.name
-      }
-
-      return next
-    })
+    setDraft((current) => ({ ...current, ...patch }))
     setError(null)
     setSuccess(null)
   }
@@ -82,7 +69,6 @@ function MenuCategoriesPage() {
     setDraft({
       id: category.id,
       name: category.name,
-      toastCategory: category.toastCategory,
       toastDestination: category.toastDestination,
     })
     setError(null)
@@ -95,7 +81,6 @@ function MenuCategoriesPage() {
     try {
       const category = saveMenuCategory(activeOrganization.id, {
         name,
-        toastCategory: name,
         toastDestination: '',
       })
       reloadCategories()
@@ -116,7 +101,6 @@ function MenuCategoriesPage() {
       const category = saveMenuCategory(activeOrganization.id, {
         id: draft.id,
         name: draft.name,
-        toastCategory: draft.toastCategory,
         toastDestination: draft.toastDestination,
       })
       reloadCategories()
@@ -162,7 +146,7 @@ function MenuCategoriesPage() {
             <div>
               <h2>{draft.id ? 'Edit category' : 'Add category'}</h2>
               <p>
-                These categories are organization-scoped UI options for new manual items. Toast export still only writes rows for categories that have items.
+                Menu Category controls how items are grouped and routed during Toast export. Toast Destination is optional and should only name a real Toast destination such as Bar, Dining Room, or Patio.
               </p>
             </div>
           </div>
@@ -195,15 +179,6 @@ function MenuCategoriesPage() {
                   placeholder="NA Bev, Retail, Cocktails…"
                   onChange={(event) => updateDraft({ name: event.target.value })}
                   required
-                />
-              </label>
-
-              <label className="inventory-search-control">
-                <span>Toast category</span>
-                <input
-                  value={draft.toastCategory}
-                  placeholder={draft.name || 'Defaults to menu category'}
-                  onChange={(event) => updateDraft({ toastCategory: event.target.value })}
                 />
               </label>
 
@@ -241,7 +216,7 @@ function MenuCategoriesPage() {
             <div>
               <h2>Saved Menu Categories</h2>
               <p>
-                These appear in the Menu group / category and Toast category fields when manually adding items.
+                These appear in the Menu Category field when manually adding items.
               </p>
             </div>
           </div>
@@ -252,12 +227,9 @@ function MenuCategoriesPage() {
                 <article key={category.id} className="inventory-menu-category-row">
                   <div>
                     <strong>{category.name}</strong>
-                    <span>
-                      Toast category: {category.toastCategory || category.name}
-                      {category.toastDestination
-                        ? ` · Destination: ${category.toastDestination}`
-                        : ''}
-                    </span>
+                    {category.toastDestination ? (
+                      <span>Destination: {category.toastDestination}</span>
+                    ) : null}
                   </div>
                   <div className="inventory-menu-category-row-actions">
                     <button

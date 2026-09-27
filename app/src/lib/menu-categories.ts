@@ -20,19 +20,24 @@ type MenuCategoryDefault = {
 
 const MENU_CATEGORY_DEFAULTS: readonly MenuCategoryDefault[] = [
   {
-    name: 'NA Bev',
-    toastCategory: 'NA Bev',
-    toastDestination: 'Toast NA Bev tab',
-  },
-  {
-    name: 'Retail',
-    toastCategory: 'Retail',
-    toastDestination: 'Toast Retail tab',
+    name: 'Beer',
+    toastCategory: 'Beer',
+    toastDestination: '',
   },
   {
     name: 'Cocktails',
     toastCategory: 'Cocktails',
-    toastDestination: 'Toast Cocktails tab',
+    toastDestination: '',
+  },
+  {
+    name: 'NA Bev',
+    toastCategory: 'NA Bev',
+    toastDestination: '',
+  },
+  {
+    name: 'Retail',
+    toastCategory: 'Retail',
+    toastDestination: '',
   },
 ]
 
@@ -92,15 +97,21 @@ export function saveMenuCategory(
   }
 
   const defaults = getDefaultMenuCategory(name)
-  const toastCategory =
-    normalizeMenuCategoryName(input.toastCategory ?? '') || defaults?.toastCategory || name
-  const toastDestination =
-    normalizeMenuCategoryName(input.toastDestination ?? '') || defaults?.toastDestination || ''
   const now = new Date().toISOString()
   const categories = listSavedMenuCategories(organizationId)
   const matchKey = normalizeMenuCategoryKey(name)
   const existingIndex = categories.findIndex((category) =>
     category.id === input.id || normalizeMenuCategoryKey(category.name) === matchKey,
+  )
+  const existingCategory =
+    existingIndex >= 0 ? categories[existingIndex] : null
+  const toastCategory =
+    normalizeMenuCategoryName(input.toastCategory ?? '') ||
+    existingCategory?.toastCategory ||
+    defaults?.toastCategory ||
+    name
+  const toastDestination = normalizeToastDestination(
+    input.toastDestination ?? existingCategory?.toastDestination ?? defaults?.toastDestination ?? '',
   )
 
   const nextCategory: InventoryMenuCategory = {
@@ -209,10 +220,9 @@ function normalizeStoredCategory(
       normalizeMenuCategoryName(category.toastCategory ?? '') ||
       defaults?.toastCategory ||
       name,
-    toastDestination:
-      normalizeMenuCategoryName(category.toastDestination ?? '') ||
-      defaults?.toastDestination ||
-      '',
+    toastDestination: normalizeToastDestination(
+      category.toastDestination ?? defaults?.toastDestination ?? '',
+    ),
     createdAt,
     updatedAt:
       typeof category.updatedAt === 'string' && category.updatedAt
@@ -247,11 +257,27 @@ function withDefaultMenuCategories(
     byKey.set(key, {
       ...category,
       toastCategory: category.toastCategory || defaults?.toastCategory || category.name,
-      toastDestination: category.toastDestination || defaults?.toastDestination || '',
+      toastDestination: normalizeToastDestination(
+        category.toastDestination || defaults?.toastDestination || '',
+      ),
     })
   })
 
   return [...byKey.values()].sort((left, right) => left.name.localeCompare(right.name))
+}
+
+export function normalizeToastDestination(value?: string | null) {
+  const normalized = normalizeMenuCategoryName(value ?? '')
+  if (!normalized) return ''
+
+  if (
+    /^(?:toast\s+)?(?:beer|liquor|cocktails?|na\s*bev|retail)\s+tab\b/i.test(normalized) ||
+    /^beer\s+tab\s*·/i.test(normalized)
+  ) {
+    return ''
+  }
+
+  return normalized
 }
 
 function getDefaultMenuCategory(value: string) {
