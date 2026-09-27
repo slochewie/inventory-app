@@ -105,6 +105,9 @@ function ManualItemPage() {
   const normalizedCategory = draft.category.trim()
   const normalizedToastCategory =
     draft.toastCategory.trim() || normalizedCategory || 'Uncategorized'
+  const isBeerItem = [normalizedCategory, normalizedToastCategory]
+    .some((value) => value.toLowerCase().includes('beer'))
+  const showToastBeerSlot = isBeerItem && enabledOptionalBeerCategories.length > 0
 
   function updateDraft(patch: Partial<ManualItemDraft>) {
     setDraft((current) => ({ ...current, ...patch }))
@@ -137,6 +140,7 @@ function ManualItemPage() {
     const sourceId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const category = normalizedCategory || normalizedToastCategory
     const toastDestination = draft.toastDestination.trim()
+    const toastSlot = showToastBeerSlot ? draft.toastSlot || null : null
 
     setSaving(true)
     setError(null)
@@ -191,7 +195,7 @@ function ManualItemPage() {
           happyHourPriceCents: happyHourPrice.value,
           toastCategoryOverride: normalizedToastCategory,
           toastDestinationOverride: toastDestination || null,
-          toastSlot: draft.toastSlot || null,
+          toastSlot,
         })
       }
 
@@ -331,21 +335,23 @@ function ManualItemPage() {
               </label>
             </div>
 
-            <label className="inventory-search-control">
-              <span>Toast beer slot</span>
-              <select
-                value={draft.toastSlot}
-                disabled={saving || enabledOptionalBeerCategories.length === 0}
-                onChange={(event) => updateDraft({ toastSlot: event.target.value })}
-              >
-                <option value="">Standard Toast placement</option>
-                {enabledOptionalBeerCategories.map((category) => (
-                  <option key={category.key} value={category.key}>
-                    {category.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {showToastBeerSlot ? (
+              <label className="inventory-search-control">
+                <span>Toast beer slot</span>
+                <select
+                  value={draft.toastSlot}
+                  disabled={saving}
+                  onChange={(event) => updateDraft({ toastSlot: event.target.value })}
+                >
+                  <option value="">Standard Toast placement</option>
+                  {enabledOptionalBeerCategories.map((category) => (
+                    <option key={category.key} value={category.key}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
 
             <div className="inventory-variant-toggles">
               <label className="inventory-inline-toggle">
@@ -369,7 +375,7 @@ function ManualItemPage() {
               </label>
             </div>
 
-            <div className="inventory-drawer-actions">
+            <div className="inventory-draft-slots-actions">
               <button
                 type="button"
                 className="inventory-secondary-button"
