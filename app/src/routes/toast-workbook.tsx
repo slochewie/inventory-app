@@ -1023,7 +1023,7 @@ function ToastWorkbook() {
               <h2>Download Toast workbook</h2>
             </div>
             <p className="inventory-export-context">
-              Writes Beer and Liquor tab values
+              Routes exported items internally from Menu Category
               {organizationConfig?.happyHourEnabled
                 ? ` with Happy Hour pricing for ${formatHappyHourSetting(organizationConfig)}.`
                 : ' without Happy Hour pricing.'}
@@ -1365,73 +1365,21 @@ function formatTime(value: string) {
 }
 
 function WorkbookInspectionCard({ workbook }: { workbook: WorkbookState }) {
-  const beer = workbook.info.beer
-
   return (
     <section className="inventory-card inventory-template-inspection">
       <div className="inventory-table-heading">
         <div>
-          <p className="inventory-kicker">Detected workbook</p>
+          <p className="inventory-kicker">Template ready</p>
           <h2>{workbook.info.fileName}</h2>
         </div>
-        <p>{workbook.info.sheetNames.length.toLocaleString()} tabs found.</p>
+        <p>
+          {workbook.info.warnings.length === 0
+            ? 'Template compatibility checked.'
+            : `${workbook.info.warnings.length} compatibility warning${workbook.info.warnings.length === 1 ? '' : 's'} detected.`}
+        </p>
       </div>
-
-      {beer ? (
-        <dl className="inventory-template-detected-grid">
-          <div>
-            <dt>Beer tab</dt>
-            <dd>{beer.sheetName}</dd>
-          </div>
-          <div>
-            <dt>Header row</dt>
-            <dd>{beer.headerRow}</dd>
-          </div>
-          <div>
-            <dt>Draft sizes</dt>
-            <dd>{beer.draftSizes.length ? beer.draftSizes.join(', ') : 'None detected'}</dd>
-          </div>
-          <div>
-            <dt>Packaged groups</dt>
-            <dd>{formatDetectedGroups(beer.packagedGroups)}</dd>
-          </div>
-        </dl>
-      ) : null}
-
-      {workbook.info.warnings.length > 0 ? (
-        <ul className="inventory-warning-list">
-          {workbook.info.warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
-      ) : null}
-
-      <details className="inventory-export-preview">
-        <summary>
-          <span>Workbook tabs</span>
-          <strong>{workbook.info.sheetNames.length.toLocaleString()}</strong>
-        </summary>
-        <div className="inventory-template-tab-list">
-          {workbook.info.sheetNames.map((sheetName) => (
-            <span key={sheetName}>{sheetName}</span>
-          ))}
-        </div>
-      </details>
     </section>
   )
-}
-
-function formatDetectedGroups(groups: string[]) {
-  if (groups.length === 0) return 'None detected'
-
-  const counts = new Map<string, number>()
-  groups.forEach((group) => {
-    counts.set(group, (counts.get(group) ?? 0) + 1)
-  })
-
-  return [...counts.entries()]
-    .map(([group, count]) => count > 1 ? `${group} ×${count}` : group)
-    .join(', ')
 }
 
 function SummaryCard({ label, value }: { label: string; value: number }) {

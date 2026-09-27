@@ -856,7 +856,7 @@ function CatalogPage() {
                   <div className="inventory-happy-hour-range2-heading">
                     <div>
                       <strong>Time Range 2</strong>
-                      <span>Optional second Happy Hour window for the Toast Notes tab.</span>
+                      <span>Optional second Happy Hour window for Toast export.</span>
                     </div>
                     <label className="inventory-inline-toggle">
                       <input
@@ -1127,7 +1127,7 @@ function CatalogPage() {
           </label>
 
           <label className="inventory-search-control">
-            <span>Toast category</span>
+            <span>Menu Category</span>
             <select value={category} onChange={(event) => setCategory(event.target.value)}>
               <option value="all">All categories</option>
               {categories.map((value) => (

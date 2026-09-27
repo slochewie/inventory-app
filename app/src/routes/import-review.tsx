@@ -306,7 +306,7 @@ function ImportReviewPage() {
                                   <tr>
                                     <th>Item</th>
                                     <th>Aloha category</th>
-                                    <th>Toast category</th>
+                                    <th>Menu Category</th>
                                     <th>Price</th>
                                     <th>Happy hour</th>
                                     <th>Import</th>
@@ -504,7 +504,7 @@ function ImportItemDrawer({
         </label>
 
         <label className="inventory-search-control">
-          <span>Toast category</span>
+          <span>Menu Category</span>
           <input
             value={item.toastCategory}
             onChange={(event) =>
