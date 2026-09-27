@@ -257,6 +257,16 @@ Run its tests with:
 bash ./bash-scripts/test-all.sh
 ```
 
+## Toast Cocktails and Retail workbook output
+
+Toast workbook generation now supports the existing **Cocktails** tab and an optional **Retail** tab.
+
+- Cocktails are written to the template's existing Item Name, Price, Description, Menu Group, and Happy Hour columns.
+- Retail is created only when exportable Retail items exist.
+- To create Retail, Inventory duplicates the pristine template's **NA Bev** worksheet inside the XLSX package and renames the duplicate **Retail**, preserving the source sheet layout and formatting.
+- Retail values are then written into the duplicated Item Name, Price, and Group columns.
+- Generated workbook validation checks Cocktails and Retail rows before download.
+
 ## Toast workbook staging review
 
 The authenticated **Export to Toast** page can stage an existing Toast XLSX for normalization without writing anything to the persistent Inventory catalog.

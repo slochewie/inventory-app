@@ -11,8 +11,15 @@ import type { NormalizedMenuItem } from './types'
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const WORKBOOK_PATH = 'xl/workbook.xml'
 const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
+const CONTENT_TYPES_PATH = '[Content_Types].xml'
 const SPREADSHEET_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 const RELATIONSHIP_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+const PACKAGE_RELATIONSHIP_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
+const CONTENT_TYPES_NS = 'http://schemas.openxmlformats.org/package/2006/content-types'
+const WORKSHEET_RELATIONSHIP_TYPE =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet'
+const WORKSHEET_CONTENT_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml'
 const DATA_ROW_BUFFER = 20
 
 const DEFAULT_HAPPY_HOUR_DAYS = [
@@ -70,6 +77,27 @@ type LiquorTemplateMapping = {
   slots: LiquorSlot[]
 }
 
+type SimpleMenuRow = {
+  itemName: string
+  basePrice: number
+  happyHourPrice: number | null
+  description: string
+  menuGroup: string
+}
+
+type SimpleSheetMapping = {
+  sheetPath: string
+  sheetName: string
+  headerRow: number
+  dataStartRow: number
+  lastTemplateRow: number
+  nameCol: number
+  priceCol: number
+  descriptionCol: number | null
+  groupCol: number | null
+  happyHourCol: number | null
+}
+
 export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   templateArrayBuffer,
   items,
@@ -108,6 +136,8 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   const workbookPackage = readWorkbookPackage(beerWorkbookBuffer)
 
   populateLiquorSheet(workbookPackage, items, happyHourEnabled)
+  populateCocktailsSheet(workbookPackage, items, happyHourEnabled)
+  populateRetailSheet(workbookPackage, items)
   populateHappyHourNotesSheet(
     workbookPackage,
     happyHourEnabled,
@@ -178,6 +208,14 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     })
   })
 
+  const cocktails = validateCocktailsSheet(
+    workbookPackage,
+    items,
+    happyHourEnabled,
+    issues,
+  )
+  const retail = validateRetailSheet(workbookPackage, items, issues)
+
   const happyHourNotes = validateHappyHourNotesSheet(
     workbookPackage,
     happyHourEnabled,
@@ -202,8 +240,421 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
       optionalBeerCategoryRows: beer.optionalBeerCategoryRows,
     },
     liquorRows,
+    cocktailRows: cocktails,
+    retailRows: retail,
     happyHourNotes: happyHourNotes.valid,
   }
+}
+
+function populateCocktailsSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+) {
+  const rows = getCocktailRows(items, happyHourEnabled)
+  if (rows.length === 0) return
+
+  const mapping = getSimpleSheetMapping(workbookPackage, 'Cocktails')
+  writeSimpleMenuRows(workbookPackage, mapping, rows)
+}
+
+function populateRetailSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+) {
+  const rows = getRetailRows(items)
+  if (rows.length === 0) return
+
+  ensureRetailSheet(workbookPackage)
+  const mapping = getSimpleSheetMapping(workbookPackage, 'Retail')
+  writeSimpleMenuRows(workbookPackage, mapping, rows)
+}
+
+function getCocktailRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+): SimpleMenuRow[] {
+  return items
+    .filter(
+      (item) =>
+        item.exportIncluded &&
+        item.basePriceCents !== null &&
+        (
+          /cocktail/i.test(clean(item.toastDestination)) ||
+          /cocktail/i.test(clean(item.toastCategory))
+        ),
+    )
+    .map((item) => ({
+      itemName: clean(item.name),
+      basePrice: item.basePriceCents! / 100,
+      happyHourPrice:
+        happyHourEnabled && item.happyHourPriceCents !== null
+          ? item.happyHourPriceCents / 100
+          : null,
+      description: clean(item.rawRows[0]?.description),
+      menuGroup: clean(item.toastCategory) || 'Cocktails',
+    }))
+    .filter((row) => row.itemName)
+    .sort((left, right) => left.itemName.localeCompare(right.itemName))
+}
+
+function getRetailRows(items: NormalizedMenuItem[]): SimpleMenuRow[] {
+  return items
+    .filter(
+      (item) =>
+        item.exportIncluded &&
+        item.basePriceCents !== null &&
+        (
+          /^retail$/i.test(clean(item.toastDestination)) ||
+          /^retail$/i.test(clean(item.toastCategory))
+        ),
+    )
+    .map((item) => ({
+      itemName: clean(item.name),
+      basePrice: item.basePriceCents! / 100,
+      happyHourPrice: null,
+      description: clean(item.rawRows[0]?.description),
+      menuGroup:
+        clean(item.toastCategory) &&
+        !/^retail$/i.test(clean(item.toastCategory))
+          ? clean(item.toastCategory)
+          : 'Retail',
+    }))
+    .filter((row) => row.itemName)
+    .sort((left, right) => left.itemName.localeCompare(right.itemName))
+}
+
+function getSimpleSheetMapping(
+  workbookPackage: WorkbookPackage,
+  sheetName: string,
+): SimpleSheetMapping {
+  const sheet = getWorkbookSheets(workbookPackage).find(
+    (candidate) => candidate.name.toLowerCase() === sheetName.toLowerCase(),
+  )
+  if (!sheet) throw new Error(`Toast template is missing a ${sheetName} tab`)
+
+  const sheetDoc = parseXml(getTextFile(workbookPackage.files, sheet.path))
+  let headerRow: number | null = null
+  let headerValues: { col: number, value: string }[] = []
+
+  for (let rowNumber = 1; rowNumber <= 30; rowNumber += 1) {
+    const values = getRowValues(
+      sheetDoc,
+      rowNumber,
+      workbookPackage.sharedStrings,
+    )
+    const normalized = values.map((cell) => normalizeHeader(cell.value))
+    if (
+      normalized.includes('item name') &&
+      normalized.some((value) => value.startsWith('price'))
+    ) {
+      headerRow = rowNumber
+      headerValues = values
+      break
+    }
+  }
+
+  if (headerRow === null) {
+    throw new Error(
+      `${sheetName} tab is missing the expected Item Name / Price header`,
+    )
+  }
+
+  const nameCol =
+    headerValues.find((cell) => normalizeHeader(cell.value) === 'item name')
+      ?.col ?? 1
+  const priceCol =
+    headerValues.find((cell) => normalizeHeader(cell.value).startsWith('price'))
+      ?.col ?? 2
+  const descriptionCol =
+    headerValues.find((cell) =>
+      normalizeHeader(cell.value).includes('description'),
+    )?.col ?? null
+  const groupCol =
+    headerValues.find((cell) => {
+      const header = normalizeHeader(cell.value)
+      return header.includes('group') || header.includes('menu group')
+    })?.col ?? null
+  const happyHourCol =
+    headerValues.find((cell) =>
+      normalizeHeader(cell.value).includes('happy hour'),
+    )?.col ?? null
+
+  return {
+    sheetPath: sheet.path,
+    sheetName: sheet.name,
+    headerRow,
+    dataStartRow: headerRow + 1,
+    lastTemplateRow: getLastWorksheetRow(sheetDoc),
+    nameCol,
+    priceCol,
+    descriptionCol,
+    groupCol,
+    happyHourCol,
+  }
+}
+
+function writeSimpleMenuRows(
+  workbookPackage: WorkbookPackage,
+  mapping: SimpleSheetMapping,
+  rows: SimpleMenuRow[],
+) {
+  const sheetDoc = parseXml(
+    getTextFile(workbookPackage.files, mapping.sheetPath),
+  )
+  const columns = [
+    mapping.nameCol,
+    mapping.priceCol,
+    mapping.descriptionCol,
+    mapping.groupCol,
+    mapping.happyHourCol,
+  ].filter((column): column is number => column !== null)
+  const clearToRow = Math.max(
+    mapping.lastTemplateRow,
+    mapping.dataStartRow + rows.length + DATA_ROW_BUFFER,
+  )
+
+  clearCells(
+    sheetDoc,
+    columns,
+    mapping.dataStartRow,
+    clearToRow,
+  )
+
+  rows.forEach((row, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    writeCellValue(
+      sheetDoc,
+      mapping.nameCol,
+      rowNumber,
+      row.itemName,
+      mapping.dataStartRow,
+    )
+    writeCellValue(
+      sheetDoc,
+      mapping.priceCol,
+      rowNumber,
+      row.basePrice,
+      mapping.dataStartRow,
+    )
+    if (mapping.descriptionCol && row.description) {
+      writeCellValue(
+        sheetDoc,
+        mapping.descriptionCol,
+        rowNumber,
+        row.description,
+        mapping.dataStartRow,
+      )
+    }
+    if (mapping.groupCol && row.menuGroup) {
+      writeCellValue(
+        sheetDoc,
+        mapping.groupCol,
+        rowNumber,
+        row.menuGroup,
+        mapping.dataStartRow,
+      )
+    }
+    if (mapping.happyHourCol && row.happyHourPrice !== null) {
+      writeCellValue(
+        sheetDoc,
+        mapping.happyHourCol,
+        rowNumber,
+        row.happyHourPrice,
+        mapping.dataStartRow,
+      )
+    }
+  })
+
+  workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
+}
+
+function validateCocktailsSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+  issues: string[],
+) {
+  const rows = getCocktailRows(items, happyHourEnabled)
+  if (rows.length === 0) return 0
+
+  const mapping = getSimpleSheetMapping(workbookPackage, 'Cocktails')
+  validateSimpleMenuRows(workbookPackage, mapping, rows, issues)
+  return rows.length
+}
+
+function validateRetailSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  issues: string[],
+) {
+  const rows = getRetailRows(items)
+  if (rows.length === 0) return 0
+
+  const mapping = getSimpleSheetMapping(workbookPackage, 'Retail')
+  validateSimpleMenuRows(workbookPackage, mapping, rows, issues)
+  return rows.length
+}
+
+function validateSimpleMenuRows(
+  workbookPackage: WorkbookPackage,
+  mapping: SimpleSheetMapping,
+  rows: SimpleMenuRow[],
+  issues: string[],
+) {
+  const sheetDoc = parseXml(
+    getTextFile(workbookPackage.files, mapping.sheetPath),
+  )
+
+  rows.forEach((row, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    validateLiquorCell(
+      issues,
+      sheetDoc,
+      workbookPackage.sharedStrings,
+      mapping.nameCol,
+      rowNumber,
+      row.itemName,
+      `${row.itemName} ${mapping.sheetName} name`,
+    )
+    validateLiquorCell(
+      issues,
+      sheetDoc,
+      workbookPackage.sharedStrings,
+      mapping.priceCol,
+      rowNumber,
+      row.basePrice,
+      `${row.itemName} ${mapping.sheetName} price`,
+    )
+    if (mapping.groupCol && row.menuGroup) {
+      validateLiquorCell(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        mapping.groupCol,
+        rowNumber,
+        row.menuGroup,
+        `${row.itemName} ${mapping.sheetName} group`,
+      )
+    }
+    if (mapping.happyHourCol && row.happyHourPrice !== null) {
+      validateLiquorCell(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        mapping.happyHourCol,
+        rowNumber,
+        row.happyHourPrice,
+        `${row.itemName} ${mapping.sheetName} Happy Hour`,
+      )
+    }
+  })
+}
+
+function ensureRetailSheet(workbookPackage: WorkbookPackage) {
+  if (
+    getWorkbookSheets(workbookPackage).some(
+      (sheet) => sheet.name.toLowerCase() === 'retail',
+    )
+  ) {
+    return
+  }
+
+  const source = getWorkbookSheets(workbookPackage).find(
+    (sheet) => /^na\s*bev$/i.test(sheet.name),
+  )
+  if (!source) {
+    throw new Error(
+      'Toast template is missing the NA Bev tab required to create Retail',
+    )
+  }
+
+  const worksheetNumbers = Object.keys(workbookPackage.files).flatMap((path) => {
+    const match = path.match(/^xl\/worksheets\/sheet(\d+)\.xml$/)
+    return match ? [Number(match[1])] : []
+  })
+  const nextWorksheetNumber = Math.max(0, ...worksheetNumbers) + 1
+  const newSheetPath = `xl/worksheets/sheet${nextWorksheetNumber}.xml`
+  workbookPackage.files[newSheetPath] =
+    workbookPackage.files[source.path].slice()
+
+  const sourceNumber = source.path.match(/sheet(\d+)\.xml$/)?.[1]
+  if (sourceNumber) {
+    const sourceRelsPath =
+      `xl/worksheets/_rels/sheet${sourceNumber}.xml.rels`
+    const sourceRels = workbookPackage.files[sourceRelsPath]
+    if (sourceRels) {
+      workbookPackage.files[
+        `xl/worksheets/_rels/sheet${nextWorksheetNumber}.xml.rels`
+      ] = sourceRels.slice()
+    }
+  }
+
+  const relationshipNodes = Array.from(
+    workbookPackage.workbookRelationships.getElementsByTagName('Relationship'),
+  )
+  const relationshipNumbers = relationshipNodes.flatMap((relationship) => {
+    const match = relationship.getAttribute('Id')?.match(/^rId(\d+)$/)
+    return match ? [Number(match[1])] : []
+  })
+  const relationshipId =
+    `rId${Math.max(0, ...relationshipNumbers) + 1}`
+  const relationship =
+    workbookPackage.workbookRelationships.createElementNS(
+      PACKAGE_RELATIONSHIP_NS,
+      'Relationship',
+    )
+  relationship.setAttribute('Id', relationshipId)
+  relationship.setAttribute('Type', WORKSHEET_RELATIONSHIP_TYPE)
+  relationship.setAttribute(
+    'Target',
+    `worksheets/sheet${nextWorksheetNumber}.xml`,
+  )
+  workbookPackage.workbookRelationships.documentElement.appendChild(
+    relationship,
+  )
+
+  const sheetNodes = Array.from(
+    workbookPackage.workbook.getElementsByTagName('sheet'),
+  )
+  const sheetIds = sheetNodes.flatMap((sheet) => {
+    const value = Number(sheet.getAttribute('sheetId'))
+    return Number.isFinite(value) ? [value] : []
+  })
+  const newSheet = workbookPackage.workbook.createElementNS(
+    SPREADSHEET_NS,
+    'sheet',
+  )
+  newSheet.setAttribute('name', 'Retail')
+  newSheet.setAttribute(
+    'sheetId',
+    String(Math.max(0, ...sheetIds) + 1),
+  )
+  newSheet.setAttributeNS(RELATIONSHIP_NS, 'r:id', relationshipId)
+  workbookPackage.workbook
+    .getElementsByTagName('sheets')[0]
+    .appendChild(newSheet)
+
+  const contentTypes = parseXml(
+    getTextFile(workbookPackage.files, CONTENT_TYPES_PATH),
+  )
+  const override = contentTypes.createElementNS(
+    CONTENT_TYPES_NS,
+    'Override',
+  )
+  override.setAttribute('PartName', `/${newSheetPath}`)
+  override.setAttribute('ContentType', WORKSHEET_CONTENT_TYPE)
+  contentTypes.documentElement.appendChild(override)
+
+  workbookPackage.files[WORKBOOK_PATH] = strToU8(
+    serializeXml(workbookPackage.workbook),
+  )
+  workbookPackage.files[WORKBOOK_RELS_PATH] = strToU8(
+    serializeXml(workbookPackage.workbookRelationships),
+  )
+  workbookPackage.files[CONTENT_TYPES_PATH] = strToU8(
+    serializeXml(contentTypes),
+  )
 }
 
 function populateHappyHourNotesSheet(
