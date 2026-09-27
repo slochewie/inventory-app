@@ -489,11 +489,10 @@ function ManualCombobox({
 
   const filteredOptions = useMemo(() => {
     const normalizedValue = value.trim().toLowerCase()
-    const filtered = normalizedValue
+
+    return normalizedValue
       ? options.filter((option) => option.toLowerCase().includes(normalizedValue))
       : options
-
-    return filtered.slice(0, 8)
   }, [options, value])
 
   const hasOptions = filteredOptions.length > 0
