@@ -370,7 +370,7 @@ function ManualItemPage() {
                 value={draft.toastDestination}
                 options={allDestinationOptions}
                 disabled={saving}
-                placeholder="Bar"
+                placeholder="Gin, Cocktails, NA Bev, Retail…"
                 onChange={(value) => updateDraft({ toastDestination: value })}
               />
 

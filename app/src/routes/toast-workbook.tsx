@@ -1023,7 +1023,7 @@ function ToastWorkbook() {
               <h2>Download Toast workbook</h2>
             </div>
             <p className="inventory-export-context">
-              Routes exported items internally from Menu Category
+              Uses each item's Toast Destination to place it in the workbook
               {organizationConfig?.happyHourEnabled
                 ? ` with Happy Hour pricing for ${formatHappyHourSetting(organizationConfig)}.`
                 : ' without Happy Hour pricing.'}

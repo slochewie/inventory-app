@@ -261,18 +261,11 @@ bash ./bash-scripts/test-all.sh
 
 When an existing Toast workbook is staged for review, Inventory preserves the structural draft-slot mapping from the source Beer tab. For example, if Toast's first structural draft slot is labeled **12oz**, staging records that as **Toast 8oz slot → actual 12oz** and uses that mapping when regenerating the workbook. Staged Toast imports read all four draft price slots rather than assuming only the first draft size.
 
-## Menu Category workbook routing
+## Toast Destination workbook routing
 
-Workbook-sheet selection is internal. Users choose a **Menu Category**; they do not choose or see worksheet targets.
+**Toast Destination** is the workbook placement target used during Toast export. It identifies where an item belongs in the XLSX, including Beer slots, Liquor groups, Cocktails, NA Bev, and Retail.
 
-Current routing includes:
-
-- **Beer** → Beer worksheet
-- **Cocktails** → Cocktails worksheet
-- **NA Bev** → NA Bev worksheet
-- **Retail** → Retail worksheet
-
-**Toast Destination** is separate from workbook routing and is reserved for real Toast destinations such as Bar, Dining Room, or Patio. Legacy values that described workbook tabs are normalized away.
+Menu Category is the user-facing grouping used when adding and organizing items. Beer, Cocktails, and NA Bev are built in. Retail is the currently supported optional category.
 
 Cocktails are written to the template's existing Item Name, Price, Description, Menu Group, and Happy Hour columns. NA Bev uses the existing NA Bev worksheet. Retail is created only when exportable Retail items exist by duplicating the pristine NA Bev worksheet and renaming the duplicate Retail, preserving the source layout and formatting.
 
