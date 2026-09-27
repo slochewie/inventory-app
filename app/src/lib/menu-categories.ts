@@ -18,22 +18,9 @@ type MenuCategoryDefault = {
   toastDestination: string
 }
 
+const BUILT_IN_MENU_CATEGORIES = ['Beer', 'Cocktails', 'NA Bev'] as const
+
 const MENU_CATEGORY_DEFAULTS: readonly MenuCategoryDefault[] = [
-  {
-    name: 'Beer',
-    toastCategory: 'Beer',
-    toastDestination: '',
-  },
-  {
-    name: 'Cocktails',
-    toastCategory: 'Cocktails',
-    toastDestination: '',
-  },
-  {
-    name: 'NA Bev',
-    toastCategory: 'NA Bev',
-    toastDestination: '',
-  },
   {
     name: 'Retail',
     toastCategory: 'Retail',
@@ -44,6 +31,10 @@ const MENU_CATEGORY_DEFAULTS: readonly MenuCategoryDefault[] = [
 type StoredMenuCategories = {
   version?: number
   categories?: Partial<InventoryMenuCategory>[]
+}
+
+export function getBuiltInMenuCategories() {
+  return [...BUILT_IN_MENU_CATEGORIES]
 }
 
 export function getMenuCategorySuggestions() {
@@ -70,6 +61,7 @@ export function listSavedMenuCategories(organizationId: string) {
       ? parsed.categories
           .map(normalizeStoredCategory)
           .filter((category): category is InventoryMenuCategory => category !== null)
+          .filter((category) => !isBuiltInMenuCategory(category.name))
       : []
 
     return withDefaultMenuCategories(storedCategories)
@@ -279,6 +271,13 @@ export function normalizeToastDestination(value?: string | null) {
   }
 
   return normalized
+}
+
+function isBuiltInMenuCategory(value: string) {
+  const key = normalizeMenuCategoryKey(value)
+  return BUILT_IN_MENU_CATEGORIES.some(
+    (category) => normalizeMenuCategoryKey(category) === key,
+  )
 }
 
 function getDefaultMenuCategory(value: string) {

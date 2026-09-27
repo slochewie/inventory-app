@@ -133,7 +133,7 @@ function MenuCategoriesPage() {
             <p className="inventory-kicker">Catalog</p>
             <h1>Menu Categories</h1>
             <p>
-              Add menu categories for {activeOrganization?.name ?? 'the selected organization'} before items exist, then use them from Add Item.
+              Add organization-specific menu categories for {activeOrganization?.name ?? 'the selected organization'}. Beer, Cocktails, and NA Bev are built in and are always available in Add Item.
             </p>
           </div>
           <a className="inventory-secondary-link" href="/manual-item">
@@ -146,7 +146,7 @@ function MenuCategoriesPage() {
             <div>
               <h2>{draft.id ? 'Edit category' : 'Add category'}</h2>
               <p>
-                Menu Category controls how items are grouped and routed during Toast export. Toast Destination is optional and should only name a real Toast destination such as Bar, Dining Room, or Patio.
+                Add only categories that are not already built into the Toast workbook. Retail can be added here when needed; Toast export creates its worksheet internally from the NA Bev template.
               </p>
             </div>
           </div>
@@ -176,7 +176,7 @@ function MenuCategoriesPage() {
                 <span>Menu category</span>
                 <input
                   value={draft.name}
-                  placeholder="NA Bev, Retail, Cocktails…"
+                  placeholder="Retail or another custom category…"
                   onChange={(event) => updateDraft({ name: event.target.value })}
                   required
                 />
@@ -252,7 +252,7 @@ function MenuCategoriesPage() {
             </div>
           ) : (
             <p className="inventory-empty-note">
-              No menu categories have been added yet. Add NA Bev or Retail here to make them available when adding an item.
+              No manual menu categories have been added yet. Beer, Cocktails, and NA Bev are already available in Add Item. Add Retail here when needed.
             </p>
           )}
         </section>

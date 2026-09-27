@@ -21,6 +21,7 @@ import {
 import {
   MENU_CATEGORIES_CHANGED_EVENT,
   findSavedMenuCategory,
+  getBuiltInMenuCategories,
   listSavedMenuCategories,
   mergeCategoryOptions,
   normalizeToastDestination,
@@ -153,8 +154,11 @@ function ManualItemPage() {
 
   const categoryOptions = useMemo(() => {
     return mergeCategoryOptions(
-      catalogCategoryOptions,
-      menuCategories.map((category) => category.name),
+      getBuiltInMenuCategories(),
+      mergeCategoryOptions(
+        catalogCategoryOptions,
+        menuCategories.map((category) => category.name),
+      ),
     )
   }, [catalogCategoryOptions, menuCategories])
 
@@ -359,7 +363,7 @@ function ManualItemPage() {
                 value={draft.category}
                 options={categoryOptions}
                 disabled={saving}
-                placeholder="Beer, Cocktails, Retail…"
+                placeholder="Beer, Cocktails, NA Bev, Retail…"
                 onChange={updateCategory}
               />
 
