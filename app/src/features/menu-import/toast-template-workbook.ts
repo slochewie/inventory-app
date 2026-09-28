@@ -1592,26 +1592,14 @@ function getEffectiveOptionalBeerCategories(
   const customDraftSizes = getCustomDraftSizes(beerRows)
     .filter((sizeOz) => !assignedDraftSizes.has(sizeOz))
     .sort((left, right) => left - right)
-  let shouldAutoAddTallBoyCan =
-    beerRows.some((row) => row.can24ozPrice !== null) &&
-    !configuredCategories.some((category) => isTallBoyCanCategory(category.label))
   let nextCustomDraftSizeIndex = 0
 
   return configuredCategories.map((category, index) => {
     const hasConfiguredDraftSize = parseOptionalDraftSize(category.label) !== null
-    const hasTallBoyCanLabel = isTallBoyCanCategory(category.label)
     const hasCustomLabel = !isDefaultOptionalBeerCategoryLabel(category.label, index)
 
-    if (category.enabled || hasConfiguredDraftSize || hasTallBoyCanLabel || hasCustomLabel) {
+    if (category.enabled || hasConfiguredDraftSize || hasCustomLabel) {
       return category
-    }
-
-    if (shouldAutoAddTallBoyCan) {
-      shouldAutoAddTallBoyCan = false
-      return {
-        enabled: true,
-        label: 'Tall Boy Can',
-      }
     }
 
     const customDraftSize = customDraftSizes[nextCustomDraftSizeIndex]

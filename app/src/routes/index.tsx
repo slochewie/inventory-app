@@ -421,6 +421,31 @@ function CatalogPage() {
     )
   }
 
+  function moveOptionalBeerCategoryDraft(
+    slot: OptionalBeerCategoryConfig['slot'],
+    direction: 'up' | 'down',
+  ) {
+    const offset = direction === 'up' ? -1 : 1
+
+    setOptionalBeerCategoryEdits((current) => {
+      const sourceIndex = current.findIndex((category) => category.slot === slot)
+      const targetIndex = sourceIndex + offset
+
+      if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= visibleOptionalBeerCategoryCount) {
+        return current
+      }
+
+      const next = current.map((category) => ({ ...category }))
+      const source = next[sourceIndex]
+      const target = next[targetIndex]
+      if (!source || !target) return current
+
+      next[sourceIndex] = { ...source, enabled: target.enabled, label: target.label }
+      next[targetIndex] = { ...target, enabled: source.enabled, label: source.label }
+      return next
+    })
+  }
+
   function removeOptionalBeerCategory(category: OptionalBeerCategoryConfig) {
     if (items.some((item) => item.toastSlot === category.key)) {
       setError(
@@ -465,7 +490,7 @@ function CatalogPage() {
       (category) => category.enabled && !category.label.trim(),
     )
     if (missingLabel) {
-      setError(`Set a label for Optional Beer Category ${missingLabel.slot}.`)
+      setError(`Set a label for the Beer export category.`)
       return
     }
 
@@ -477,7 +502,7 @@ function CatalogPage() {
     )
     if (disabledAssignedCategory) {
       setError(
-        `Optional Beer Category ${disabledAssignedCategory.slot} is still assigned to catalog items. Reassign those items before disabling it.`,
+        `This Beer export category is still assigned to catalog items. Reassign those items before disabling it.`,
       )
       return
     }
@@ -818,7 +843,7 @@ function CatalogPage() {
                 <div className="inventory-draft-slots-copy">
                   <h2>Beer export categories</h2>
                   <p>
-                    Map non-standard Beer formats to Toast Optional Beer Category slots. Custom draft sizes detected in the catalog are shown here; click Update to save them.
+                    Map non-standard Beer formats to Toast optional slots. The order here controls which hidden workbook slot each category exports to; click Update to save changes.
                   </p>
                 </div>
 
@@ -826,7 +851,7 @@ function CatalogPage() {
                   <div className="inventory-draft-slots-grid">
                     {optionalBeerCategoryEdits
                       .slice(0, visibleOptionalBeerCategoryCount)
-                      .map((category) => (
+                      .map((category, index) => (
                         <div key={category.key} className="inventory-draft-slot-field">
                           <label className="inventory-inline-toggle">
                             <input
@@ -840,7 +865,7 @@ function CatalogPage() {
                               }
                             />
                             <span>
-                              Optional Beer Category {category.slot} ·{' '}
+                              {getBeerExportCategoryTitle(category)} ·{' '}
                               {category.enabled ? 'Enabled' : 'Disabled'}
                             </span>
                           </label>
@@ -856,18 +881,40 @@ function CatalogPage() {
                                   label: event.target.value,
                                 })
                               }
-                              placeholder={`Tall Boy Can, 10oz, or Optional Beer Category ${category.slot}`}
+                              placeholder="Tall Boy Can, 10oz, or custom label"
                             />
                           </label>
 
-                          {category.slot === visibleOptionalBeerCategoryCount ? (
+                          <div className="inventory-draft-slots-actions">
+                            <button
+                              type="button"
+                              className="inventory-secondary-button"
+                              disabled={index === 0 || savingOptionalBeerCategories}
+                              onClick={() => moveOptionalBeerCategoryDraft(category.slot, 'up')}
+                            >
+                              Move up
+                            </button>
+                            <button
+                              type="button"
+                              className="inventory-secondary-button"
+                              disabled={
+                                index >= visibleOptionalBeerCategoryCount - 1 ||
+                                savingOptionalBeerCategories
+                              }
+                              onClick={() => moveOptionalBeerCategoryDraft(category.slot, 'down')}
+                            >
+                              Move down
+                            </button>
+                          </div>
+
+                          {index === visibleOptionalBeerCategoryCount - 1 ? (
                             <button
                               type="button"
                               className="inventory-secondary-button"
                               disabled={savingOptionalBeerCategories}
                               onClick={() => removeOptionalBeerCategory(category)}
                             >
-                              Remove Optional Beer Category
+                              Remove category
                             </button>
                           ) : null}
                         </div>
@@ -886,7 +933,7 @@ function CatalogPage() {
                       )
                     }
                   >
-                    Add Optional Beer Category
+                    Add category
                   </button>
                 ) : null}
 
@@ -1521,6 +1568,12 @@ function NameField({
       ) : null}
     </label>
   )
+}
+
+function getBeerExportCategoryTitle(category: OptionalBeerCategoryConfig) {
+  return isDefaultOptionalBeerCategoryLabel(category.label, category.slot - 1)
+    ? 'Beer export category'
+    : category.label.trim()
 }
 
 function buildOptionalBeerCategoryConfig(
