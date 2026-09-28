@@ -8,6 +8,7 @@ import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
 import { formatCurrency, type NormalizedMenuItem } from '#/features/menu-import/types'
 import { authClient } from '#/lib/auth-client'
 import {
+  addInventoryOrganizationVariant,
   getInventoryOrganizationConfig,
   getOptionalBeerCategories,
   listInventoryCatalog,
@@ -50,6 +51,7 @@ function CatalogPage() {
   const [error, setError] = useState<string | null>(null)
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null)
   const [mergingItemId, setMergingItemId] = useState<string | null>(null)
+  const [addingFormatKey, setAddingFormatKey] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryConfig[]>([])
   const [organizationConfig, setOrganizationConfig] =
@@ -207,6 +209,37 @@ function CatalogPage() {
       )
     } finally {
       setMergingItemId(null)
+    }
+  }
+
+  async function addOrganizationBeerFormat(
+    group: CatalogGroup,
+    format: BeerFormatOption,
+  ) {
+    if (!canEdit || !activeOrganization?.id || addingFormatKey) return
+
+    setAddingFormatKey(format.key)
+    setError(null)
+
+    try {
+      await addInventoryOrganizationVariant({
+        organizationId: activeOrganization.id,
+        itemId: group.id,
+        toastCategory: 'Beer',
+        toastDestination: format.toastDestination,
+        toastSlot: format.toastSlot,
+      })
+
+      const catalog = await listInventoryCatalog(activeOrganization.id)
+      setItems(catalog.items.map(catalogRowToNormalizedItem))
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to add the Beer format.',
+      )
+    } finally {
+      setAddingFormatKey(null)
     }
   }
 
@@ -444,9 +477,11 @@ function CatalogPage() {
             categoryOptions={categoryOptions}
             optionalBeerCategories={optionalBeerCategories}
             organizationConfig={organizationConfig}
+            addingFormatKey={addingFormatKey}
             savingVariantId={savingVariantId}
             merging={mergingItemId === selectedGroup.id}
             onClose={() => setSelectedGroupId(null)}
+            onAddBeerFormat={addOrganizationBeerFormat}
             onUpdate={updateVariant}
             onUpdateCategory={updateGroupCategory}
             onMerge={mergeGroup}
@@ -465,6 +500,7 @@ function CatalogDrawer({
   categoryOptions,
   optionalBeerCategories,
   organizationConfig,
+  addingFormatKey,
   savingVariantId,
   merging,
   onClose,
@@ -479,9 +515,14 @@ function CatalogDrawer({
   categoryOptions: CatalogCategoryOption[]
   optionalBeerCategories: OptionalBeerCategoryConfig[]
   organizationConfig: InventoryOrganizationConfig | null
+  addingFormatKey: string | null
   savingVariantId: string | null
   merging: boolean
   onClose: () => void
+  onAddBeerFormat: (
+    group: CatalogGroup,
+    format: BeerFormatOption,
+  ) => Promise<void>
   onUpdate: (
     item: NormalizedMenuItem,
     patch: Partial<NormalizedMenuItem>,
@@ -531,6 +572,15 @@ function CatalogDrawer({
           ),
         )
       : draftItems
+  const availableBeerFormats =
+    selectedCategoryIsBeer && organizationConfig
+      ? getAvailableBeerFormats(
+          organizationConfig,
+          optionalBeerCategories,
+        ).filter((format) =>
+          !draftItems.some((item) => beerItemMatchesFormat(item, format)),
+        )
+      : []
 
   const hasChanges = categoryChanged || draftItems.some((draftItem) => {
     const original = group.items.find((item) => item.id === draftItem.id)
@@ -791,6 +841,37 @@ function CatalogDrawer({
             )
           })}
         </div>
+
+        {availableBeerFormats.length > 0 ? (
+          <div className="inventory-drawer-section">
+            <div className="inventory-drawer-section-heading">
+              <div>
+                <p className="inventory-kicker">Enabled for this organization</p>
+                <h3>Add format</h3>
+              </div>
+            </div>
+            <div className="inventory-draft-slots-actions">
+              {availableBeerFormats.map((format) => (
+                <button
+                  key={format.key}
+                  type="button"
+                  className="inventory-secondary-button"
+                  disabled={
+                    !canEdit ||
+                    updating ||
+                    savingVariantId !== null ||
+                    addingFormatKey !== null
+                  }
+                  onClick={() => void onAddBeerFormat(group, format)}
+                >
+                  {addingFormatKey === format.key
+                    ? 'Adding…'
+                    : `Add ${format.label}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {canMerge ? (
@@ -922,6 +1003,124 @@ function NameField({
       ) : null}
     </label>
   )
+}
+
+type BeerFormatOption = {
+  key: string
+  label: string
+  toastDestination: string
+  toastSlot: string | null
+  kind: 'draft' | 'can' | 'bottle'
+  sizeOz: number | null
+}
+
+function getAvailableBeerFormats(
+  config: InventoryOrganizationConfig,
+  optionalBeerCategories: readonly OptionalBeerCategoryConfig[],
+): BeerFormatOption[] {
+  const formats: BeerFormatOption[] = []
+
+  if (config.draft8Enabled) {
+    formats.push({
+      key: 'draft-8',
+      label: '8oz Draft',
+      toastDestination: 'Beer tab · Draft Beer 8oz',
+      toastSlot: null,
+      kind: 'draft',
+      sizeOz: 8,
+    })
+  }
+  if (config.draft16Enabled) {
+    formats.push({
+      key: 'draft-16',
+      label: '16oz Draft',
+      toastDestination: 'Beer tab · Draft Beer 16oz',
+      toastSlot: null,
+      kind: 'draft',
+      sizeOz: 16,
+    })
+  }
+  if (config.draft24Enabled) {
+    formats.push({
+      key: 'draft-24',
+      label: '24oz Draft',
+      toastDestination: 'Beer tab · Draft Beer 24oz',
+      toastSlot: null,
+      kind: 'draft',
+      sizeOz: 24,
+    })
+  }
+  if (config.pitcherEnabled) {
+    formats.push({
+      key: 'pitcher',
+      label: 'Pitcher',
+      toastDestination: 'Beer tab · Pitcher',
+      toastSlot: null,
+      kind: 'draft',
+      sizeOz: null,
+    })
+  }
+  if (config.canEnabled) {
+    formats.push({
+      key: 'can',
+      label: 'Can',
+      toastDestination: 'Beer tab · Can',
+      toastSlot: null,
+      kind: 'can',
+      sizeOz: null,
+    })
+  }
+  if (config.bottleEnabled) {
+    formats.push({
+      key: 'bottle',
+      label: 'Bottle',
+      toastDestination: 'Beer tab · Bottle',
+      toastSlot: null,
+      kind: 'bottle',
+      sizeOz: null,
+    })
+  }
+
+  optionalBeerCategories
+    .filter((category) => category.enabled)
+    .forEach((category) => {
+      const sizeOz = parseOptionalBeerCategoryDraftSize(category.label)
+      const normalized = category.label.toLowerCase()
+      const isCan = normalized.includes('can')
+
+      formats.push({
+        key: category.key,
+        label: category.label,
+        toastDestination:
+          sizeOz !== null && !isCan
+            ? `Beer tab · Draft Beer ${sizeOz}oz`
+            : isCan
+              ? `Beer tab · ${category.label}`
+              : `Beer tab · ${category.label}`,
+        toastSlot: category.key,
+        kind: isCan ? 'can' : 'draft',
+        sizeOz,
+      })
+    })
+
+  return formats
+}
+
+function beerItemMatchesFormat(
+  item: NormalizedMenuItem,
+  format: BeerFormatOption,
+) {
+  if (format.kind === 'draft') {
+    return item.variantKind === 'draft' && item.variantSizeOz === format.sizeOz
+  }
+
+  if (format.kind === 'can') {
+    if (item.variantKind !== 'can') return false
+    if (format.sizeOz === null) return item.variantSizeOz === null
+    return item.variantSizeOz === format.sizeOz
+  }
+
+  return item.variantKind === 'bottle'
 }
 
 function isBeerVariantEnabledForOrganization(
