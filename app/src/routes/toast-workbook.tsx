@@ -1331,6 +1331,376 @@ function ToastWorkbook() {
   )
 }
 
+function StagedReconciliationPanel({
+  items,
+  catalog,
+  decisions,
+  query,
+  onQueryChange,
+  onReview,
+  onCancel,
+  onImport,
+  importing,
+}: {
+  items: NormalizedMenuItem[]
+  catalog: InventoryCatalogRow[]
+  decisions: Record<string, ReconciliationDecision>
+  query: string
+  onQueryChange: (value: string) => void
+  onReview: (itemId: string) => void
+  onCancel: () => void
+  onImport: () => void
+  importing: boolean
+}) {
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredItems = items.filter((item) =>
+    !normalizedQuery ||
+    [item.name, item.category ?? '', item.toastCategory, item.variantLabel ?? '']
+      .some((value) => value.toLowerCase().includes(normalizedQuery)),
+  )
+  const decidedCount = items.filter((item) => decisions[item.id]).length
+  const unresolvedCount = items.length - decidedCount
+  const newCount = items.filter(
+    (item) => decisions[item.id]?.kind === 'new',
+  ).length
+  const mappedCount = decidedCount - newCount
+
+  return (
+    <div className="inventory-import-workspace">
+      <section
+        className="inventory-summary-grid"
+        aria-label="Master reconciliation summary"
+      >
+        <SummaryCard label="Unresolved" value={unresolvedCount} />
+        <SummaryCard label="Map existing" value={mappedCount} />
+        <SummaryCard label="Create new" value={newCount} />
+        <SummaryCard label="Total" value={items.length} />
+      </section>
+
+      <label className="inventory-search-control">
+        <span>Search staged items</span>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="Item name, category, format…"
+        />
+      </label>
+
+      <div className="inventory-table-wrap">
+        <table className="inventory-table inventory-reconcile-table">
+          <thead>
+            <tr>
+              <th>Staged item</th>
+              <th>Decision</th>
+              <th>Suggested match</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredItems.map((item) => {
+              const decision = decisions[item.id]
+              const selected =
+                decision?.kind === 'existing'
+                  ? catalog.find(
+                      (candidate) =>
+                        candidate.variant.id === decision.variantId,
+                    )
+                  : null
+              const suggested = findMasterCandidates(item, catalog)[0] ?? null
+
+              return (
+                <tr key={item.id}>
+                  <td>
+                    <strong>{item.name}</strong>
+                    <span>
+                      {item.variantLabel ||
+                        item.category ||
+                        item.toastCategory}
+                    </span>
+                  </td>
+                  <td>
+                    {decision?.kind === 'new'
+                      ? 'Create new master'
+                      : selected
+                        ? `Map to ${formatMasterVariant(selected)}`
+                        : 'Needs decision'}
+                  </td>
+                  <td>
+                    {suggested
+                      ? formatMasterVariant(suggested)
+                      : 'No close match'}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="inventory-row-action"
+                      onClick={() => onReview(item.id)}
+                    >
+                      {decision ? 'Change' : 'Review'}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="inventory-draft-slots-actions">
+        <button
+          type="button"
+          className="inventory-secondary-button"
+          disabled={importing}
+          onClick={onCancel}
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          className="inventory-primary-button"
+          disabled={importing || unresolvedCount > 0 || items.length === 0}
+          onClick={onImport}
+        >
+          {importing ? 'Importing…' : 'Import reconciled items'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function StagedReconciliationDrawer({
+  item,
+  catalog,
+  decision,
+  onClose,
+  onChooseExisting,
+  onChooseNew,
+}: {
+  item: NormalizedMenuItem
+  catalog: InventoryCatalogRow[]
+  decision?: ReconciliationDecision
+  onClose: () => void
+  onChooseExisting: (variantId: string) => void
+  onChooseNew: () => void
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const [query, setQuery] = useState('')
+  const candidates = findMasterCandidates(item, catalog, query)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (!dialog.open) dialog.showModal()
+
+    return () => {
+      if (dialog.open) dialog.close()
+    }
+  }, [])
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="inventory-edit-drawer inventory-catalog-drawer"
+      aria-labelledby="staged-reconciliation-title"
+      onCancel={(event) => {
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div className="inventory-catalog-drawer-heading">
+        <div>
+          <p className="inventory-kicker">Master reconciliation</p>
+          <h2 id="staged-reconciliation-title">{item.name}</h2>
+          <p>
+            {item.variantLabel || item.category || item.toastCategory}
+          </p>
+        </div>
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <section className="inventory-drawer-section">
+        <div className="inventory-drawer-section-heading">
+          <div>
+            <p className="inventory-kicker">Decision</p>
+            <h3>Choose master destination</h3>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className={
+            decision?.kind === 'new'
+              ? 'inventory-primary-button'
+              : 'inventory-secondary-button'
+          }
+          onClick={onChooseNew}
+        >
+          Create new master item
+        </button>
+      </section>
+
+      <section className="inventory-drawer-section">
+        <label className="inventory-search-control">
+          <span>Find existing master item</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search master catalog…"
+          />
+        </label>
+
+        <div className="inventory-reconcile-candidate-list">
+          {candidates.length === 0 ? (
+            <p className="inventory-empty-state">
+              No compatible master variants match this search.
+            </p>
+          ) : (
+            candidates.slice(0, 50).map((candidate) => (
+              <button
+                key={candidate.variant.id}
+                type="button"
+                className={
+                  decision?.kind === 'existing' &&
+                  decision.variantId === candidate.variant.id
+                    ? 'inventory-reconcile-candidate is-selected'
+                    : 'inventory-reconcile-candidate'
+                }
+                onClick={() => onChooseExisting(candidate.variant.id)}
+              >
+                <strong>{candidate.name}</strong>
+                <span>{formatMasterVariant(candidate)}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </section>
+    </dialog>
+  )
+}
+
+function findMasterCandidates(
+  item: NormalizedMenuItem,
+  catalog: InventoryCatalogRow[],
+  query = '',
+) {
+  const normalizedQuery = normalizeMasterName(query)
+  const normalizedItemName = normalizeMasterName(item.name)
+
+  return catalog
+    .filter((candidate) => candidate.active && candidate.variant.active)
+    .filter((candidate) => masterVariantCompatible(item, candidate))
+    .filter((candidate) => {
+      if (!normalizedQuery) return true
+      return normalizeMasterName(
+        `${candidate.name} ${candidate.variant.name ?? ''} ${candidate.category?.name ?? ''}`,
+      ).includes(normalizedQuery)
+    })
+    .map((candidate) => ({
+      candidate,
+      exact:
+        normalizeMasterName(candidate.name) === normalizedItemName ? 0 : 1,
+      distance: masterNameDistance(
+        normalizedItemName,
+        normalizeMasterName(candidate.name),
+      ),
+    }))
+    .sort(
+      (left, right) =>
+        left.exact - right.exact ||
+        left.distance - right.distance ||
+        left.candidate.name.localeCompare(right.candidate.name),
+    )
+    .map(({ candidate }) => candidate)
+}
+
+function masterVariantCompatible(
+  item: NormalizedMenuItem,
+  candidate: InventoryCatalogRow,
+) {
+  if (item.variantKind && candidate.variant.kind !== item.variantKind) {
+    return false
+  }
+
+  if (
+    item.variantSizeOz !== undefined &&
+    item.variantSizeOz !== candidate.variant.sizeOz
+  ) {
+    return false
+  }
+
+  if (
+    item.variantPackageType !== undefined &&
+    item.variantPackageType !== candidate.variant.packageType
+  ) {
+    return false
+  }
+
+  return true
+}
+
+function normalizeMasterName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\b\d+(?:\.\d+)?\s*oz\b/g, ' ')
+    .replace(
+      /\b(draft|pint|imperial|imp|reg|regular|can|bottle|btl|tall)\b/g,
+      ' ',
+    )
+    .replace(/[^a-z0-9]+/g, '')
+}
+
+function masterNameDistance(left: string, right: string) {
+  if (left === right) return 0
+  if (!left) return right.length
+  if (!right) return left.length
+
+  const previous = Array.from(
+    { length: right.length + 1 },
+    (_, index) => index,
+  )
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = [leftIndex]
+
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const substitutionCost =
+        left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1
+
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1] + 1,
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + substitutionCost,
+      )
+    }
+
+    for (let index = 0; index < current.length; index += 1) {
+      previous[index] = current[index]
+    }
+  }
+
+  return previous[right.length]
+}
+
+function formatMasterVariant(item: InventoryCatalogRow) {
+  const details = [
+    item.variant.name,
+    item.variant.sizeOz !== null ? `${item.variant.sizeOz}oz` : null,
+    item.variant.packageType,
+    item.category?.name,
+  ].filter(Boolean)
+
+  return details.length > 0
+    ? `${item.name} · ${details.join(' · ')}`
+    : item.name
+}
+
 function StagedItemDrawer({
   item,
   onClose,
