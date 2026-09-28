@@ -2922,3 +2922,15 @@ select {
     width: 100%;
   }
 }
+
+
+.inventory-format-remove-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+}
