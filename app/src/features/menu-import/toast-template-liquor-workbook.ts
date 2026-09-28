@@ -84,7 +84,7 @@ type LiquorTemplateMapping = {
 
 type SimpleMenuRow = {
   itemName: string
-  basePrice: number
+  basePrice: number | null
   happyHourPrice: number | null
   description: string
   menuGroup: string
@@ -355,12 +355,15 @@ function getSimpleCategoryRows(
     .filter(
       (item) =>
         item.exportIncluded &&
-        item.basePriceCents !== null &&
+        (workbookCategory === 'Open Items' || item.basePriceCents !== null) &&
         matchesSimpleWorkbookDestination(item, workbookCategory),
     )
     .map((item) => ({
       itemName: clean(item.name),
-      basePrice: item.basePriceCents! / 100,
+      basePrice:
+        item.basePriceCents === null
+          ? null
+          : item.basePriceCents / 100,
       happyHourPrice: null,
       description: clean(
         item.rawRows[0]?.description ??
@@ -571,13 +574,15 @@ function writeSimpleMenuRows(
       row.itemName,
       mapping.dataStartRow,
     )
-    writeCellValue(
-      sheetDoc,
-      mapping.priceCol,
-      rowNumber,
-      row.basePrice,
-      mapping.dataStartRow,
-    )
+    if (row.basePrice !== null) {
+      writeCellValue(
+        sheetDoc,
+        mapping.priceCol,
+        rowNumber,
+        row.basePrice,
+        mapping.dataStartRow,
+      )
+    }
     if (mapping.descriptionCol && row.description) {
       writeCellValue(
         sheetDoc,
