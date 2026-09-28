@@ -226,6 +226,7 @@ export type InventorySourceMapping = {
   normalizedSourceName: string
   inventoryItemId: string | null
   inventoryItemVariantId: string | null
+  mappingConfirmed: boolean
   itemName: string | null
   variantName: string | null
   variantKind: string | null
