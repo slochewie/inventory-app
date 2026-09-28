@@ -1124,38 +1124,64 @@ function ToastWorkbook() {
                   <div className="inventory-table-heading">
                     <div>
                       <p className="inventory-kicker">Post staging</p>
-                      <h2>Import reviewed items</h2>
+                      <h2>
+                        {reconciliationActive
+                          ? 'Reconcile with master catalog'
+                          : 'Review master mappings'}
+                      </h2>
                       <p>
-                        Save the reviewed rows to Inventory, then continue directly
-                        to Mapping review to reconcile them with the master catalog.
+                        {reconciliationActive
+                          ? 'Choose whether each staged item maps to an existing master variant or creates a new master item.'
+                          : 'Staging is complete. Review master mappings before anything is written to Inventory.'}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      className="inventory-primary-button"
-                      disabled={
-                        importingReviewedItems ||
-                        summary.reviewItems > 0 ||
-                        items.filter(
-                          (item) =>
-                            item.status === 'ready' &&
-                            item.exportIncluded,
-                        ).length === 0
-                      }
-                      onClick={() => void handleImportReviewedItems()}
-                    >
-                      {importingReviewedItems
-                        ? 'Importing…'
-                        : 'Import reviewed items'}
-                    </button>
+                    {!reconciliationActive ? (
+                      <button
+                        type="button"
+                        className="inventory-primary-button"
+                        disabled={
+                          summary.reviewItems > 0 ||
+                          items.filter(
+                            (item) =>
+                              item.status === 'ready' &&
+                              item.exportIncluded,
+                          ).length === 0
+                        }
+                        onClick={beginReconciliation}
+                      >
+                        Review master mappings
+                      </button>
+                    ) : null}
                   </div>
 
                   {summary.reviewItems > 0 ? (
                     <p className="inventory-import-message">
                       {summary.reviewItems.toLocaleString()} staged item
                       {summary.reviewItems === 1 ? '' : 's'} still need review or
-                      must be ignored before import.
+                      must be ignored before reconciliation.
                     </p>
+                  ) : null}
+
+                  {reconciliationActive ? (
+                    <StagedReconciliationPanel
+                      items={items.filter(
+                        (item) =>
+                          item.status === 'ready' && item.exportIncluded,
+                      )}
+                      catalog={masterCatalog}
+                      decisions={reconciliationDecisions}
+                      query={reconciliationQuery}
+                      onQueryChange={setReconciliationQuery}
+                      onReview={setSelectedReconciliationItemId}
+                      onCancel={() => {
+                        setReconciliationActive(false)
+                        setReconciliationDecisions({})
+                        setSelectedReconciliationItemId(null)
+                        setReconciliationQuery('')
+                      }}
+                      onImport={() => void handleImportReviewedItems()}
+                      importing={importingReviewedItems}
+                    />
                   ) : null}
 
                   {importReviewedError ? (
