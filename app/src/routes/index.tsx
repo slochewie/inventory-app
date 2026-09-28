@@ -504,6 +504,7 @@ function CatalogDrawer({
   savingVariantId,
   merging,
   onClose,
+  onAddBeerFormat,
   onUpdate,
   onUpdateCategory,
   onMerge,
