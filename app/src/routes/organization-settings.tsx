@@ -25,6 +25,33 @@ export const Route = createFileRoute('/organization-settings')({
 
 type OptionalBeerCategoryState = OptionalBeerCategoryConfig
 
+type BuiltInBeerFormatSettings = Pick<
+  InventoryOrganizationConfig,
+  | 'draft8Enabled'
+  | 'draft8ActualSizeOz'
+  | 'draft16Enabled'
+  | 'draft16ActualSizeOz'
+  | 'draft24Enabled'
+  | 'draft24ActualSizeOz'
+  | 'pitcherEnabled'
+  | 'pitcherActualSizeOz'
+  | 'canEnabled'
+  | 'bottleEnabled'
+>
+
+const DEFAULT_BUILT_IN_BEER_FORMATS: BuiltInBeerFormatSettings = {
+  draft8Enabled: false,
+  draft8ActualSizeOz: 8,
+  draft16Enabled: false,
+  draft16ActualSizeOz: 16,
+  draft24Enabled: false,
+  draft24ActualSizeOz: 24,
+  pitcherEnabled: false,
+  pitcherActualSizeOz: null,
+  canEnabled: true,
+  bottleEnabled: true,
+}
+
 const HAPPY_HOUR_DAY_OPTIONS: Array<{
   value: HappyHourDay
   label: string
@@ -71,6 +98,10 @@ function OrganizationSettingsPage() {
   ])
   const [savingHappyHour, setSavingHappyHour] = useState(false)
 
+  const [builtInBeerFormats, setBuiltInBeerFormats] =
+    useState<BuiltInBeerFormatSettings>(DEFAULT_BUILT_IN_BEER_FORMATS)
+  const [builtInBeerFormatEdits, setBuiltInBeerFormatEdits] =
+    useState<BuiltInBeerFormatSettings>(DEFAULT_BUILT_IN_BEER_FORMATS)
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryState[]>([])
   const [optionalBeerCategoryEdits, setOptionalBeerCategoryEdits] = useState<OptionalBeerCategoryState[]>([])
   const [visibleOptionalBeerCategoryCount, setVisibleOptionalBeerCategoryCount] = useState(0)
@@ -124,12 +155,19 @@ function OrganizationSettingsPage() {
         setHappyHourRange2DraftEnd(range2End)
         setHappyHourRange2DraftDays(range2Days)
 
+        const nextBuiltInBeerFormats =
+          getBuiltInBeerFormatSettings(organizationConfig)
+        setBuiltInBeerFormats(nextBuiltInBeerFormats)
+        setBuiltInBeerFormatEdits(nextBuiltInBeerFormats)
+
         const savedCategories = getOptionalBeerCategories(organizationConfig)
         const effectiveCategories = getEffectiveOptionalBeerCategories(
           savedCategories,
           catalogItems,
         )
-        setOptionalBeerCategories(savedCategories)
+        setBuiltInBeerFormats(savedBuiltInBeerFormats)
+      setBuiltInBeerFormatEdits(savedBuiltInBeerFormats)
+      setOptionalBeerCategories(savedCategories)
         setOptionalBeerCategoryEdits(
           effectiveCategories.map((category) => ({ ...category })),
         )
@@ -199,7 +237,7 @@ function OrganizationSettingsPage() {
         happyHourRange2Start: happyHourRange2DraftStart || null,
         happyHourRange2End: happyHourRange2DraftEnd || null,
         happyHourRange2Days: happyHourRange2DraftDays,
-        ...buildFixedToastDraftSlotConfig(),
+        ...builtInBeerFormats,
         ...buildOptionalBeerCategoryConfig(optionalBeerCategories),
       })
 
@@ -246,6 +284,9 @@ function OrganizationSettingsPage() {
     }
   }
 
+  const builtInBeerFormatsHaveChanges =
+    JSON.stringify(builtInBeerFormatEdits) !== JSON.stringify(builtInBeerFormats)
+
   const optionalBeerCategoriesHaveChanges =
     optionalBeerCategoryEdits.length !== optionalBeerCategories.length ||
     optionalBeerCategoryEdits.some((draftCategory, index) => {
@@ -260,6 +301,7 @@ function OrganizationSettingsPage() {
   const savedOptionalBeerCategoryCount =
     getVisibleOptionalBeerCategoryCount(optionalBeerCategories)
   const optionalBeerCategoryUiHasChanges =
+    builtInBeerFormatsHaveChanges ||
     optionalBeerCategoriesHaveChanges ||
     visibleOptionalBeerCategoryCount !== savedOptionalBeerCategoryCount
 
@@ -338,7 +380,7 @@ function OrganizationSettingsPage() {
     if (
       !canEdit ||
       !activeOrganization?.id ||
-      !optionalBeerCategoriesHaveChanges ||
+      (!optionalBeerCategoriesHaveChanges && !builtInBeerFormatsHaveChanges) ||
       savingOptionalBeerCategories
     ) {
       return
@@ -376,9 +418,25 @@ function OrganizationSettingsPage() {
         happyHourRange2Start: happyHourRange2Start || null,
         happyHourRange2End: happyHourRange2End || null,
         happyHourRange2Days,
-        ...buildFixedToastDraftSlotConfig(),
+        ...builtInBeerFormatEdits,
         ...buildOptionalBeerCategoryConfig(normalizedCategories),
       })
+
+      const savedBuiltInBeerFormats = getBuiltInBeerFormatSettings(
+        config ?? ({
+          enabled: true,
+          happyHourEnabled,
+          happyHourStart: happyHourStart || null,
+          happyHourEnd: happyHourEnd || null,
+          happyHourDays,
+          happyHourRange2Enabled,
+          happyHourRange2Start: happyHourRange2Start || null,
+          happyHourRange2End: happyHourRange2End || null,
+          happyHourRange2Days,
+          ...builtInBeerFormatEdits,
+          ...buildOptionalBeerCategoryConfig(normalizedCategories),
+        } satisfies InventoryOrganizationConfig),
+      )
 
       const savedCategories = getOptionalBeerCategories(
         config ?? ({
@@ -391,7 +449,7 @@ function OrganizationSettingsPage() {
           happyHourRange2Start: happyHourRange2Start || null,
           happyHourRange2End: happyHourRange2End || null,
           happyHourRange2Days,
-          ...buildFixedToastDraftSlotConfig(),
+          ...builtInBeerFormatEdits,
           ...buildOptionalBeerCategoryConfig(normalizedCategories),
         } satisfies InventoryOrganizationConfig),
       )
@@ -637,6 +695,55 @@ function OrganizationSettingsPage() {
                 </p>
               </div>
 
+              <div className="inventory-draft-slots-copy">
+                <h3>Toast default formats</h3>
+                <p>
+                  Enable only the built-in Beer formats this organization uses.
+                  Disabled formats stay out of Beer destination drop-down menus.
+                </p>
+              </div>
+
+              <div className="inventory-draft-slots-grid">
+                {[
+                  ['draft8Enabled', '8oz Draft'],
+                  ['draft16Enabled', '16oz Draft'],
+                  ['draft24Enabled', '24oz Draft'],
+                  ['pitcherEnabled', 'Pitcher'],
+                  ['canEnabled', 'Can'],
+                  ['bottleEnabled', 'Bottle'],
+                ].map(([key, label]) => (
+                  <label
+                    key={key}
+                    className="inventory-inline-toggle inventory-beer-format-toggle"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={
+                        builtInBeerFormatEdits[
+                          key as keyof BuiltInBeerFormatSettings
+                        ] === true
+                      }
+                      disabled={savingOptionalBeerCategories}
+                      onChange={(event) =>
+                        setBuiltInBeerFormatEdits((current) => ({
+                          ...current,
+                          [key]: event.target.checked,
+                        }))
+                      }
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="inventory-draft-slots-copy">
+                <h3>Custom formats</h3>
+                <p>
+                  Custom draft or packaged formats use the hidden Optional Beer
+                  Category workbook slots below.
+                </p>
+              </div>
+
               {visibleOptionalBeerCategoryCount > 0 ? (
                 <div className="inventory-draft-slots-grid">
                   {optionalBeerCategoryEdits
@@ -748,6 +855,7 @@ function OrganizationSettingsPage() {
                       savingOptionalBeerCategories
                     }
                     onClick={() => {
+                      setBuiltInBeerFormatEdits(builtInBeerFormats)
                       setOptionalBeerCategoryEdits(
                         optionalBeerCategories.map((category) => ({ ...category })),
                       )
@@ -821,26 +929,20 @@ function buildOptionalBeerCategoryConfig(
   }
 }
 
-function buildFixedToastDraftSlotConfig(): Pick<
-  InventoryOrganizationConfig,
-  | 'draft8Enabled'
-  | 'draft8ActualSizeOz'
-  | 'draft16Enabled'
-  | 'draft16ActualSizeOz'
-  | 'draft24Enabled'
-  | 'draft24ActualSizeOz'
-  | 'pitcherEnabled'
-  | 'pitcherActualSizeOz'
-> {
+function getBuiltInBeerFormatSettings(
+  config: InventoryOrganizationConfig,
+): BuiltInBeerFormatSettings {
   return {
-    draft8Enabled: true,
+    draft8Enabled: config.draft8Enabled,
     draft8ActualSizeOz: 8,
-    draft16Enabled: true,
+    draft16Enabled: config.draft16Enabled,
     draft16ActualSizeOz: 16,
-    draft24Enabled: true,
+    draft24Enabled: config.draft24Enabled,
     draft24ActualSizeOz: 24,
-    pitcherEnabled: false,
+    pitcherEnabled: config.pitcherEnabled,
     pitcherActualSizeOz: null,
+    canEnabled: config.canEnabled,
+    bottleEnabled: config.bottleEnabled,
   }
 }
 
