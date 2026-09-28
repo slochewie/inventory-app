@@ -20,17 +20,9 @@ jobs:
           const fs = require('fs')
           const path = 'app/src/routes/index.tsx'
           let text = fs.readFileSync(path, 'utf8')
-          const from = `      draft8Enabled: draft8.enabled,
-      draft8ActualSizeOz: parseDraftSize(draft8.actualSizeOz),
-      draft16Enabled: draft16.enabled,
-      draft16ActualSizeOz: parseDraftSize(draft16.actualSizeOz),
-      draft24Enabled: draft24.enabled,
-      draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
-      pitcherEnabled: pitcher.enabled,
-      pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
-`
-          if (!text.includes(from)) throw new Error('Missing stale draft config block')
-          text = text.replace(from, '      ...buildFixedToastDraftSlotConfig(),\n')
+          const pattern = /      draft8Enabled: draft8\.enabled,\n      draft8ActualSizeOz: parseDraftSize\(draft8\.actualSizeOz\),\n      draft16Enabled: draft16\.enabled,\n      draft16ActualSizeOz: parseDraftSize\(draft16\.actualSizeOz\),\n      draft24Enabled: draft24\.enabled,\n      draft24ActualSizeOz: parseDraftSize\(draft24\.actualSizeOz\),\n      pitcherEnabled: pitcher\.enabled,\n      pitcherActualSizeOz: parseDraftSize\(pitcher\.actualSizeOz\),\n/
+          if (!pattern.test(text)) throw new Error('Missing stale draft config block')
+          text = text.replace(pattern, '      ...buildFixedToastDraftSlotConfig(),\n')
           fs.writeFileSync(path, text)
           NODE
       - name: Commit source patch
