@@ -3233,3 +3233,192 @@ select {
     overflow-y: auto;
   }
 }
+
+
+.inventory-bulk-price-dialog {
+  width: min(44rem, calc(100vw - 2rem));
+  max-width: 44rem;
+  max-height: min(82vh, 44rem);
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.inventory-bulk-price-dialog::backdrop {
+  background: rgb(15 23 42 / 45%);
+}
+
+.inventory-bulk-price-dialog-card {
+  display: grid;
+  max-height: min(82vh, 44rem);
+  overflow: hidden;
+  gap: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1.1rem;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 22%);
+}
+
+.inventory-bulk-price-dialog-heading h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.35rem;
+}
+
+.inventory-bulk-price-dialog-copy,
+.inventory-bulk-price-note {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.inventory-bulk-price-note {
+  font-size: 0.82rem;
+}
+
+.inventory-bulk-price-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.inventory-bulk-price-field > span {
+  color: #6b7280;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.inventory-bulk-price-field > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  border-radius: 0.7rem;
+  background: #fff;
+}
+
+.inventory-bulk-price-field > div > span {
+  padding-left: 0.8rem;
+  color: #6b7280;
+  font-weight: 800;
+}
+
+.inventory-bulk-price-field input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  padding: 0.75rem 0.8rem 0.75rem 0.35rem;
+  font: inherit;
+}
+
+.inventory-bulk-price-warning {
+  display: grid;
+  gap: 0.25rem;
+  border: 1px solid #fde68a;
+  border-radius: 0.75rem;
+  background: #fffbeb;
+  padding: 0.8rem;
+  color: #92400e;
+}
+
+.inventory-bulk-price-warning span {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.inventory-bulk-price-review {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
+.inventory-bulk-price-review-head,
+.inventory-bulk-price-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.5rem 6.5rem;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.7rem 0.8rem;
+}
+
+.inventory-bulk-price-review-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  color: #6b7280;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.inventory-bulk-price-review-row + .inventory-bulk-price-review-row {
+  border-top: 1px solid #e5e7eb;
+}
+
+.inventory-bulk-price-review-row > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.inventory-bulk-price-review-row > div strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventory-bulk-price-review-row > div span {
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+
+.inventory-bulk-price-review-row > span,
+.inventory-bulk-price-review-row > strong:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.inventory-bulk-price-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+@media (max-width: 700px) {
+  .inventory-catalog-bulk-actions {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .inventory-bulk-price-dialog {
+    width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .inventory-bulk-price-dialog-card {
+    max-height: calc(100dvh - 1rem);
+    padding: 0.9rem;
+  }
+
+  .inventory-bulk-price-review-head,
+  .inventory-bulk-price-review-row {
+    grid-template-columns: minmax(0, 1fr) 5.5rem 5.5rem;
+    gap: 0.5rem;
+    padding: 0.65rem;
+  }
+
+  .inventory-bulk-price-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inventory-bulk-price-actions .inventory-primary-button {
+    grid-column: 1 / -1;
+  }
+}
