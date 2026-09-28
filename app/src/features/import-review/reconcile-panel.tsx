@@ -30,6 +30,7 @@ export function ReconcilePanel() {
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('attention')
   const [editingMappingId, setEditingMappingId] = useState<string | null>(null)
   const [candidateQuery, setCandidateQuery] = useState('')
+  const [selectedVariantId, setSelectedVariantId] = useState('')
   const [loading, setLoading] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -142,6 +143,7 @@ export function ReconcilePanel() {
       })
       setEditingMappingId(null)
       setCandidateQuery('')
+      setSelectedVariantId('')
       await reload()
     } catch (caught) {
       setError(
@@ -154,9 +156,10 @@ export function ReconcilePanel() {
     }
   }
 
-  function beginChange(mappingId: string) {
-    setEditingMappingId(mappingId)
+  function beginChange(mapping: InventorySourceMapping) {
+    setEditingMappingId(mapping.id)
     setCandidateQuery('')
+    setSelectedVariantId(mapping.inventoryItemVariantId ?? '')
   }
 
   return (
@@ -315,13 +318,11 @@ export function ReconcilePanel() {
                             />
                             <select
                               className="inventory-input"
-                              value=""
+                              value={selectedVariantId}
                               disabled={updating}
-                              onChange={(event) => {
-                                if (event.target.value) {
-                                  void remap(mapping, event.target.value)
-                                }
-                              }}
+                              onChange={(event) =>
+                                setSelectedVariantId(event.target.value)
+                              }
                             >
                               <option value="" disabled>
                                 {candidateQuery
@@ -348,9 +349,25 @@ export function ReconcilePanel() {
                                 onClick={() => {
                                   setEditingMappingId(null)
                                   setCandidateQuery('')
+                                  setSelectedVariantId('')
                                 }}
                               >
                                 Cancel
+                              </button>
+                              <button
+                                type="button"
+                                className="inventory-primary-button"
+                                disabled={
+                                  updating ||
+                                  !selectedVariantId ||
+                                  selectedVariantId ===
+                                    mapping.inventoryItemVariantId
+                                }
+                                onClick={() =>
+                                  void remap(mapping, selectedVariantId)
+                                }
+                              >
+                                Save
                               </button>
                             </div>
                           </div>
@@ -358,7 +375,7 @@ export function ReconcilePanel() {
                           <button
                             className="inventory-row-action"
                             type="button"
-                            onClick={() => beginChange(mapping.id)}
+                            onClick={() => beginChange(mapping)}
                           >
                             {mapping.inventoryItemVariantId ? 'Change' : 'Map'}
                           </button>
@@ -434,6 +451,13 @@ function assessMapping(
     return {
       status: 'unmapped',
       alternatives: findSimilarCatalogItems(mapping, catalog),
+    }
+  }
+
+  if (mapping.mappingConfirmed) {
+    return {
+      status: 'mapped',
+      alternatives: [],
     }
   }
 
