@@ -28,7 +28,6 @@ jobs:
 
           const workbookPath = 'app/src/features/menu-import/toast-template-workbook.ts'
           let workbook = fs.readFileSync(workbookPath, 'utf8')
-
           workbook = replaceOnce(
             workbook,
 `  let shouldAutoAddTallBoyCan =
@@ -39,7 +38,6 @@ jobs:
 `  let nextCustomDraftSizeIndex = 0
 `,
           )
-
           workbook = replaceOnce(
             workbook,
 `    const hasTallBoyCanLabel = isTallBoyCanCategory(category.label)
@@ -66,12 +64,10 @@ jobs:
 
 `,
           )
-
           fs.writeFileSync(workbookPath, workbook)
 
           const indexPath = 'app/src/routes/index.tsx'
           let index = fs.readFileSync(indexPath, 'utf8')
-
           index = replaceOnce(
             index,
 `  function updateOptionalBeerCategoryDraft(
@@ -138,7 +134,6 @@ jobs:
 
 `,
           )
-
           index = replaceOnce(
             index,
 `                  <p>
@@ -150,7 +145,6 @@ jobs:
                   </p>
 `,
           )
-
           index = replaceOnce(
             index,
 `                    {optionalBeerCategoryEdits
@@ -274,31 +268,15 @@ jobs:
                       ))}
 `,
           )
-
-          index = replaceOnce(
-            index,
-`                    Add Optional Beer Category
-`,
-`                    Add category
-`,
-          )
-
-          index = replaceOnce(
-            index,
-`      setError(\`Set a label for Optional Beer Category ${missingLabel.slot}.\`)
-`,
-`      setError('Set a label for the Beer export category.')
-`,
-          )
-
-          index = replaceOnce(
-            index,
-`        \`Optional Beer Category ${disabledAssignedCategory.slot} is still assigned to catalog items. Reassign those items before disabling it.\`,
-`,
-`        'This Beer export category is still assigned to catalog items. Reassign those items before disabling it.',
-`,
-          )
-
+          index = replaceOnce(index, `                    Add Optional Beer Category
+`, `                    Add category
+`)
+          index = replaceOnce(index, `      setError(\`Set a label for Optional Beer Category ${missingLabel.slot}.\`)
+`, `      setError('Set a label for the Beer export category.')
+`)
+          index = replaceOnce(index, `        \`Optional Beer Category ${disabledAssignedCategory.slot} is still assigned to catalog items. Reassign those items before disabling it.\`,
+`, `        'This Beer export category is still assigned to catalog items. Reassign those items before disabling it.',
+`)
           index = replaceOnce(
             index,
 `function buildOptionalBeerCategoryConfig(
@@ -316,7 +294,6 @@ function buildOptionalBeerCategoryConfig(
 ): Pick<
 `,
           )
-
           fs.writeFileSync(indexPath, index)
           NODE
       - name: Commit source patch
