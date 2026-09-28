@@ -1295,22 +1295,20 @@ function getStagedDraftSlotMappings(
 function getOrganizationDraftSlotMappings(
   config: InventoryOrganizationConfig | null,
 ): ToastDraftSlotMapping[] {
-  if (!config) return []
+  const fixedDraftMappings: ToastDraftSlotMapping[] = [
+    { toastSizeOz: 8, actualSizeOz: 8 },
+    { toastSizeOz: 16, actualSizeOz: 16 },
+    { toastSizeOz: 24, actualSizeOz: 24 },
+  ]
 
-  return [
-    config.draft8Enabled && config.draft8ActualSizeOz !== null
-      ? { toastSizeOz: 8, actualSizeOz: config.draft8ActualSizeOz }
-      : null,
-    config.draft16Enabled && config.draft16ActualSizeOz !== null
-      ? { toastSizeOz: 16, actualSizeOz: config.draft16ActualSizeOz }
-      : null,
-    config.draft24Enabled && config.draft24ActualSizeOz !== null
-      ? { toastSizeOz: 24, actualSizeOz: config.draft24ActualSizeOz }
-      : null,
+  if (!config) return fixedDraftMappings
+
+  const pitcherMapping =
     config.pitcherEnabled && config.pitcherActualSizeOz !== null
-      ? { toastSizeOz: null, actualSizeOz: config.pitcherActualSizeOz }
-      : null,
-  ].filter((mapping): mapping is ToastDraftSlotMapping => mapping !== null)
+      ? [{ toastSizeOz: null, actualSizeOz: config.pitcherActualSizeOz }]
+      : []
+
+  return [...fixedDraftMappings, ...pitcherMapping]
 }
 
 function formatHappyHourSetting(

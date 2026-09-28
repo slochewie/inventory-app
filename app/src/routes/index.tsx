@@ -25,10 +25,6 @@ export const Route = createFileRoute('/')({ component: CatalogPage })
 
 type AvailabilityFilter = 'carried' | 'not-carried' | 'all'
 
-type DraftSlotState = {
-  enabled: boolean
-  actualSizeOz: string
-}
 
 type OptionalBeerCategoryState = OptionalBeerCategoryConfig
 
@@ -99,15 +95,6 @@ function CatalogPage() {
     ...ALL_HAPPY_HOUR_DAYS,
   ])
   const [savingHappyHour, setSavingHappyHour] = useState(false)
-  const [draft8, setDraft8] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
-  const [draft16, setDraft16] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
-  const [draft24, setDraft24] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
-  const [pitcher, setPitcher] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
-  const [draft8Edit, setDraft8Edit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
-  const [draft16Edit, setDraft16Edit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
-  const [draft24Edit, setDraft24Edit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
-  const [pitcherEdit, setPitcherEdit] = useState<DraftSlotState>({ enabled: false, actualSizeOz: '' })
-  const [savingDraftSlots, setSavingDraftSlots] = useState(false)
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryState[]>([])
   const [optionalBeerCategoryEdits, setOptionalBeerCategoryEdits] = useState<OptionalBeerCategoryState[]>([])
   const [visibleOptionalBeerCategoryCount, setVisibleOptionalBeerCategoryCount] = useState(0)
@@ -164,31 +151,6 @@ function CatalogPage() {
         setHappyHourRange2DraftEnd(range2End)
         setHappyHourRange2DraftDays(range2Days)
 
-        const nextDraft8 = {
-          enabled: organizationConfig.draft8Enabled === true,
-          actualSizeOz: organizationConfig.draft8ActualSizeOz?.toString() ?? '',
-        }
-        const nextDraft16 = {
-          enabled: organizationConfig.draft16Enabled === true,
-          actualSizeOz: organizationConfig.draft16ActualSizeOz?.toString() ?? '',
-        }
-        const nextDraft24 = {
-          enabled: organizationConfig.draft24Enabled === true,
-          actualSizeOz: organizationConfig.draft24ActualSizeOz?.toString() ?? '',
-        }
-        const nextPitcher = {
-          enabled: organizationConfig.pitcherEnabled === true,
-          actualSizeOz: organizationConfig.pitcherActualSizeOz?.toString() ?? '',
-        }
-
-        setDraft8(nextDraft8)
-        setDraft16(nextDraft16)
-        setDraft24(nextDraft24)
-        setPitcher(nextPitcher)
-        setDraft8Edit(nextDraft8)
-        setDraft16Edit(nextDraft16)
-        setDraft24Edit(nextDraft24)
-        setPitcherEdit(nextPitcher)
 
         const nextOptionalBeerCategories = getOptionalBeerCategories(organizationConfig)
         setOptionalBeerCategories(nextOptionalBeerCategories)
@@ -377,14 +339,7 @@ function CatalogPage() {
         happyHourRange2Start: happyHourRange2DraftStart || null,
         happyHourRange2End: happyHourRange2DraftEnd || null,
         happyHourRange2Days: happyHourRange2DraftDays,
-        draft8Enabled: draft8.enabled,
-        draft8ActualSizeOz: parseDraftSize(draft8.actualSizeOz),
-        draft16Enabled: draft16.enabled,
-        draft16ActualSizeOz: parseDraftSize(draft16.actualSizeOz),
-        draft24Enabled: draft24.enabled,
-        draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
-        pitcherEnabled: pitcher.enabled,
-        pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
+        ...buildFixedToastDraftSlotConfig(),
         ...buildOptionalBeerCategoryConfig(optionalBeerCategories),
       })
 
@@ -430,100 +385,6 @@ function CatalogPage() {
       )
     } finally {
       setSavingHappyHour(false)
-    }
-  }
-
-  const draftSlotsHaveChanges =
-    !draftSlotEquals(draft8, draft8Edit) ||
-    !draftSlotEquals(draft16, draft16Edit) ||
-    !draftSlotEquals(draft24, draft24Edit) ||
-    !draftSlotEquals(pitcher, pitcherEdit)
-
-  async function saveDraftSlotSettings() {
-    if (
-      !canEdit ||
-      !activeOrganization?.id ||
-      !draftSlotsHaveChanges ||
-      savingDraftSlots
-    ) {
-      return
-    }
-
-    const slots = [
-      ['8oz', draft8Edit],
-      ['16oz', draft16Edit],
-      ['24oz', draft24Edit],
-      ['Pitcher', pitcherEdit],
-    ] as const
-
-    const invalidSlot = slots.find(([, slot]) => {
-      const size = parseDraftSize(slot.actualSizeOz)
-      return slot.enabled && (size === null || size <= 0)
-    })
-
-    if (invalidSlot) {
-      setError(`Set an actual size for the enabled ${invalidSlot[0]} Toast draft slot.`)
-      return
-    }
-
-    setSavingDraftSlots(true)
-    setError(null)
-
-    try {
-      const config = await updateInventoryOrganizationConfig({
-        organizationId: activeOrganization.id,
-        happyHourEnabled,
-        happyHourStart: happyHourStart || null,
-        happyHourEnd: happyHourEnd || null,
-        happyHourDays,
-        happyHourRange2Enabled,
-        happyHourRange2Start: happyHourRange2Start || null,
-        happyHourRange2End: happyHourRange2End || null,
-        happyHourRange2Days,
-        draft8Enabled: draft8Edit.enabled,
-        draft8ActualSizeOz: parseDraftSize(draft8Edit.actualSizeOz),
-        draft16Enabled: draft16Edit.enabled,
-        draft16ActualSizeOz: parseDraftSize(draft16Edit.actualSizeOz),
-        draft24Enabled: draft24Edit.enabled,
-        draft24ActualSizeOz: parseDraftSize(draft24Edit.actualSizeOz),
-        pitcherEnabled: pitcherEdit.enabled,
-        pitcherActualSizeOz: parseDraftSize(pitcherEdit.actualSizeOz),
-        ...buildOptionalBeerCategoryConfig(optionalBeerCategories),
-      })
-
-      const nextDraft8 = {
-        enabled: config?.draft8Enabled ?? draft8Edit.enabled,
-        actualSizeOz: config?.draft8ActualSizeOz?.toString() ?? draft8Edit.actualSizeOz,
-      }
-      const nextDraft16 = {
-        enabled: config?.draft16Enabled ?? draft16Edit.enabled,
-        actualSizeOz: config?.draft16ActualSizeOz?.toString() ?? draft16Edit.actualSizeOz,
-      }
-      const nextDraft24 = {
-        enabled: config?.draft24Enabled ?? draft24Edit.enabled,
-        actualSizeOz: config?.draft24ActualSizeOz?.toString() ?? draft24Edit.actualSizeOz,
-      }
-      const nextPitcher = {
-        enabled: config?.pitcherEnabled ?? pitcherEdit.enabled,
-        actualSizeOz: config?.pitcherActualSizeOz?.toString() ?? pitcherEdit.actualSizeOz,
-      }
-
-      setDraft8(nextDraft8)
-      setDraft16(nextDraft16)
-      setDraft24(nextDraft24)
-      setPitcher(nextPitcher)
-      setDraft8Edit(nextDraft8)
-      setDraft16Edit(nextDraft16)
-      setDraft24Edit(nextDraft24)
-      setPitcherEdit(nextPitcher)
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : 'Unable to save draft size settings.',
-      )
-    } finally {
-      setSavingDraftSlots(false)
     }
   }
 
@@ -620,7 +481,6 @@ function CatalogPage() {
     setError(null)
 
     try {
-      const [slot1, slot2, slot3, slot4, slot5] = normalizedCategories
       const config = await updateInventoryOrganizationConfig({
         organizationId: activeOrganization.id,
         happyHourEnabled,
@@ -631,14 +491,7 @@ function CatalogPage() {
         happyHourRange2Start: happyHourRange2Start || null,
         happyHourRange2End: happyHourRange2End || null,
         happyHourRange2Days,
-        draft8Enabled: draft8.enabled,
-        draft8ActualSizeOz: parseDraftSize(draft8.actualSizeOz),
-        draft16Enabled: draft16.enabled,
-        draft16ActualSizeOz: parseDraftSize(draft16.actualSizeOz),
-        draft24Enabled: draft24.enabled,
-        draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
-        pitcherEnabled: pitcher.enabled,
-        pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
+        ...buildFixedToastDraftSlotConfig(),
         ...buildOptionalBeerCategoryConfig(normalizedCategories),
       })
 
@@ -774,7 +627,7 @@ function CatalogPage() {
             <summary>
               <div>
                 <p className="inventory-kicker">Organization settings</p>
-                <strong>Happy Hour & draft sizes</strong>
+                <strong>Happy Hour & beer export categories</strong>
                 <span>
                   Settings for {activeOrganization?.name ?? 'this organization'}.
                 </span>
@@ -965,54 +818,9 @@ function CatalogPage() {
 
               <section className="inventory-organization-settings-section inventory-draft-slots-settings">
                 <div className="inventory-draft-slots-copy">
-                  <h2>Draft sizes</h2>
+                  <h2>Beer export categories</h2>
                   <p>
-                    Map this location's actual draft sizes to Toast's fixed draft slots.
-                  </p>
-                </div>
-
-                <div className="inventory-draft-slot-list">
-                  <div className="inventory-draft-slot-header" aria-hidden="true">
-                    <span>Toast slot</span>
-                    <span>Used</span>
-                    <span>Actual size</span>
-                  </div>
-                  <DraftSlotField toastLabel="8oz" value={draft8Edit} disabled={savingDraftSlots} onChange={setDraft8Edit} />
-                  <DraftSlotField toastLabel="16oz" value={draft16Edit} disabled={savingDraftSlots} onChange={setDraft16Edit} />
-                  <DraftSlotField toastLabel="24oz" value={draft24Edit} disabled={savingDraftSlots} onChange={setDraft24Edit} />
-                  <DraftSlotField toastLabel="Pitcher" value={pitcherEdit} disabled={savingDraftSlots} onChange={setPitcherEdit} />
-                </div>
-
-                <div className="inventory-draft-slots-actions">
-                  <button
-                    type="button"
-                    className="inventory-secondary-button"
-                    disabled={!draftSlotsHaveChanges || savingDraftSlots}
-                    onClick={() => {
-                      setDraft8Edit(draft8)
-                      setDraft16Edit(draft16)
-                      setDraft24Edit(draft24)
-                      setPitcherEdit(pitcher)
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="inventory-primary-button"
-                    disabled={!draftSlotsHaveChanges || savingDraftSlots}
-                    onClick={() => void saveDraftSlotSettings()}
-                  >
-                    {savingDraftSlots ? 'Saving…' : 'Update'}
-                  </button>
-                </div>
-              </section>
-
-              <section className="inventory-organization-settings-section inventory-draft-slots-settings">
-                <div className="inventory-draft-slots-copy">
-                  <h2>Optional beer categories</h2>
-                  <p>
-                    Add only the Toast Optional Beer Category slots this organization uses.
+                    Map non-standard Beer formats to Toast Optional Beer Category slots. Use labels like Tall Boy Can for packaged cans or 10oz for custom draft sizes.
                   </p>
                 </div>
 
@@ -1040,7 +848,7 @@ function CatalogPage() {
                           </label>
 
                           <label className="inventory-search-control">
-                            <span>Category label</span>
+                            <span>Import/export mapping</span>
                             <input
                               type="text"
                               value={category.label}
@@ -1050,7 +858,7 @@ function CatalogPage() {
                                   label: event.target.value,
                                 })
                               }
-                              placeholder={`Optional Beer Category ${category.slot}`}
+                              placeholder={`Tall Boy Can, 10oz, or Optional Beer Category ${category.slot}`}
                             />
                           </label>
 
@@ -1717,70 +1525,6 @@ function NameField({
   )
 }
 
-function DraftSlotField({
-  toastLabel,
-  value,
-  disabled,
-  onChange,
-}: {
-  toastLabel: string
-  value: DraftSlotState
-  disabled: boolean
-  onChange: (value: DraftSlotState) => void
-}) {
-  const toastSize = toastLabel.endsWith('oz')
-    ? toastLabel.replace('oz', '')
-    : ''
-
-  return (
-    <div className="inventory-draft-slot-row">
-      <strong>{toastLabel}</strong>
-
-      <label className="inventory-draft-slot-used">
-        <input
-          type="checkbox"
-          checked={value.enabled}
-          disabled={disabled}
-          onChange={(event) => {
-            const enabled = event.target.checked
-            onChange({
-              ...value,
-              enabled,
-              actualSizeOz:
-                enabled && !value.actualSizeOz.trim() && toastSize
-                  ? toastSize
-                  : value.actualSizeOz,
-            })
-          }}
-        />
-        <span>{value.enabled ? 'Yes' : 'No'}</span>
-      </label>
-
-      <label className="inventory-draft-size-input">
-        <span className="sr-only">{toastLabel} actual size in ounces</span>
-        <div className="inventory-draft-size-control">
-          <input
-            type="number"
-            min="1"
-            step="1"
-            inputMode="numeric"
-            value={value.actualSizeOz}
-            disabled={!value.enabled || disabled}
-            placeholder="—"
-            onInput={(event) =>
-              onChange({
-                ...value,
-                actualSizeOz: (event.currentTarget as HTMLInputElement).value,
-              })
-            }
-          />
-          <span>oz</span>
-        </div>
-      </label>
-    </div>
-  )
-}
-
 function buildOptionalBeerCategoryConfig(
   categories: readonly OptionalBeerCategoryConfig[],
 ): Pick<
@@ -1812,6 +1556,29 @@ function buildOptionalBeerCategoryConfig(
   }
 }
 
+function buildFixedToastDraftSlotConfig(): Pick<
+  InventoryOrganizationConfig,
+  | 'draft8Enabled'
+  | 'draft8ActualSizeOz'
+  | 'draft16Enabled'
+  | 'draft16ActualSizeOz'
+  | 'draft24Enabled'
+  | 'draft24ActualSizeOz'
+  | 'pitcherEnabled'
+  | 'pitcherActualSizeOz'
+> {
+  return {
+    draft8Enabled: true,
+    draft8ActualSizeOz: 8,
+    draft16Enabled: true,
+    draft16ActualSizeOz: 16,
+    draft24Enabled: true,
+    draft24ActualSizeOz: 24,
+    pitcherEnabled: false,
+    pitcherActualSizeOz: null,
+  }
+}
+
 function getVisibleOptionalBeerCategoryCount(
   categories: readonly OptionalBeerCategoryConfig[],
 ) {
@@ -1822,21 +1589,6 @@ function getVisibleOptionalBeerCategoryCount(
   })
 
   return visibleCount
-}
-
-function draftSlotEquals(left: DraftSlotState, right: DraftSlotState) {
-  return (
-    left.enabled === right.enabled &&
-    left.actualSizeOz.trim() === right.actualSizeOz.trim()
-  )
-}
-
-function parseDraftSize(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
 }
 
 function MoneyField({
