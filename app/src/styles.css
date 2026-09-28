@@ -1162,6 +1162,83 @@ select {
   margin: 0;
 }
 
+.inventory-catalog-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 3.35rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  padding: 0.65rem 1rem;
+}
+
+.inventory-catalog-bulk-toolbar.is-active {
+  background: #f8fafc;
+}
+
+.inventory-catalog-bulk-toggle,
+.inventory-catalog-bulk-actions > button {
+  display: inline-flex;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #111827;
+  padding: 0.45rem 0.65rem;
+  font-weight: 800;
+}
+
+.inventory-catalog-bulk-toggle[aria-pressed='true'] {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+
+.inventory-catalog-bulk-toggle svg,
+.inventory-catalog-bulk-actions svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.inventory-catalog-bulk-count {
+  color: #4b5563;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.inventory-catalog-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.inventory-catalog-bulk-actions > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.inventory-catalog-select-column {
+  width: 3rem !important;
+  min-width: 3rem !important;
+  text-align: center !important;
+}
+
+.inventory-catalog-select-column input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+}
+
+.inventory-catalog-row.is-selected {
+  background: #f8fafc;
+}
+
 .inventory-catalog-subtitle {
   margin: 0.25rem 0 0 !important;
   text-align: left !important;
@@ -1253,6 +1330,10 @@ select {
 .inventory-catalog-table th:first-child,
 .inventory-catalog-table td:first-child {
   min-width: 15rem;
+}
+
+.inventory-catalog-table .inventory-catalog-select-column:first-child {
+  min-width: 3rem;
 }
 
 .inventory-catalog-action-cell {
