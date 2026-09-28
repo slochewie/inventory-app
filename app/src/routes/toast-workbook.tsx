@@ -71,72 +71,67 @@ function ToastWorkbookRoute() {
   )
 }
 
-function ToastWorkbook() {
-  const savedReviewSession = useMemo(() => {
-    const saved = loadReviewSession()
-    if (
-      saved?.importFile?.meta?.source === 'toast-workbook-staging' &&
-      saved.importFile.meta.parserVersion !==
-        TOAST_WORKBOOK_STAGING_PARSER_VERSION
-    ) {
-      return null
-    }
+function loadOrganizationReviewSession(organizationId: string) {
+  const saved = loadReviewSession(organizationId)
+  if (
+    saved?.importFile?.meta?.source === 'toast-workbook-staging' &&
+    saved.importFile.meta.parserVersion !==
+      TOAST_WORKBOOK_STAGING_PARSER_VERSION
+  ) {
+    return null
+  }
 
-    if (
-      saved?.importFile?.meta?.source === 'toast-workbook-staging' &&
-      saved.items.length
-    ) {
-      const repairedItems = saved.items.map((item) => {
-        const validReadyItem =
-          item.status === 'ready' &&
-          item.name.trim() !== '' &&
-          !/^\[Review /i.test(item.name) &&
-          item.basePriceCents !== null
+  if (
+    saved?.importFile?.meta?.source === 'toast-workbook-staging' &&
+    saved.items.length
+  ) {
+    const repairedItems = saved.items.map((item) => {
+      const validReadyItem =
+        item.status === 'ready' &&
+        item.name.trim() !== '' &&
+        !/^\[Review /i.test(item.name) &&
+        item.basePriceCents !== null
 
-        if (
-          !validReadyItem ||
-          item.stagingExplicitlyExcluded === true ||
-          (item.exportIncluded && item.exportToToast !== false)
-        ) {
-          return item
-        }
+      if (
+        !validReadyItem ||
+        item.stagingExplicitlyExcluded === true ||
+        (item.exportIncluded && item.exportToToast !== false)
+      ) {
+        return item
+      }
 
-        return {
-          ...item,
-          exportToToast: true,
-          exportIncluded: true,
-          stagingExplicitlyExcluded: false,
-        }
-      })
+      return {
+        ...item,
+        exportToToast: true,
+        exportIncluded: true,
+        stagingExplicitlyExcluded: false,
+      }
+    })
 
-      const changed = repairedItems.some(
-        (item, index) => item !== saved.items[index],
-      )
+    const changed = repairedItems.some(
+      (item, index) => item !== saved.items[index],
+    )
 
-      if (changed) {
-        saveReviewSession(saved.importFile, repairedItems)
-        return {
-          ...saved,
-          items: repairedItems,
-        }
+    if (changed) {
+      saveReviewSession(saved.importFile, repairedItems, organizationId)
+      return {
+        ...saved,
+        items: repairedItems,
       }
     }
+  }
 
-    return saved
-  }, [])
+  return saved
+}
+
+function ToastWorkbook() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
-  const [importFile, setImportFile] = useState<ParsedMenuImport | null>(savedReviewSession?.importFile ?? null)
-  const [items, setItems] = useState<NormalizedMenuItem[]>(savedReviewSession?.items ?? [])
+  const [importFile, setImportFile] = useState<ParsedMenuImport | null>(null)
+  const [items, setItems] = useState<NormalizedMenuItem[]>([])
   const [reviewSource, setReviewSource] = useState<
     'catalog' | 'saved' | 'review-csv' | 'uploaded' | 'toast-workbook' | null
-  >(
-    savedReviewSession?.items.length
-      ? savedReviewSession.importFile?.meta?.source === 'toast-workbook-staging'
-        ? 'toast-workbook'
-        : 'saved'
-      : null,
-  )
-  const [reviewSavedAt, setReviewSavedAt] = useState(savedReviewSession?.savedAt ?? null)
+  >(null)
+  const [reviewSavedAt, setReviewSavedAt] = useState<string | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [organizationConfig, setOrganizationConfig] =
     useState<InventoryOrganizationConfig | null>(null)
@@ -238,23 +233,62 @@ function ToastWorkbook() {
   }, [stagedReviewCategory, stagedReviewQuery, stagedReviewStatus])
 
   useEffect(() => {
-    if (!activeOrganization?.id) return
+    if (!activeOrganization?.id) {
+      setOrganizationConfig(null)
+      setImportFile(null)
+      setItems([])
+      setReviewSource(null)
+      setReviewSavedAt(null)
+      return
+    }
+
+    const organizationId = activeOrganization.id
+    const savedReviewSession = loadOrganizationReviewSession(organizationId)
+
+    setSelectedStagedItemId(null)
+    setStagedReviewQuery('')
+    setStagedReviewStatus('review')
+    setStagedReviewCategory('all')
+    setStagedReviewPage(1)
+    setWorkbookValidation(null)
+    setDownloadError(null)
+    setAlohaError(null)
+
+    if (savedReviewSession?.items.length) {
+      setImportFile(savedReviewSession.importFile)
+      setItems(savedReviewSession.items)
+      setReviewSource(
+        savedReviewSession.importFile?.meta?.source === 'toast-workbook-staging'
+          ? 'toast-workbook'
+          : 'saved',
+      )
+      setReviewSavedAt(savedReviewSession.savedAt)
+    } else {
+      setImportFile(null)
+      setItems([])
+      setReviewSource(null)
+      setReviewSavedAt(null)
+    }
 
     const controller = new AbortController()
     setCatalogLoading(true)
 
     void Promise.all([
-      listInventoryCatalog(activeOrganization.id, controller.signal),
-      getInventoryOrganizationConfig(activeOrganization.id, controller.signal),
+      listInventoryCatalog(organizationId, controller.signal),
+      getInventoryOrganizationConfig(organizationId, controller.signal),
     ])
       .then(([catalog, config]) => {
         setOrganizationConfig(config)
 
-        if (reviewSource === 'toast-workbook') {
+        if (savedReviewSession?.items.length) return
+
+        if (catalog.items.length === 0) {
+          setImportFile(null)
+          setItems([])
+          setReviewSource(null)
+          setReviewSavedAt(null)
           return
         }
-
-        if (catalog.items.length === 0) return
 
         const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
 
@@ -265,7 +299,7 @@ function ToastWorkbook() {
           warnings: [],
           meta: {
             store: activeOrganization.name,
-            organizationId: activeOrganization.id,
+            organizationId,
             source: 'inventory-catalog',
           },
         })
@@ -286,11 +320,7 @@ function ToastWorkbook() {
       })
 
     return () => controller.abort()
-  }, [
-    activeOrganization?.id,
-    activeOrganization?.name,
-    reviewSource,
-  ])
+  }, [activeOrganization?.id, activeOrganization?.name])
 
   useEffect(() => {
     let cancelled = false
@@ -334,7 +364,7 @@ function ToastWorkbook() {
   }, [])
 
   async function handleClearStagedImport() {
-    clearReviewSession()
+    clearReviewSession(activeOrganization?.id)
     setSelectedStagedItemId(null)
     setStagedReviewQuery('')
     setStagedReviewStatus('review')
@@ -407,7 +437,7 @@ function ToastWorkbook() {
       setItems(normalizedItems)
       setReviewSource('uploaded')
       setReviewSavedAt(null)
-      saveReviewSession(parsed, normalizedItems)
+      saveReviewSession(parsed, normalizedItems, activeOrganization?.id)
     } catch (error) {
       setImportFile(null)
       setItems([])
@@ -445,7 +475,7 @@ function ToastWorkbook() {
       setItems(parsed.items)
       setReviewSource('toast-workbook')
       setReviewSavedAt(null)
-      saveReviewSession(stagedImportFile, parsed.items)
+      saveReviewSession(stagedImportFile, parsed.items, activeOrganization?.id)
     } catch (error) {
       setAlohaError(
         error instanceof Error
@@ -488,7 +518,7 @@ function ToastWorkbook() {
         } satisfies NormalizedMenuItem
       })
 
-      saveReviewSession(importFile, next)
+      saveReviewSession(importFile, next, activeOrganization?.id)
       return next
     })
   }
@@ -513,7 +543,7 @@ function ToastWorkbook() {
         }
       })
 
-      saveReviewSession(importFile, next)
+      saveReviewSession(importFile, next, activeOrganization?.id)
       return next
     })
   }
@@ -530,7 +560,7 @@ function ToastWorkbook() {
             }
           : item,
       )
-      saveReviewSession(importFile, next)
+      saveReviewSession(importFile, next, activeOrganization?.id)
       return next
     })
   }
@@ -550,7 +580,7 @@ function ToastWorkbook() {
       setItems(parsed.items)
       setReviewSource('review-csv')
       setReviewSavedAt(null)
-      saveReviewSession(parsed.importFile, parsed.items)
+      saveReviewSession(parsed.importFile, parsed.items, activeOrganization?.id)
     } catch (error) {
       setImportFile(null)
       setItems([])
