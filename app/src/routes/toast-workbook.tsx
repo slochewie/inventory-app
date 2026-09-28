@@ -593,6 +593,43 @@ function ToastWorkbook() {
     }
   }
 
+  function beginReconciliation() {
+    const reviewedItems = items.filter(
+      (item) => item.status === 'ready' && item.exportIncluded,
+    )
+
+    const mappedDecisions: Record<string, ReconciliationDecision> = {}
+
+    reviewedItems.forEach((item) => {
+      const sourceKey = item.sourceItemNumber?.trim() || item.id
+      const existingMapping = sourceMappings.find(
+        (mapping) =>
+          mapping.sourceType === 'toast-template' &&
+          mapping.sourceKey === sourceKey &&
+          mapping.inventoryItemVariantId,
+      )
+
+      if (
+        existingMapping?.inventoryItemVariantId &&
+        masterCatalog.some(
+          (candidate) =>
+            candidate.variant.id === existingMapping.inventoryItemVariantId,
+        )
+      ) {
+        mappedDecisions[item.id] = {
+          kind: 'existing',
+          variantId: existingMapping.inventoryItemVariantId,
+        }
+      }
+    })
+
+    setReconciliationDecisions(mappedDecisions)
+    setReconciliationActive(true)
+    setSelectedReconciliationItemId(null)
+    setReconciliationQuery('')
+    setImportReviewedError(null)
+  }
+
   async function handleImportReviewedItems() {
     if (
       !activeOrganization?.id ||
@@ -603,20 +640,17 @@ function ToastWorkbook() {
       return
     }
 
-    const unresolvedItems = items.filter((item) => item.status === 'review')
-    if (unresolvedItems.length > 0) {
-      setImportReviewedError(
-        `Resolve or ignore all staged review items before importing. ${unresolvedItems.length.toLocaleString()} still need review.`,
-      )
-      return
-    }
-
     const reviewedItems = items.filter(
       (item) => item.status === 'ready' && item.exportIncluded,
     )
+    const missingDecision = reviewedItems.find(
+      (item) => !reconciliationDecisions[item.id],
+    )
 
-    if (reviewedItems.length === 0) {
-      setImportReviewedError('There are no reviewed items selected for import.')
+    if (missingDecision) {
+      setImportReviewedError(
+        'Choose an existing master item or Create new master for every reviewed item.',
+      )
       return
     }
 
@@ -628,32 +662,41 @@ function ToastWorkbook() {
         organizationId: activeOrganization.id,
         sourceType: 'toast-template',
         sourceName: importFile.sourceName,
-        items: reviewedItems.map((item) => ({
-          id: item.id,
-          sourceItemNumber: item.sourceItemNumber,
-          name: item.name,
-          category: item.category,
-          toastCategory: item.toastCategory,
-          toastDestination: item.toastDestination,
-          basePriceCents: item.basePriceCents,
-          happyHourPriceCents: item.happyHourPriceCents,
-          status: item.status,
-          exportIncluded: item.exportIncluded,
-        })),
+        reconciliationMode: 'explicit',
+        items: reviewedItems.map((item) => {
+          const decision = reconciliationDecisions[item.id]
+          return {
+            id: item.id,
+            sourceItemNumber: item.sourceItemNumber,
+            name: item.name,
+            category: item.category,
+            toastCategory: item.toastCategory,
+            toastDestination: item.toastDestination,
+            basePriceCents: item.basePriceCents,
+            happyHourPriceCents: item.happyHourPriceCents,
+            status: item.status,
+            exportIncluded: item.exportIncluded,
+            targetVariantId:
+              decision?.kind === 'existing' ? decision.variantId : undefined,
+            createNewMaster:
+              decision?.kind === 'new' ? true : undefined,
+          }
+        }),
       })
 
       clearReviewSession(activeOrganization.id)
       setSelectedStagedItemId(null)
+      setSelectedReconciliationItemId(null)
 
       await navigate({
         to: '/import-review',
-        search: { workspace: 'mappings' },
+        search: { workspace: 'history' },
       })
     } catch (error) {
       setImportReviewedError(
         error instanceof Error
           ? error.message
-          : 'Unable to import the reviewed Toast items.',
+          : 'Unable to import the reconciled Toast items.',
       )
     } finally {
       setImportingReviewedItems(false)
