@@ -94,7 +94,7 @@ function MenuCategoriesPage() {
             <div>
               <h2>Optional categories</h2>
               <p>
-                Add Retail or Open Items when this organization needs them. Built-in categories are already available automatically.
+                Enable only the extra categories this organization uses. Beer, Cocktails, and NA Bev are always available.
               </p>
             </div>
           </div>
@@ -102,43 +102,13 @@ function MenuCategoriesPage() {
           {error ? <p className="inventory-error">{error}</p> : null}
           {success ? <p className="inventory-success">{success}</p> : null}
 
-          {suggestions.length ? (
-            <div className="inventory-menu-category-suggestions">
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  className="inventory-primary-button"
-                  onClick={() => addSuggestion(suggestion)}
-                >
-                  Add {suggestion}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="inventory-empty-note">
-              All currently supported optional categories are already enabled.
-            </p>
-          )}
-        </section>
-
-        <section className="inventory-card inventory-menu-category-card">
-          <div className="inventory-table-heading">
-            <div>
-              <h2>Saved Menu Categories</h2>
-              <p>
-                These appear in the Menu Category field when manually adding items.
-              </p>
-            </div>
-          </div>
-
           {categories.length ? (
             <div className="inventory-menu-category-list">
               {categories.map((category) => (
                 <article key={category.id} className="inventory-menu-category-row">
                   <div>
                     <strong>{category.name}</strong>
-
+                    <span>Available in Add Item and Toast export routing.</span>
                   </div>
                   <div className="inventory-menu-category-row-actions">
                     <button
@@ -154,9 +124,25 @@ function MenuCategoriesPage() {
             </div>
           ) : (
             <p className="inventory-empty-note">
-              No optional menu categories are enabled. Beer, Cocktails, and NA Bev are already available in Add Item.
+              No optional categories are enabled.
             </p>
           )}
+
+          {suggestions.length ? (
+            <div className="inventory-menu-category-suggestions">
+              <span>Available to add</span>
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  className="inventory-primary-button"
+                  onClick={() => addSuggestion(suggestion)}
+                >
+                  Add {suggestion}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </section>
       </section>
     </AuthenticatedInventoryShell>
