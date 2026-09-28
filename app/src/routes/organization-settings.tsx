@@ -165,9 +165,7 @@ function OrganizationSettingsPage() {
           savedCategories,
           catalogItems,
         )
-        setBuiltInBeerFormats(savedBuiltInBeerFormats)
-      setBuiltInBeerFormatEdits(savedBuiltInBeerFormats)
-      setOptionalBeerCategories(savedCategories)
+        setOptionalBeerCategories(savedCategories)
         setOptionalBeerCategoryEdits(
           effectiveCategories.map((category) => ({ ...category })),
         )
@@ -453,6 +451,9 @@ function OrganizationSettingsPage() {
           ...buildOptionalBeerCategoryConfig(normalizedCategories),
         } satisfies InventoryOrganizationConfig),
       )
+
+      setBuiltInBeerFormats(savedBuiltInBeerFormats)
+      setBuiltInBeerFormatEdits(savedBuiltInBeerFormats)
 
       setOptionalBeerCategories(savedCategories)
       setOptionalBeerCategoryEdits(
@@ -870,7 +871,8 @@ function OrganizationSettingsPage() {
                     type="button"
                     className="inventory-primary-button"
                     disabled={
-                      !optionalBeerCategoriesHaveChanges ||
+                      (!optionalBeerCategoriesHaveChanges &&
+                        !builtInBeerFormatsHaveChanges) ||
                       savingOptionalBeerCategories
                     }
                     onClick={() => void saveOptionalBeerCategorySettings()}
