@@ -6,10 +6,11 @@ export type ToastDestination = {
 }
 
 const BUILT_IN_TOAST_DESTINATIONS = [
-  'Beer tab · Draft Beer 10oz',
+  'Beer tab · Draft Beer 8oz',
   'Beer tab · Draft Beer 16oz',
+  'Beer tab · Draft Beer 24oz',
+  'Beer tab · Pitcher',
   'Beer tab · Can',
-  'Beer tab · 24oz Can',
   'Beer tab · Bottle',
   'Brandy/Cognac',
   'Cocktails',
