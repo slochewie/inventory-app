@@ -156,6 +156,7 @@ function ToastWorkbook() {
     cocktailRows: number
     naBevRows: number
     retailRows: number
+    openItemsRows: number
     happyHourNotes: boolean
   } | null>(null)
   const [stagedReviewQuery, setStagedReviewQuery] = useState('')
@@ -759,6 +760,7 @@ function ToastWorkbook() {
       cocktailRows: validation.cocktailRows,
       naBevRows: validation.naBevRows,
       retailRows: validation.retailRows,
+      openItemsRows: validation.openItemsRows,
       happyHourNotes: validation.happyHourNotes,
     })
 
@@ -1283,14 +1285,14 @@ function ToastWorkbook() {
                 {' · '}
                 {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows ·{' '}
                 {workbookValidation.cocktailRows} cocktail rows · {workbookValidation.naBevRows} NA Bev rows ·{' '}
-                {workbookValidation.retailRows} retail rows · Notes schedule checked
+                {workbookValidation.retailRows} retail rows · {workbookValidation.openItemsRows} Open Items rows · Notes schedule checked
               </span>
             </div>
           ) : (
             <div className="inventory-workbook-validation">
               <strong>Automatic validation</strong>
               <span>
-                Beer, Liquor, Cocktails, NA Bev, Retail, Happy Hour cells, optional Beer categories, 24oz cans, and the Notes schedule are checked before download.
+                Beer, Liquor, Cocktails, NA Bev, Retail, Open Items, Happy Hour cells, optional Beer categories, 24oz cans, and the Notes schedule are checked before download.
               </span>
             </div>
           )}
