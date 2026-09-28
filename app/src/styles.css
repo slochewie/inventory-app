@@ -1305,16 +1305,13 @@ select {
   font-size: 0.78rem !important;
 }
 
-.inventory-catalog-table th:nth-child(2),
-.inventory-catalog-table td:nth-child(2),
-.inventory-catalog-table th:nth-child(3),
-.inventory-catalog-table td:nth-child(3) {
+.inventory-catalog-price-column,
+.inventory-catalog-happy-hour-column {
   width: 10rem;
   white-space: nowrap;
 }
 
-.inventory-catalog-table th:nth-child(4),
-.inventory-catalog-table td:nth-child(4) {
+.inventory-catalog-availability-column {
   width: 9rem;
   white-space: nowrap;
 }
