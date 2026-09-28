@@ -605,15 +605,15 @@ function ToastWorkbook() {
     }
 
     const reviewedItems = items.filter(
-      (item) => item.status === 'ready' && item.exportIncluded,
-    )
-    const missingDecision = reviewedItems.find(
-      (item) => !reconciliationDecisions[item.id],
+      (item) =>
+        item.status === 'ready' &&
+        item.exportIncluded &&
+        reconciliationDecisions[item.id],
     )
 
-    if (missingDecision) {
+    if (reviewedItems.length === 0) {
       setImportReviewedError(
-        'Choose an existing master item or Create new master for every reviewed item.',
+        'Review at least one staged item before importing.',
       )
       return
     }
@@ -648,14 +648,41 @@ function ToastWorkbook() {
         }),
       })
 
-      clearReviewSession(activeOrganization.id)
+      const importedItemIds = new Set(
+        reviewedItems.map((item) => item.id),
+      )
+      const remainingItems = items.filter(
+        (item) => !importedItemIds.has(item.id),
+      )
+
+      if (remainingItems.length > 0) {
+        saveReviewSession(
+          importFile,
+          remainingItems,
+          activeOrganization.id,
+        )
+      } else {
+        clearReviewSession(activeOrganization.id)
+      }
+
+      setItems(remainingItems)
       setSelectedStagedItemId(null)
       setSelectedReconciliationItemId(null)
+      setReconciliationDecisions({})
+      setReconciliationActive(false)
+      setReconciliationQuery('')
 
-      await navigate({
-        to: '/import-review',
-        search: { workspace: 'history' },
-      })
+      const refreshedCatalog = await listInventoryCatalog(
+        activeOrganization.id,
+      )
+      setMasterCatalog(refreshedCatalog.items)
+
+      if (remainingItems.length === 0) {
+        await navigate({
+          to: '/import-review',
+          search: { workspace: 'history' },
+        })
+      }
     } catch (error) {
       setImportReviewedError(
         error instanceof Error
