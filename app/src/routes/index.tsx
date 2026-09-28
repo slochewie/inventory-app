@@ -57,6 +57,7 @@ function CatalogPage() {
   const [bulkEditEnabled, setBulkEditEnabled] = useState(false)
   const [bulkUpdating, setBulkUpdating] = useState(false)
   const [bulkHelpOpen, setBulkHelpOpen] = useState(false)
+  const bulkHelpRef = useRef<HTMLDivElement>(null)
   const [selectedBulkGroupIds, setSelectedBulkGroupIds] = useState<Set<string>>(
     () => new Set(),
   )
@@ -174,6 +175,35 @@ function CatalogPage() {
   useEffect(() => {
     if (!bulkEditEnabled) setSelectedBulkGroupIds(new Set())
   }, [bulkEditEnabled])
+
+  useEffect(() => {
+    if (!bulkHelpOpen) return
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target
+      if (
+        target instanceof Node &&
+        bulkHelpRef.current &&
+        !bulkHelpRef.current.contains(target)
+      ) {
+        setBulkHelpOpen(false)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setBulkHelpOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [bulkHelpOpen])
 
   const selectedGroup =
     groups.find((group) => group.id === selectedGroupId) ?? null
@@ -505,7 +535,7 @@ function CatalogPage() {
                 <span>Bulk edit</span>
               </button>
 
-              <div className="inventory-catalog-bulk-help">
+              <div ref={bulkHelpRef} className="inventory-catalog-bulk-help">
                 <button
                   type="button"
                   className="inventory-catalog-bulk-help-button"
