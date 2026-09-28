@@ -500,21 +500,18 @@ function ToastWorkbook() {
           updated.name.trim() !== '' &&
           !/^\[Review /i.test(updated.name) &&
           updated.basePriceCents !== null
-
-        const becameReady = item.status === 'review' && ready
+        const included =
+          ready &&
+          (Object.hasOwn(patch, 'exportIncluded')
+            ? patch.exportIncluded === true
+            : updated.exportIncluded !== false)
 
         return {
           ...updated,
           status: ready ? 'ready' : 'review',
-          exportToToast: becameReady
-            ? true
-            : ready && updated.exportToToast !== false,
-          exportIncluded: becameReady
-            ? true
-            : ready && updated.exportIncluded !== false,
-          stagingExplicitlyExcluded: becameReady
-            ? false
-            : updated.stagingExplicitlyExcluded,
+          exportToToast: included,
+          exportIncluded: included,
+          stagingExplicitlyExcluded: ready ? !included : false,
         } satisfies NormalizedMenuItem
       })
 
@@ -523,40 +520,16 @@ function ToastWorkbook() {
     })
   }
 
-  function approveStagedItem(itemId: string) {
-    setItems((current) => {
-      const next = current.map((item) => {
-        if (item.id !== itemId) return item
-        if (
-          !item.name.trim() ||
-          /^\[Review /i.test(item.name) ||
-          item.basePriceCents === null
-        ) {
-          return item
-        }
-
-        return {
-          ...item,
-          status: 'ready' as const,
-          exportToToast: true,
-          exportIncluded: true,
-        }
-      })
-
-      saveReviewSession(importFile, next, activeOrganization?.id)
-      return next
-    })
-  }
-
-  function toggleStagedItemIncluded(itemId: string, included: boolean) {
+  function ignoreStagedItem(itemId: string) {
     setItems((current) => {
       const next = current.map((item) =>
         item.id === itemId
           ? {
               ...item,
-              exportToToast: included,
-              exportIncluded: included,
-              stagingExplicitlyExcluded: !included,
+              status: 'ignored' as const,
+              exportToToast: false,
+              exportIncluded: false,
+              stagingExplicitlyExcluded: true,
             }
           : item,
       )
@@ -1011,18 +984,14 @@ function ToastWorkbook() {
                   <StagedItemDrawer
                     item={selectedStagedItem}
                     onClose={() => setSelectedStagedItemId(null)}
-                    onUpdate={(patch) =>
+                    onUpdate={(patch) => {
                       updateStagedItem(selectedStagedItem.id, patch)
-                    }
-                    onApprove={() =>
-                      approveStagedItem(selectedStagedItem.id)
-                    }
-                    onToggleIncluded={(included) =>
-                      toggleStagedItemIncluded(
-                        selectedStagedItem.id,
-                        included,
-                      )
-                    }
+                      setSelectedStagedItemId(null)
+                    }}
+                    onIgnore={() => {
+                      ignoreStagedItem(selectedStagedItem.id)
+                      setSelectedStagedItemId(null)
+                    }}
                   />
                 ) : null}
               </>
@@ -1125,16 +1094,19 @@ function StagedItemDrawer({
   item,
   onClose,
   onUpdate,
-  onApprove,
-  onToggleIncluded,
+  onIgnore,
 }: {
   item: NormalizedMenuItem
   onClose: () => void
   onUpdate: (patch: Partial<NormalizedMenuItem>) => void
-  onApprove: () => void
-  onToggleIncluded: (included: boolean) => void
+  onIgnore: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const [draft, setDraft] = useState(() => ({ ...item }))
+
+  useEffect(() => {
+    setDraft({ ...item })
+  }, [item.id])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -1146,6 +1118,24 @@ function StagedItemDrawer({
     }
   }, [])
 
+  const hasChanges =
+    draft.name !== item.name ||
+    draft.category !== item.category ||
+    draft.toastCategory !== item.toastCategory ||
+    draft.toastDestination !== item.toastDestination ||
+    draft.basePriceCents !== item.basePriceCents ||
+    draft.exportIncluded !== item.exportIncluded
+
+  const ready =
+    draft.name.trim() !== '' &&
+    !/^\[Review /i.test(draft.name) &&
+    draft.basePriceCents !== null
+
+  function closeWithoutSaving() {
+    setDraft({ ...item })
+    onClose()
+  }
+
   return (
     <dialog
       ref={dialogRef}
@@ -1153,10 +1143,10 @@ function StagedItemDrawer({
       aria-labelledby="staged-item-drawer-title"
       onCancel={(event) => {
         event.preventDefault()
-        onClose()
+        closeWithoutSaving()
       }}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === event.currentTarget) closeWithoutSaving()
       }}
     >
       <div className="inventory-catalog-drawer-heading">
@@ -1165,10 +1155,14 @@ function StagedItemDrawer({
           <h2 id="staged-item-drawer-title">{item.name}</h2>
           <p>
             Browser-only review ·{' '}
-            {item.status === 'review' ? 'Needs review' : 'Ready'}
+            {item.status === 'review'
+              ? 'Needs review'
+              : item.status === 'ignored'
+                ? 'Ignored'
+                : 'Ready'}
           </p>
         </div>
-        <button type="button" onClick={onClose}>
+        <button type="button" onClick={closeWithoutSaving}>
           Close
         </button>
       </div>
@@ -1201,8 +1195,13 @@ function StagedItemDrawer({
           <span>Item name</span>
           <input
             type="text"
-            value={item.name}
-            onChange={(event) => onUpdate({ name: event.target.value })}
+            value={draft.name}
+            onChange={(event) =>
+              setDraft((current) => ({
+                ...current,
+                name: event.target.value,
+              }))
+            }
           />
         </label>
 
@@ -1210,12 +1209,13 @@ function StagedItemDrawer({
           <span>Menu Category</span>
           <input
             type="text"
-            value={item.category || item.toastCategory}
+            value={draft.category || draft.toastCategory}
             onChange={(event) =>
-              onUpdate({
+              setDraft((current) => ({
+                ...current,
                 category: event.target.value,
                 toastCategory: event.target.value,
-              })
+              }))
             }
           />
         </label>
@@ -1224,9 +1224,12 @@ function StagedItemDrawer({
           <span>Toast destination</span>
           <input
             type="text"
-            value={item.toastDestination}
+            value={draft.toastDestination}
             onChange={(event) =>
-              onUpdate({ toastDestination: event.target.value })
+              setDraft((current) => ({
+                ...current,
+                toastDestination: event.target.value,
+              }))
             }
           />
         </label>
@@ -1238,19 +1241,20 @@ function StagedItemDrawer({
             min="0"
             step="0.01"
             value={
-              item.basePriceCents === null
+              draft.basePriceCents === null
                 ? ''
-                : (item.basePriceCents / 100).toFixed(2)
+                : (draft.basePriceCents / 100).toFixed(2)
             }
             onChange={(event) => {
               const value = event.target.value.trim()
               const dollars = Number(value)
-              onUpdate({
+              setDraft((current) => ({
+                ...current,
                 basePriceCents:
                   value && Number.isFinite(dollars) && dollars > 0
                     ? Math.round(dollars * 100)
                     : null,
-              })
+              }))
             }}
           />
         </label>
@@ -1258,26 +1262,54 @@ function StagedItemDrawer({
         <label className="inventory-inline-toggle">
           <input
             type="checkbox"
-            checked={item.exportIncluded}
-            disabled={item.basePriceCents === null}
-            onChange={(event) => onToggleIncluded(event.target.checked)}
+            checked={draft.exportIncluded}
+            disabled={!ready}
+            onChange={(event) =>
+              setDraft((current) => ({
+                ...current,
+                exportIncluded: event.target.checked,
+                exportToToast: event.target.checked,
+              }))
+            }
           />
           <span>Include in staged Toast export</span>
         </label>
-
-        {item.status === 'review' &&
-        item.name.trim() &&
-        !/^\[Review /i.test(item.name) &&
-        item.basePriceCents !== null ? (
-          <button
-            type="button"
-            className="inventory-primary-button"
-            onClick={onApprove}
-          >
-            Approve as-is
-          </button>
-        ) : null}
       </section>
+
+      <div className="inventory-drawer-actions">
+        <button
+          type="button"
+          className="inventory-danger-button"
+          onClick={onIgnore}
+        >
+          Ignore
+        </button>
+        <button
+          type="button"
+          className="inventory-secondary-button"
+          onClick={closeWithoutSaving}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="inventory-primary-button"
+          disabled={!hasChanges && item.status === 'ready'}
+          onClick={() =>
+            onUpdate({
+              name: draft.name,
+              category: draft.category,
+              toastCategory: draft.toastCategory,
+              toastDestination: draft.toastDestination,
+              basePriceCents: draft.basePriceCents,
+              exportIncluded: draft.exportIncluded,
+              exportToToast: draft.exportIncluded,
+            })
+          }
+        >
+          Update
+        </button>
+      </div>
     </dialog>
   )
 }
