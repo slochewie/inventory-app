@@ -273,7 +273,7 @@ Generated workbook validation checks Cocktails, NA Bev, and Retail rows before d
 
 ## Toast workbook staging review
 
-The authenticated **Export to Toast** page can stage an existing Toast XLSX for normalization without writing anything to the persistent Inventory catalog.
+The authenticated **Export to Toast** page can stage an existing Toast XLSX for normalization without writing anything to the persistent Inventory catalog. Staged review state is scoped to the selected organization, so switching organizations restores that organization's own staged workbook instead of sharing one browser-global staging session.
 
 The staging importer:
 
