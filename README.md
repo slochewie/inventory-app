@@ -35,6 +35,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for the operator and development workflow.
 | `/import-review` | Consolidated New Import, History, and Mapping Review workspace | Viewer; import/edit tabs are role-gated |
 | `/toast-template-import` | Import a populated Toast workbook and save it to Inventory | Staff |
 | `/toast-workbook` | Export the selected organization's persistent catalog to Toast | Staff |
+| `/organization-settings` | Configure organization Happy Hour and Beer Formats | Manager |
 | `/assignments` | Enable Inventory access and assign Inventory roles | Admin |
 | `/imports` | Standalone import-history view retained for compatibility | Viewer |
 | `/reconcile` | Standalone mapping-review view retained for compatibility | Manager |
@@ -137,16 +138,15 @@ Time Range 2 is written only when the organization enables it. The exporter vali
 
 Toast's workbook structure is treated as fixed: the exporter uses the template's existing rows/columns rather than inserting custom Beer columns.
 
-Current beer mapping includes:
+Current beer mapping follows Toast's fixed workbook structure:
 
-- organization-configured draft sizes → selected existing Toast draft slots
-- standard can → existing Can slot
-- organization-specific optional Beer grouping → existing **Optional Beer Category** slot
-- bottle → existing Bottle slot
+- built-in Toast draft formats use exact matching only; custom draft sizes never remap into another built-in size
+- standard can and bottle use their native workbook sections
+- custom draft or packaged formats use organization-configured **Optional Beer Category** slots
 
 Toast exposes five hidden **Optional Beer Category** groups on the Beer tab. Inventory now supports all five as organization settings.
 
-The UI uses progressive disclosure: an organization with no optional Beer categories sees only **Add Optional Beer Category**. Each press reveals the next slot in order, up to five. Enabled slots are persisted with an organization-specific label and only those saved slots remain visible on reload. McCarthy's currently uses Optional Beer Category 1 with the label **Tall Boy Can**.
+The Organization Settings page exposes these as **Beer Formats**. The UI uses progressive disclosure: an organization with no custom Beer formats sees only **Add format**. Each press reveals the next available Optional Beer Category slot, up to five. The visible order controls workbook slot order, while each saved label also acts as the import mapping for that custom format. Custom draft sizes such as 10oz and packaged formats such as Tall Boy Can remain distinct formats.
 
 Catalog Beer variants can be assigned to a stable `toastSlot` key:
 
