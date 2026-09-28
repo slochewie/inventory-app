@@ -360,14 +360,20 @@ export function ReconcilePanel() {
                                 disabled={
                                   updating ||
                                   !selectedVariantId ||
-                                  selectedVariantId ===
-                                    mapping.inventoryItemVariantId
+                                  (
+                                    selectedVariantId ===
+                                      mapping.inventoryItemVariantId &&
+                                    mapping.mappingConfirmed
+                                  )
                                 }
                                 onClick={() =>
                                   void remap(mapping, selectedVariantId)
                                 }
                               >
-                                Save
+                                {selectedVariantId ===
+                                  mapping.inventoryItemVariantId
+                                  ? 'Confirm'
+                                  : 'Save'}
                               </button>
                             </div>
                           </div>
@@ -377,7 +383,11 @@ export function ReconcilePanel() {
                             type="button"
                             onClick={() => beginChange(mapping)}
                           >
-                            {mapping.inventoryItemVariantId ? 'Change' : 'Map'}
+                            {mapping.inventoryItemVariantId
+                              ? mapping.mappingConfirmed
+                                ? 'Change'
+                                : 'Review'
+                              : 'Map'}
                           </button>
                         )}
                       </td>
