@@ -1,0 +1,153 @@
+name: One-time Catalog beer export settings patch
+
+on:
+  push:
+    paths:
+      - .github/workflows/fix-catalog-beer-export-settings.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Catalog beer export settings
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+
+          function replaceOnce(text, from, to, label) {
+            if (!text.includes(from)) throw new Error(`Missing expected block: ${label}`)
+            return text.replace(from, to)
+          }
+
+          function replaceRegex(text, pattern, to, label) {
+            if (!pattern.test(text)) throw new Error(`Missing expected block: ${label}`)
+            return text.replace(pattern, to)
+          }
+
+          const indexPath = 'app/src/routes/index.tsx'
+          let index = fs.readFileSync(indexPath, 'utf8')
+
+          index = replaceRegex(
+            index,
+            /\ntype DraftSlotState = \{\n  enabled: boolean\n  actualSizeOz: string\n\}\n/,
+            '\n',
+            'DraftSlotState type',
+          )
+
+          index = replaceRegex(
+            index,
+            /  const \[draft8, setDraft8\] = useState[\s\S]*?  const \[savingDraftSlots, setSavingDraftSlots\] = useState\(false\)\n/,
+            '',
+            'draft slot state block',
+          )
+
+          index = replaceRegex(
+            index,
+            /\n        const nextDraft8 = \{[\s\S]*?\n        setPitcherEdit\(nextPitcher\)\n/,
+            '\n',
+            'loaded draft slot state setup',
+          )
+
+          index = index.replace(
+            /        draft8Enabled: draft8\.enabled,\n        draft8ActualSizeOz: parseDraftSize\(draft8\.actualSizeOz\),\n        draft16Enabled: draft16\.enabled,\n        draft16ActualSizeOz: parseDraftSize\(draft16\.actualSizeOz\),\n        draft24Enabled: draft24\.enabled,\n        draft24ActualSizeOz: parseDraftSize\(draft24\.actualSizeOz\),\n        pitcherEnabled: pitcher\.enabled,\n        pitcherActualSizeOz: parseDraftSize\(pitcher\.actualSizeOz\),\n/g,
+            '        ...buildFixedToastDraftSlotConfig(),\n',
+          )
+
+          index = replaceRegex(
+            index,
+            /\n  const draftSlotsHaveChanges =[\s\S]*?\n  const optionalBeerCategoriesHaveChanges =/,
+            '\n  const optionalBeerCategoriesHaveChanges =',
+            'draft slot save logic',
+          )
+
+          index = replaceOnce(
+            index,
+            "      const [slot1, slot2, slot3, slot4, slot5] = normalizedCategories\n      const config = await updateInventoryOrganizationConfig({",
+            "      const config = await updateInventoryOrganizationConfig({",
+            'unused normalized category tuple',
+          )
+
+          index = replaceOnce(
+            index,
+            '<strong>Happy Hour & draft sizes</strong>',
+            '<strong>Happy Hour & beer export categories</strong>',
+            'organization settings summary',
+          )
+
+          index = replaceRegex(
+            index,
+            /\n              <section className=\"inventory-organization-settings-section inventory-draft-slots-settings\">\n                <div className=\"inventory-draft-slots-copy\">\n                  <h2>Draft sizes<\/h2>[\s\S]*?\n              <section className=\"inventory-organization-settings-section inventory-draft-slots-settings\">\n                <div className=\"inventory-draft-slots-copy\">\n                  <h2>Optional beer categories<\/h2>/,
+            '\n              <section className="inventory-organization-settings-section inventory-draft-slots-settings">\n                <div className="inventory-draft-slots-copy">\n                  <h2>Beer export categories</h2>',
+            'draft size settings section',
+          )
+
+          index = replaceOnce(
+            index,
+            "                    Add only the Toast Optional Beer Category slots this organization uses.\n",
+            "                    Map non-standard Beer formats to Toast Optional Beer Category slots. Use labels like Tall Boy Can for packaged cans or 10oz for custom draft sizes.\n",
+            'optional beer category helper text',
+          )
+
+          index = replaceOnce(
+            index,
+            '<span>Category label</span>',
+            '<span>Import/export mapping</span>',
+            'optional category field label',
+          )
+
+          index = replaceOnce(
+            index,
+            'placeholder={`Optional Beer Category ${category.slot}`}',
+            'placeholder={`Tall Boy Can, 10oz, or Optional Beer Category ${category.slot}`}',
+            'optional category placeholder',
+          )
+
+          index = replaceRegex(
+            index,
+            /\nfunction DraftSlotField\(\{[\s\S]*?\n\}\n\nfunction buildOptionalBeerCategoryConfig/,
+            '\nfunction buildOptionalBeerCategoryConfig',
+            'DraftSlotField component',
+          )
+
+          index = replaceOnce(
+            index,
+            `}\n\nfunction getVisibleOptionalBeerCategoryCount(\n  categories: readonly OptionalBeerCategoryConfig[],\n) {`,
+            `}\n\nfunction buildFixedToastDraftSlotConfig(): Pick<\n  InventoryOrganizationConfig,\n  | 'draft8Enabled'\n  | 'draft8ActualSizeOz'\n  | 'draft16Enabled'\n  | 'draft16ActualSizeOz'\n  | 'draft24Enabled'\n  | 'draft24ActualSizeOz'\n  | 'pitcherEnabled'\n  | 'pitcherActualSizeOz'\n> {\n  return {\n    draft8Enabled: true,\n    draft8ActualSizeOz: 8,\n    draft16Enabled: true,\n    draft16ActualSizeOz: 16,\n    draft24Enabled: true,\n    draft24ActualSizeOz: 24,\n    pitcherEnabled: false,\n    pitcherActualSizeOz: null,\n  }\n}\n\nfunction getVisibleOptionalBeerCategoryCount(\n  categories: readonly OptionalBeerCategoryConfig[],\n) {`,
+            'fixed draft slot helper insertion',
+          )
+
+          index = replaceRegex(
+            index,
+            /\nfunction draftSlotEquals\(left: DraftSlotState, right: DraftSlotState\) \{[\s\S]*?\n\}\n\nfunction MoneyField/,
+            '\nfunction MoneyField',
+            'draft slot helpers',
+          )
+
+          fs.writeFileSync(indexPath, index)
+
+          const workbookPath = 'app/src/routes/toast-workbook.tsx'
+          let workbook = fs.readFileSync(workbookPath, 'utf8')
+
+          workbook = replaceRegex(
+            workbook,
+            /function getOrganizationDraftSlotMappings\([\s\S]*?\n}\n\nfunction formatHappyHourSetting/,
+            `function getOrganizationDraftSlotMappings(\n  config: InventoryOrganizationConfig | null,\n): ToastDraftSlotMapping[] {\n  const fixedDraftMappings: ToastDraftSlotMapping[] = [\n    { toastSizeOz: 8, actualSizeOz: 8 },\n    { toastSizeOz: 16, actualSizeOz: 16 },\n    { toastSizeOz: 24, actualSizeOz: 24 },\n  ]\n\n  if (!config) return fixedDraftMappings\n\n  const pitcherMapping =\n    config.pitcherEnabled && config.pitcherActualSizeOz !== null\n      ? [{ toastSizeOz: null, actualSizeOz: config.pitcherActualSizeOz }]\n      : []\n\n  return [...fixedDraftMappings, ...pitcherMapping]\n}\n\nfunction formatHappyHourSetting`,
+            'organization draft slot mappings',
+          )
+
+          fs.writeFileSync(workbookPath, workbook)
+          NODE
+      - name: Commit source patch
+        run: |
+          rm -f .github/workflows/fix-catalog-beer-export-settings.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/routes/index.tsx app/src/routes/toast-workbook.tsx .github/workflows/fix-catalog-beer-export-settings.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "Replace draft mappings with beer export categories"
+          git push
