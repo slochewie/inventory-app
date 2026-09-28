@@ -21,6 +21,8 @@ export const Route = createFileRoute('/')({ component: CatalogPage })
 
 type AvailabilityFilter = 'carried' | 'not-carried' | 'all'
 
+const PAGE_SIZE = 50
+
 
 type CatalogGroup = {
   id: string
