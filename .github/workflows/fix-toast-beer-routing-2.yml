@@ -1,0 +1,305 @@
+name: Correct one-time Toast beer routing patch
+
+on:
+  push:
+    paths:
+      - .github/workflows/fix-toast-beer-routing-2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Toast beer routing
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+
+          const path = 'app/src/features/menu-import/toast-template-workbook.ts'
+          let text = fs.readFileSync(path, 'utf8')
+
+          function replaceRegex(pattern, replacement, label) {
+            if (!pattern.test(text)) {
+              throw new Error(`Missing expected block: ${label}`)
+            }
+            text = text.replace(pattern, () => replacement)
+          }
+
+          replaceRegex(
+          /function buildOptionalPackagedBeerSlotDefinitions\([\s\S]*?\n}\n\nfunction writeOptionalPackagedSlotRows/,
+          `function buildOptionalPackagedBeerSlotDefinitions(
+            beerRows: BeerTabPreviewRow[],
+            optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+          ): OptionalPackagedBeerSlotDefinition[] {
+            const effectiveOptionalBeerCategories = getEffectiveOptionalBeerCategories(
+              beerRows,
+              optionalBeerCategories,
+            )
+
+            return DEFAULT_OPTIONAL_BEER_CATEGORIES.map((defaultOptions, slotIndex) => {
+              const configured = effectiveOptionalBeerCategories[slotIndex] ?? defaultOptions
+              const slotKey = \`optional-beer-\${slotIndex + 1}\`
+              const draftSizeOz = parseOptionalDraftSize(configured.label)
+              const draftSizeLabel = draftSizeOz === null ? null : formatDraftSizeLabel(draftSizeOz)
+              const tallBoyCan = isTallBoyCanCategory(configured.label)
+              const description = draftSizeLabel
+                ? \`\${draftSizeLabel} draft\`
+                : tallBoyCan
+                  ? 'Tall Boy Can'
+                  : configured.label.trim() || \`Optional Beer Category \${slotIndex + 1}\`
+              const rows = configured.enabled
+                ? beerRows.filter((row) => {
+                    if (draftSizeOz !== null) {
+                      return getDraftBeerPrice(row, draftSizeOz)?.price !== null &&
+                        getDraftBeerPrice(row, draftSizeOz)?.price !== undefined
+                    }
+
+                    if (tallBoyCan) return row.can24ozPrice !== null
+
+                    return row.optionalBySlot[slotKey]?.price !== null &&
+                      row.optionalBySlot[slotKey]?.price !== undefined
+                  })
+                : []
+
+              return {
+                enabled: configured.enabled,
+                label: configured.label,
+                slotIndex,
+                categoryHeader: draftSizeLabel ? 'Draft Beer' : description,
+                priceHeader: draftSizeLabel ? \`\${draftSizeLabel} $\` : 'Price $',
+                happyHourHeader: 'Happy Hour $',
+                description,
+                rows,
+                getPrice: (row) =>
+                  draftSizeOz !== null
+                    ? getDraftBeerPrice(row, draftSizeOz)?.price ?? null
+                    : tallBoyCan
+                      ? row.can24ozPrice
+                      : row.optionalBySlot[slotKey]?.price ?? null,
+                getHappyHour: (row) =>
+                  draftSizeOz !== null
+                    ? getDraftBeerPrice(row, draftSizeOz)?.happyHour ?? null
+                    : tallBoyCan
+                      ? row.can24ozHappyHour
+                      : row.optionalBySlot[slotKey]?.happyHour ?? null,
+              }
+            })
+          }
+
+          function writeOptionalPackagedSlotRows`,
+          'optional beer category definitions',
+          )
+
+          replaceRegex(
+          /function hasAnyBeerPrice\([\s\S]*?\nfunction centsToDollars/,
+          `function hasAnyBeerPrice(
+            row: BeerTabPreviewRow,
+            draftSlotMappings: readonly ToastDraftSlotMapping[],
+            optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+          ) {
+            return (
+              hasConfiguredDraftBeerPrice(row, draftSlotMappings) ||
+              hasCustomDraftBeerPrice(row) ||
+              hasOptionalBeerCategoryPrice(row, optionalBeerCategories) ||
+              [row.canPrice, row.can24ozPrice, row.bottlePrice].some(
+                (value) => value !== null,
+              ) ||
+              Object.values(row.optionalBySlot).some(
+                (value) => value.price !== null,
+              )
+            )
+          }
+
+          function hasConfiguredDraftBeerPrice(
+            row: BeerTabPreviewRow,
+            draftSlotMappings: readonly ToastDraftSlotMapping[],
+          ) {
+            return draftSlotMappings.some(
+              (mapping) => getDraftBeerPrice(row, mapping.actualSizeOz)?.price !== null &&
+                getDraftBeerPrice(row, mapping.actualSizeOz)?.price !== undefined,
+            )
+          }
+
+          function hasCustomDraftBeerPrice(row: BeerTabPreviewRow) {
+            return Object.entries(row.draftBySizeOz).some(([sizeOz, price]) => {
+              const parsedSizeOz = Number(sizeOz)
+              return isCustomDraftSize(parsedSizeOz) &&
+                price.price !== null &&
+                price.price !== undefined
+            })
+          }
+
+          function getEffectiveOptionalBeerCategories(
+            beerRows: readonly BeerTabPreviewRow[],
+            optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+          ): OptionalBeerCategoryOptions[] {
+            const configuredCategories = DEFAULT_OPTIONAL_BEER_CATEGORIES.map(
+              (defaultOptions, index) => optionalBeerCategories[index] ?? defaultOptions,
+            )
+            const assignedDraftSizes = new Set(
+              configuredCategories.flatMap((category) => {
+                const draftSizeOz = parseOptionalDraftSize(category.label)
+                return draftSizeOz === null ? [] : [draftSizeOz]
+              }),
+            )
+            const customDraftSizes = getCustomDraftSizes(beerRows)
+              .filter((sizeOz) => !assignedDraftSizes.has(sizeOz))
+              .sort((left, right) => left - right)
+            let shouldAutoAddTallBoyCan =
+              beerRows.some((row) => row.can24ozPrice !== null) &&
+              !configuredCategories.some((category) => isTallBoyCanCategory(category.label))
+            let nextCustomDraftSizeIndex = 0
+
+            return configuredCategories.map((category, index) => {
+              const hasConfiguredDraftSize = parseOptionalDraftSize(category.label) !== null
+              const hasTallBoyCanLabel = isTallBoyCanCategory(category.label)
+              const hasCustomLabel = !isDefaultOptionalBeerCategoryLabel(category.label, index)
+
+              if (category.enabled || hasConfiguredDraftSize || hasTallBoyCanLabel || hasCustomLabel) {
+                return category
+              }
+
+              if (shouldAutoAddTallBoyCan) {
+                shouldAutoAddTallBoyCan = false
+                return {
+                  enabled: true,
+                  label: 'Tall Boy Can',
+                }
+              }
+
+              const customDraftSize = customDraftSizes[nextCustomDraftSizeIndex]
+              if (customDraftSize === undefined) return category
+
+              nextCustomDraftSizeIndex += 1
+              return {
+                enabled: true,
+                label: formatDraftSizeLabel(customDraftSize),
+              }
+            })
+          }
+
+          function getCustomDraftSizes(beerRows: readonly BeerTabPreviewRow[]) {
+            const sizes = new Set<number>()
+
+            beerRows.forEach((row) => {
+              Object.keys(row.draftBySizeOz).forEach((sizeOz) => {
+                const parsedSizeOz = Number(sizeOz)
+                if (isCustomDraftSize(parsedSizeOz)) sizes.add(parsedSizeOz)
+              })
+            })
+
+            return [...sizes]
+          }
+
+          function isCustomDraftSize(sizeOz: number) {
+            return Number.isFinite(sizeOz) && ![8, 16, 24].includes(sizeOz)
+          }
+
+          function isDefaultOptionalBeerCategoryLabel(label: string, index: number) {
+            const normalized = label.trim().toLowerCase()
+            return !normalized ||
+              normalized === \`optional beer category \${index + 1}\`
+          }
+
+          function isTallBoyCanCategory(label: string) {
+            return /\\btall\\s*boy\\s*can\\b/i.test(label) ||
+              /\\b2[45]\\s*oz\\s*can\\b/i.test(label)
+          }
+
+          function hasOptionalBeerCategoryPrice(
+            row: BeerTabPreviewRow,
+            optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+          ) {
+            return optionalBeerCategories.some((category) => {
+              if (!category.enabled) return false
+
+              if (isTallBoyCanCategory(category.label)) {
+                return row.can24ozPrice !== null
+              }
+
+              const draftSizeOz = parseOptionalDraftSize(category.label)
+              return draftSizeOz !== null &&
+                getDraftBeerPrice(row, draftSizeOz)?.price !== null &&
+                getDraftBeerPrice(row, draftSizeOz)?.price !== undefined
+            })
+          }
+
+          function normalizeDraftSlotMappings(
+            draftSlotMappings: readonly ToastDraftSlotMapping[],
+          ): ToastDraftSlotMapping[] {
+            return draftSlotMappings.flatMap((mapping) => {
+              if (mapping.toastSizeOz === null) return [mapping]
+
+              // Toast's built-in draft headers are fixed slots. Do not rename 8oz to
+              // 10oz or otherwise map unlike sizes. Custom draft sizes are written to
+              // Optional Beer Category columns instead.
+              if (mapping.toastSizeOz !== mapping.actualSizeOz) return []
+
+              return [mapping]
+            })
+          }
+
+          function parseOptionalDraftSize(label: string) {
+            const match = label.match(/\\b(\\d+(?:\\.\\d+)?)\\s*oz\\b/i) ??
+              label.match(/^\\s*(\\d+(?:\\.\\d+)?)\\s*$/)
+            if (!match) return null
+
+            const parsed = Number(match[1])
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+          }
+
+          function formatDraftSizeLabel(sizeOz: number) {
+            return \`\${Number.isInteger(sizeOz) ? sizeOz.toString() : sizeOz.toFixed(1)}oz\`
+          }
+
+          function isPriceHeader(value: string) {
+            return /price/i.test(value) || /\\b\\d+(?:\\.\\d+)?\\s*oz\\s*\\$?\\b/i.test(value)
+          }
+
+          function centsToDollars`,
+          'beer price helpers',
+          )
+
+          text = text.replace(
+          `  const bottleRows = [
+              ...beerRows
+                .filter((row) => row.can24ozPrice !== null)
+                .map((row) => ({ row, kind: '24oz can' as const })),
+              ...beerRows
+                .filter((row) => row.bottlePrice !== null)
+                .map((row) => ({ row, kind: 'bottle' as const })),
+            ]`,
+          `  const bottleRows = beerRows
+              .filter((row) => row.bottlePrice !== null)
+              .map((row) => ({ row, kind: 'bottle' as const }))`,
+          )
+
+          text = text.replace(
+          `  const bottleSlotRows = [
+              ...beerRows
+                .filter((row) => row.can24ozPrice !== null)
+                .map((row) => ({ row, kind: 'can24oz' as const })),
+              ...beerRows
+                .filter((row) => row.bottlePrice !== null)
+                .map((row) => ({ row, kind: 'bottle' as const })),
+            ]`,
+          `  const bottleSlotRows = beerRows
+              .filter((row) => row.bottlePrice !== null)
+              .map((row) => ({ row, kind: 'bottle' as const }))`,
+          )
+
+          fs.writeFileSync(path, text)
+          NODE
+      - name: Commit source patch
+        run: |
+          rm -f .github/workflows/fix-toast-beer-routing-2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/features/menu-import/toast-template-workbook.ts .github/workflows/fix-toast-beer-routing-2.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "Separate tall boy cans from custom draft sizes"
+          git push
