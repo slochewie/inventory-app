@@ -1,52 +1,92 @@
 # Inventory Data Model
 
-The authenticated Inventory application uses one global master catalog with organization-specific selections, pricing, and Toast export behavior.
+The authenticated Inventory application uses one shared master catalog with organization-specific availability, pricing, Toast behavior, and source reconciliation.
 
-The temporary unauthenticated routes at `/wip` and `/wip/toast-workbook` remain browser/session based and must not depend on this schema.
+The frontend does not connect to Postgres directly. Persistent data is owned by the Auth service Inventory plugin.
 
 ## Authorization
 
 ### inventoryAssignment
 
-Organization-scoped application access.
+Organization-scoped Inventory access.
 
 - `id`
 - `organizationId`
 - `userId`
 - `enabled`
-- `role` — initially `viewer`, `staff`, `manager`, or `admin`
+- `role` — `viewer`, `staff`, `manager`, or `admin`
 - `createdAt`
 - `updatedAt`
 - unique: `organizationId + userId`
 
-System administrators retain implicit full access. Organization owners/admins may administer Inventory access. Inventory `admin` assignments may administer ordinary Inventory assignments.
+Inventory permissions are checked against the selected organization. System administrators retain implicit full access.
 
 ## Organization configuration
 
 ### inventoryOrganizationConfig
 
-Inventory and Toast behavior for one Better Auth organization/location.
+Organization-level Inventory/Toast settings.
+
+Core fields:
 
 - `id`
 - `organizationId`
 - `enabled`
-- `happyHourEnabled`
-- `happyHourStart` — nullable local wall-clock value
-- `happyHourEnd` — nullable local wall-clock value
-- `happyHourDays` — comma-separated selected day keys (`mon,tue,wed,thu,fri,sat,sun`) exposed by the API as an array
 - `createdAt`
 - `updatedAt`
 - unique: `organizationId`
 
-Real-world serving/package sizes belong in Inventory data. Toast's XLSX column labels are treated as fixed and are never renamed.
+Happy Hour fields:
 
-Happy Hour configuration is organization-scoped. The current model supports one start/end time window plus independently selected days of the week. During Toast export, selected days are written to the Notes tab's Time Range 1; unselected days remain blank and Time Range 2 is intentionally left blank.
+- `happyHourEnabled`
+- `happyHourStart`
+- `happyHourEnd`
+- `happyHourDays`
+- `happyHourRange2Enabled`
+- `happyHourRange2Start`
+- `happyHourRange2End`
+- `happyHourRange2Days`
+
+The API exposes day selections as arrays of `mon..sun`; the database stores the persisted representation used by the Auth plugin.
+
+Built-in Beer format fields:
+
+- `draft8Enabled`
+- `draft8ActualSizeOz`
+- `draft16Enabled`
+- `draft16ActualSizeOz`
+- `draft24Enabled`
+- `draft24ActualSizeOz`
+- `pitcherEnabled`
+- `pitcherActualSizeOz`
+- `canEnabled`
+- `bottleEnabled`
+
+Custom Beer format fields exposed by the API:
+
+- `optionalBeerCategory1Enabled`
+- `optionalBeerCategory1Label`
+- `optionalBeerCategory2Enabled`
+- `optionalBeerCategory2Label`
+- `optionalBeerCategory3Enabled`
+- `optionalBeerCategory3Label`
+- `optionalBeerCategory4Enabled`
+- `optionalBeerCategory4Label`
+- `optionalBeerCategory5Enabled`
+- `optionalBeerCategory5Label`
+
+Optional Beer Category 1 is still stored internally in legacy columns:
+
+- `tallBoyCanEnabled`
+- `tallBoyCanLabel`
+
+The frontend/API treat that slot generically; it is not semantically hardcoded to Tall Boy.
 
 ## Master catalog
 
 ### inventoryCategory
 
-Canonical categories shared by every organization.
+Canonical shared category.
 
 - `id`
 - `name`
@@ -57,9 +97,11 @@ Canonical categories shared by every organization.
 - `createdAt`
 - `updatedAt`
 
+Canonical category is shared across organizations and is authoritative for workbook routing.
+
 ### inventoryItem
 
-Canonical product identity shared by every organization.
+Canonical shared product identity.
 
 - `id`
 - `categoryId`
@@ -69,13 +111,13 @@ Canonical product identity shared by every organization.
 - `createdAt`
 - `updatedAt`
 
-Examples: Guinness, Coors Light, Jameson.
+Examples: Guinness, Coors Original, Jameson.
 
-POS item numbers are deliberately not used as master identities because they are source/location specific.
+The shared master name is currently not editable from the Inventory UI. Canonical category can be changed, and duplicate master items can be merged.
 
 ### inventoryItemAlias
 
-Known alternate names for a canonical item.
+Known alternate names for a master item.
 
 - `id`
 - `inventoryItemId`
@@ -84,18 +126,18 @@ Known alternate names for a canonical item.
 - `createdAt`
 - `updatedAt`
 
-Examples for one item may include `COORS LT`, `Coors Lt.`, and `Coors Light`.
+Aliases support matching/reconciliation without replacing the canonical item identity.
 
 ### inventoryItemVariant
 
-A canonical sellable form of a master item.
+Canonical sellable form of a master item.
 
 - `id`
 - `inventoryItemId`
 - `kind` — examples: `standard`, `draft`, `can`, `bottle`, `pour`
 - `sizeOz` — nullable
 - `packageType` — nullable
-- `name` — nullable variant label
+- `name` — nullable canonical variant label
 - `defaultPriceCents` — nullable
 - `active`
 - `createdAt`
@@ -103,30 +145,30 @@ A canonical sellable form of a master item.
 
 Examples:
 
-- Guinness / draft / 16 oz
-- Guinness / draft / 20 oz
-- Coors Light / can / 12 oz
-- Coors Light / can / 24 oz
+- Guinness / draft / 16oz
+- Guinness / can
+- PBR / can / 24oz
+- Johnny Walker Black / standard
 
-Items without meaningful variants receive one `standard` variant.
+A master item can have variants that are used by different organizations without every organization carrying every variant.
 
 ## Organization catalog
 
 ### inventoryOrganizationVariant
 
-Defines which master variants an organization/location carries and any location-specific overrides.
+Joins one organization to one shared master variant.
 
 - `id`
 - `organizationId`
 - `inventoryItemVariantId`
 - `enabled`
 - `exportToToast`
-- `priceOverrideCents` — nullable; falls back to the variant default price
+- `priceOverrideCents` — nullable
 - `happyHourPriceCents` — nullable
 - `toastNameOverride` — nullable
 - `toastCategoryOverride` — nullable
 - `toastDestinationOverride` — nullable
-- `toastSlot` — nullable export mapping
+- `toastSlot` — nullable
 - `createdAt`
 - `updatedAt`
 - unique: `organizationId + inventoryItemVariantId`
@@ -138,21 +180,46 @@ organization priceOverrideCents
     ?? inventoryItemVariant.defaultPriceCents
 ```
 
-The database stores actual serving/package truth. The Toast exporter maps that truth to Toast's fixed workbook:
+Important separation:
 
-- 10 oz draft -> existing 8 oz Toast slot
-- 16 oz draft -> existing 16 oz Toast slot
-- standard can -> existing Can slot
-- 24 oz can -> existing Bottle slot
-- bottle -> existing Bottle slot
+- `enabled` means **Available here**.
+- `exportToToast` means include the carried variant in Toast export.
 
-Any differences are disclosed in the workbook Notes tab rather than by changing Toast headers.
+These are intentionally independent.
 
-## Import and reconciliation
+### toastSlot
+
+For custom Beer formats, `toastSlot` identifies a stable Optional Beer Category assignment, for example:
+
+- `optional-beer-1`
+- `optional-beer-2`
+- `optional-beer-3`
+- `optional-beer-4`
+- `optional-beer-5`
+
+The stable key is independent from the human-visible label.
+
+## Beer format model
+
+Built-in Toast Beer formats are fixed structural slots and are exact-match choices at the organization layer.
+
+Custom draft/package formats do not get coerced into an unrelated built-in format. They use an enabled Optional Beer Category slot.
+
+The exporter preserves Toast's workbook structure by changing visibility, not by deleting/reordering fixed Beer columns:
+
+- disabled built-in format columns are hidden,
+- enabled built-in columns remain visible,
+- the Draft Beer name column is hidden when no built-in draft format is enabled,
+- enabled Optional Beer Category groups are unhidden/relabelled,
+- disabled Optional Beer Category groups stay hidden.
+
+This corrects the older model where custom real-world sizes were described as being remapped into built-in Toast sizes.
+
+## Import history
 
 ### inventoryImport
 
-One source import for one organization.
+One persisted source import for one organization.
 
 - `id`
 - `organizationId`
@@ -164,38 +231,108 @@ One source import for one organization.
 - `createdAt`
 - `updatedAt`
 
+Toast workbook staging itself is browser-side review state until an explicit persist/import action occurs.
+
+## Source reconciliation
+
 ### inventorySourceItem
 
-Persistent source-to-master mapping so the same normalization does not need to be repeated on every import.
+Persistent organization/source → master mapping.
 
 - `id`
 - `organizationId`
 - `sourceType`
-- `sourceKey` — stable required key generated from the source record
-- `sourceItemId` — nullable original POS identifier
+- `sourceKey`
+- `sourceItemId` — nullable source POS identifier
 - `sourceName`
 - `normalizedSourceName`
-- `inventoryItemId` — nullable while awaiting reconciliation
-- `inventoryItemVariantId` — nullable while awaiting reconciliation
+- `inventoryItemId` — nullable while unresolved
+- `inventoryItemVariantId` — nullable while unresolved
 - `lastImportId`
+- `mappingConfirmed` — boolean, default false
 - `createdAt`
 - `updatedAt`
 - unique: `organizationId + sourceType + sourceKey`
 
-Aloha/Toast imports from different locations can therefore converge on the same canonical item and variant while preserving each source system's original naming and identifiers.
+`mappingConfirmed` distinguishes a mapping that has been explicitly reviewed/accepted from an automatically inferred mapping that may still need review.
 
-## Ownership boundaries
+Aloha and Toast source rows from different organizations can map to the same shared master item/variant while retaining organization/source-specific identifiers.
 
-Better Auth / Inventory plugin owns:
+## Explicit reconciliation
 
-- Inventory application access
-- organization context
-- master catalog
-- organization catalog selections and price overrides
-- source reconciliation mappings
+The import endpoint supports:
 
-The Toast workbook remains an output format, not the data model.
+- `reconciliationMode: "automatic"`
+- `reconciliationMode: "explicit"`
 
-The pristine repository workbook is never modified in place. Each export starts from a fresh copy and writes values only into existing cells.
+In explicit mode, every included item must choose exactly one:
 
-Generated XLSX/ZIP files are staged temporarily through the Inventory app's same-origin download route so the final response can supply `Content-Disposition` with the intended filename. Staged downloads expire automatically and remain available across repeated GET requests within the TTL to support iOS browser preview/download behavior.
+- `targetVariantId`, or
+- `createNewMaster: true`
+
+Supplying both, or neither, is rejected.
+
+This is used by the post-staging master mapping review so a reviewed source row cannot be silently reconciled to a merely similar product.
+
+## Bulk organization updates
+
+The Inventory API supports updating multiple organization variants in one request.
+
+Supported fields include:
+
+- `enabled`
+- `exportToToast`
+- `priceOverrideCents`
+- `happyHourPriceCents`
+- organization Toast routing overrides
+
+The Catalog bulk UI currently uses this for availability, Toast export state, and bulk price changes.
+
+## Master-item category and merge operations
+
+The API supports:
+
+- updating a shared master item's `categoryId`,
+- merging one shared master item into another.
+
+Merge reconciles/moves variants and source mappings under the target master identity.
+
+These are shared/global catalog operations, not organization-local edits.
+
+## Optional Menu Categories
+
+Retail and Open Items are currently organization-local frontend configuration rather than first-class persistent Auth tables.
+
+They control Add Item choices and workbook routing for the organization.
+
+Built-in choices:
+
+- Beer
+- Cocktails
+- NA Bev
+
+Optional choices:
+
+- Retail
+- Open Items
+
+Open Items is allowed to export with a null/blank price.
+
+## Toast workbook ownership boundary
+
+The Toast workbook is an output format, not the persistent data model.
+
+The pristine template is never modified in place.
+
+Each export:
+
+1. loads a fresh template copy,
+2. writes the selected organization's catalog,
+3. creates Retail/Open Items clones when needed,
+4. adjusts Beer column visibility,
+5. writes Notes/Happy Hour schedule,
+6. moves Notes to the final tab,
+7. validates generated values/visibility,
+8. stages the final XLSX/ZIP briefly for same-origin browser download.
+
+The generated file is disposable output; persistent truth remains in Inventory/Auth.
