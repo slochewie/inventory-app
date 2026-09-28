@@ -529,14 +529,7 @@ function CatalogPage() {
       happyHourRange2Start: happyHourRange2Start || null,
       happyHourRange2End: happyHourRange2End || null,
       happyHourRange2Days,
-      draft8Enabled: draft8.enabled,
-      draft8ActualSizeOz: parseDraftSize(draft8.actualSizeOz),
-      draft16Enabled: draft16.enabled,
-      draft16ActualSizeOz: parseDraftSize(draft16.actualSizeOz),
-      draft24Enabled: draft24.enabled,
-      draft24ActualSizeOz: parseDraftSize(draft24.actualSizeOz),
-      pitcherEnabled: pitcher.enabled,
-      pitcherActualSizeOz: parseDraftSize(pitcher.actualSizeOz),
+      ...buildFixedToastDraftSlotConfig(),
       ...buildOptionalBeerCategoryConfig(optionalBeerCategories),
     }
   }
