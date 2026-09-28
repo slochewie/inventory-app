@@ -273,6 +273,10 @@ function ToastWorkbook() {
     setWorkbookValidation(null)
     setDownloadError(null)
     setAlohaError(null)
+    setReconciliationActive(false)
+    setReconciliationDecisions({})
+    setSelectedReconciliationItemId(null)
+    setReconciliationQuery('')
 
     if (savedReviewSession?.items.length) {
       setImportFile(savedReviewSession.importFile)
@@ -296,9 +300,12 @@ function ToastWorkbook() {
     void Promise.all([
       listInventoryCatalog(organizationId, controller.signal),
       getInventoryOrganizationConfig(organizationId, controller.signal),
+      listInventorySourceMappings(organizationId, controller.signal),
     ])
-      .then(([catalog, config]) => {
+      .then(([catalog, config, mappings]) => {
         setOrganizationConfig(config)
+        setMasterCatalog(catalog.items)
+        setSourceMappings(mappings)
 
         if (savedReviewSession?.items.length) return
 
@@ -405,13 +412,16 @@ function ToastWorkbook() {
     setCatalogLoading(true)
 
     try {
-      const [catalog, config] = await Promise.all([
+      const [catalog, config, mappings] = await Promise.all([
         listInventoryCatalog(activeOrganization.id),
         getInventoryOrganizationConfig(activeOrganization.id),
+        listInventorySourceMappings(activeOrganization.id),
       ])
       const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
 
       setOrganizationConfig(config)
+      setMasterCatalog(catalog.items)
+      setSourceMappings(mappings)
       setImportFile({
         sourceKind: 'toast-template-sheet',
         sourceName: 'Persistent Inventory catalog',
