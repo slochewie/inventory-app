@@ -540,7 +540,7 @@ function CatalogDrawer({
   useEffect(() => {
     setDraftItems(group.items.map((item) => ({ ...item })))
     setDraftCategoryId(group.categoryId ?? '')
-  }, [group.id])
+  }, [group.id, group.items])
 
   useEffect(() => {
     const dialog = dialogRef.current
