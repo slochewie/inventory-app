@@ -146,7 +146,7 @@ Current beer mapping follows Toast's fixed workbook structure:
 
 Toast exposes five hidden **Optional Beer Category** groups on the Beer tab. Inventory now supports all five as organization settings.
 
-The Organization Settings page exposes these as **Beer Formats**. The UI uses progressive disclosure: an organization with no custom Beer formats sees only **Add format**. Each press reveals the next available Optional Beer Category slot, up to five. The visible order controls workbook slot order, while each saved label also acts as the import mapping for that custom format. Custom draft sizes such as 10oz and packaged formats such as Tall Boy Can remain distinct formats.
+The Organization Settings page exposes these as **Beer Formats**. Toast default Beer formats (8oz Draft, 16oz Draft, 24oz Draft, Pitcher, Can, and Bottle) are shown as organization-level enable/disable controls; disabled defaults are omitted from Beer destination drop-down menus. The UI uses progressive disclosure: an organization with no custom Beer formats sees only **Add format**. Each press reveals the next available Optional Beer Category slot, up to five. The visible order controls workbook slot order, while each saved label also acts as the import mapping for that custom format. Custom draft sizes such as 10oz and packaged formats such as Tall Boy Can remain distinct formats.
 
 Catalog Beer variants can be assigned to a stable `toastSlot` key:
 
