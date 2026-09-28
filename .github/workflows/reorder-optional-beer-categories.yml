@@ -19,281 +19,175 @@ jobs:
           node <<'NODE'
           const fs = require('fs')
 
-          function replaceOnce(text, from, to) {
-            if (!text.includes(from)) {
-              throw new Error('Missing expected block:\n' + from)
-            }
-            return text.replace(from, to)
+          function block(lines) {
+            return lines.join('\n') + '\n'
+          }
+
+          function mustReplace(text, pattern, replacement, label) {
+            const next = text.replace(pattern, replacement)
+            if (next === text) throw new Error('Missing ' + label)
+            return next
           }
 
           const workbookPath = 'app/src/features/menu-import/toast-template-workbook.ts'
           let workbook = fs.readFileSync(workbookPath, 'utf8')
-          workbook = replaceOnce(
+
+          workbook = mustReplace(
             workbook,
-`  let shouldAutoAddTallBoyCan =
-    beerRows.some((row) => row.can24ozPrice !== null) &&
-    !configuredCategories.some((category) => isTallBoyCanCategory(category.label))
-  let nextCustomDraftSizeIndex = 0
-`,
-`  let nextCustomDraftSizeIndex = 0
-`,
+            /  let shouldAutoAddTallBoyCan =\n    beerRows\.some\(\(row\) => row\.can24ozPrice !== null\) &&\n    !configuredCategories\.some\(\(category\) => isTallBoyCanCategory\(category\.label\)\)\n  let nextCustomDraftSizeIndex = 0\n/,
+            '  let nextCustomDraftSizeIndex = 0\n',
+            'Tall Boy auto-add flag',
           )
-          workbook = replaceOnce(
+
+          workbook = mustReplace(
             workbook,
-`    const hasTallBoyCanLabel = isTallBoyCanCategory(category.label)
-    const hasCustomLabel = !isDefaultOptionalBeerCategoryLabel(category.label, index)
-
-    if (category.enabled || hasConfiguredDraftSize || hasTallBoyCanLabel || hasCustomLabel) {
-      return category
-    }
-
-    if (shouldAutoAddTallBoyCan) {
-      shouldAutoAddTallBoyCan = false
-      return {
-        enabled: true,
-        label: 'Tall Boy Can',
-      }
-    }
-
-`,
-`    const hasCustomLabel = !isDefaultOptionalBeerCategoryLabel(category.label, index)
-
-    if (category.enabled || hasConfiguredDraftSize || hasCustomLabel) {
-      return category
-    }
-
-`,
+            /    const hasTallBoyCanLabel = isTallBoyCanCategory\(category\.label\)\n    const hasCustomLabel = !isDefaultOptionalBeerCategoryLabel\(category\.label, index\)\n\n    if \(category\.enabled \|\| hasConfiguredDraftSize \|\| hasTallBoyCanLabel \|\| hasCustomLabel\) \{\n      return category\n    \}\n\n    if \(shouldAutoAddTallBoyCan\) \{\n      shouldAutoAddTallBoyCan = false\n      return \{\n        enabled: true,\n        label: 'Tall Boy Can',\n      \}\n    \}\n\n/,
+            block([
+              '    const hasCustomLabel = !isDefaultOptionalBeerCategoryLabel(category.label, index)',
+              '',
+              '    if (category.enabled || hasConfiguredDraftSize || hasCustomLabel) {',
+              '      return category',
+              '    }',
+              '',
+            ]),
+            'Tall Boy auto-add branch',
           )
+
           fs.writeFileSync(workbookPath, workbook)
 
           const indexPath = 'app/src/routes/index.tsx'
           let index = fs.readFileSync(indexPath, 'utf8')
-          index = replaceOnce(
+
+          index = mustReplace(
             index,
-`  function updateOptionalBeerCategoryDraft(
-    slot: OptionalBeerCategoryConfig['slot'],
-    patch: Partial<Pick<OptionalBeerCategoryConfig, 'enabled' | 'label'>>,
-  ) {
-    setOptionalBeerCategoryEdits((current) =>
-      current.map((category) =>
-        category.slot === slot ? { ...category, ...patch } : category,
-      ),
-    )
-  }
-
-`,
-`  function updateOptionalBeerCategoryDraft(
-    slot: OptionalBeerCategoryConfig['slot'],
-    patch: Partial<Pick<OptionalBeerCategoryConfig, 'enabled' | 'label'>>,
-  ) {
-    setOptionalBeerCategoryEdits((current) =>
-      current.map((category) =>
-        category.slot === slot ? { ...category, ...patch } : category,
-      ),
-    )
-  }
-
-  function moveOptionalBeerCategoryDraft(
-    slot: OptionalBeerCategoryConfig['slot'],
-    direction: 'up' | 'down',
-  ) {
-    const offset = direction === 'up' ? -1 : 1
-
-    setOptionalBeerCategoryEdits((current) => {
-      const sourceIndex = current.findIndex((category) => category.slot === slot)
-      const targetIndex = sourceIndex + offset
-
-      if (
-        sourceIndex < 0 ||
-        targetIndex < 0 ||
-        targetIndex >= visibleOptionalBeerCategoryCount
-      ) {
-        return current
-      }
-
-      const next = current.map((category) => ({ ...category }))
-      const source = next[sourceIndex]
-      const target = next[targetIndex]
-
-      if (!source || !target) return current
-
-      next[sourceIndex] = {
-        ...source,
-        enabled: target.enabled,
-        label: target.label,
-      }
-      next[targetIndex] = {
-        ...target,
-        enabled: source.enabled,
-        label: source.label,
-      }
-
-      return next
-    })
-  }
-
-`,
+            /  function updateOptionalBeerCategoryDraft\(\n    slot: OptionalBeerCategoryConfig\['slot'\],\n    patch: Partial<Pick<OptionalBeerCategoryConfig, 'enabled' \| 'label'>>,\n  \) \{\n    setOptionalBeerCategoryEdits\(\(current\) =>\n      current\.map\(\(category\) =>\n        category\.slot === slot \? \{ \.\.\.category, \.\.\.patch \} : category,\n      \),\n    \)\n  \}\n\n/,
+            block([
+              "  function updateOptionalBeerCategoryDraft(",
+              "    slot: OptionalBeerCategoryConfig['slot'],",
+              "    patch: Partial<Pick<OptionalBeerCategoryConfig, 'enabled' | 'label'>>,",
+              "  ) {",
+              "    setOptionalBeerCategoryEdits((current) =>",
+              "      current.map((category) =>",
+              "        category.slot === slot ? { ...category, ...patch } : category,",
+              "      ),",
+              "    )",
+              "  }",
+              "",
+              "  function moveOptionalBeerCategoryDraft(",
+              "    slot: OptionalBeerCategoryConfig['slot'],",
+              "    direction: 'up' | 'down',",
+              "  ) {",
+              "    const offset = direction === 'up' ? -1 : 1",
+              "",
+              "    setOptionalBeerCategoryEdits((current) => {",
+              "      const sourceIndex = current.findIndex((category) => category.slot === slot)",
+              "      const targetIndex = sourceIndex + offset",
+              "",
+              "      if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= visibleOptionalBeerCategoryCount) {",
+              "        return current",
+              "      }",
+              "",
+              "      const next = current.map((category) => ({ ...category }))",
+              "      const source = next[sourceIndex]",
+              "      const target = next[targetIndex]",
+              "      if (!source || !target) return current",
+              "",
+              "      next[sourceIndex] = { ...source, enabled: target.enabled, label: target.label }",
+              "      next[targetIndex] = { ...target, enabled: source.enabled, label: source.label }",
+              "      return next",
+              "    })",
+              "  }",
+              "",
+            ]),
+            'move optional category helper',
           )
-          index = replaceOnce(
+
+          index = mustReplace(
             index,
-`                  <p>
-                    Map non-standard Beer formats to Toast Optional Beer Category slots. Custom draft sizes detected in the catalog are shown here; click Update to save them.
-                  </p>
-`,
-`                  <p>
-                    Map non-standard Beer formats to Toast optional slots. The order here controls which hidden workbook slot each category exports to; click Update to save changes.
-                  </p>
-`,
+            /Map non-standard Beer formats to Toast Optional Beer Category slots\. Custom draft sizes detected in the catalog are shown here; click Update to save them\./,
+            'Map non-standard Beer formats to Toast optional slots. The order here controls which hidden workbook slot each category exports to; click Update to save changes.',
+            'settings copy',
           )
-          index = replaceOnce(
+
+          index = mustReplace(
             index,
-`                    {optionalBeerCategoryEdits
-                      .slice(0, visibleOptionalBeerCategoryCount)
-                      .map((category) => (
-                        <div key={category.key} className="inventory-draft-slot-field">
-                          <label className="inventory-inline-toggle">
-                            <input
-                              type="checkbox"
-                              checked={category.enabled}
-                              disabled={savingOptionalBeerCategories}
-                              onChange={(event) =>
-                                updateOptionalBeerCategoryDraft(category.slot, {
-                                  enabled: event.target.checked,
-                                })
-                              }
-                            />
-                            <span>
-                              Optional Beer Category {category.slot} ·{' '}
-                              {category.enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                          </label>
-
-                          <label className="inventory-search-control">
-                            <span>Import/export mapping</span>
-                            <input
-                              type="text"
-                              value={category.label}
-                              disabled={!category.enabled || savingOptionalBeerCategories}
-                              onChange={(event) =>
-                                updateOptionalBeerCategoryDraft(category.slot, {
-                                  label: event.target.value,
-                                })
-                              }
-                              placeholder={\`Tall Boy Can, 10oz, or Optional Beer Category ${category.slot}\`}
-                            />
-                          </label>
-
-                          {category.slot === visibleOptionalBeerCategoryCount ? (
-                            <button
-                              type="button"
-                              className="inventory-secondary-button"
-                              disabled={savingOptionalBeerCategories}
-                              onClick={() => removeOptionalBeerCategory(category)}
-                            >
-                              Remove Optional Beer Category
-                            </button>
-                          ) : null}
-                        </div>
-                      ))}
-`,
-`                    {optionalBeerCategoryEdits
-                      .slice(0, visibleOptionalBeerCategoryCount)
-                      .map((category, index) => (
-                        <div key={category.key} className="inventory-draft-slot-field">
-                          <label className="inventory-inline-toggle">
-                            <input
-                              type="checkbox"
-                              checked={category.enabled}
-                              disabled={savingOptionalBeerCategories}
-                              onChange={(event) =>
-                                updateOptionalBeerCategoryDraft(category.slot, {
-                                  enabled: event.target.checked,
-                                })
-                              }
-                            />
-                            <span>
-                              {getBeerExportCategoryTitle(category)} ·{' '}
-                              {category.enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                          </label>
-
-                          <label className="inventory-search-control">
-                            <span>Import/export mapping</span>
-                            <input
-                              type="text"
-                              value={category.label}
-                              disabled={!category.enabled || savingOptionalBeerCategories}
-                              onChange={(event) =>
-                                updateOptionalBeerCategoryDraft(category.slot, {
-                                  label: event.target.value,
-                                })
-                              }
-                              placeholder="Tall Boy Can, 10oz, or custom label"
-                            />
-                          </label>
-
-                          <div className="inventory-draft-slots-actions">
-                            <button
-                              type="button"
-                              className="inventory-secondary-button"
-                              disabled={index === 0 || savingOptionalBeerCategories}
-                              onClick={() => moveOptionalBeerCategoryDraft(category.slot, 'up')}
-                            >
-                              Move up
-                            </button>
-                            <button
-                              type="button"
-                              className="inventory-secondary-button"
-                              disabled={
-                                index >= visibleOptionalBeerCategoryCount - 1 ||
-                                savingOptionalBeerCategories
-                              }
-                              onClick={() => moveOptionalBeerCategoryDraft(category.slot, 'down')}
-                            >
-                              Move down
-                            </button>
-                          </div>
-
-                          {index === visibleOptionalBeerCategoryCount - 1 ? (
-                            <button
-                              type="button"
-                              className="inventory-secondary-button"
-                              disabled={savingOptionalBeerCategories}
-                              onClick={() => removeOptionalBeerCategory(category)}
-                            >
-                              Remove category
-                            </button>
-                          ) : null}
-                        </div>
-                      ))}
-`,
+            /\.slice\(0, visibleOptionalBeerCategoryCount\)\n                      \.map\(\(category\) => \(/,
+            '.slice(0, visibleOptionalBeerCategoryCount)\n                      .map((category, index) => (',
+            'optional category map index',
           )
-          index = replaceOnce(index, `                    Add Optional Beer Category
-`, `                    Add category
-`)
-          index = replaceOnce(index, `      setError(\`Set a label for Optional Beer Category ${missingLabel.slot}.\`)
-`, `      setError('Set a label for the Beer export category.')
-`)
-          index = replaceOnce(index, `        \`Optional Beer Category ${disabledAssignedCategory.slot} is still assigned to catalog items. Reassign those items before disabling it.\`,
-`, `        'This Beer export category is still assigned to catalog items. Reassign those items before disabling it.',
-`)
-          index = replaceOnce(
+
+          index = mustReplace(
             index,
-`function buildOptionalBeerCategoryConfig(
-  categories: readonly OptionalBeerCategoryConfig[],
-): Pick<
-`,
-`function getBeerExportCategoryTitle(category: OptionalBeerCategoryConfig) {
-  return isDefaultOptionalBeerCategoryLabel(category.label, category.slot - 1)
-    ? 'Beer export category'
-    : category.label.trim()
-}
-
-function buildOptionalBeerCategoryConfig(
-  categories: readonly OptionalBeerCategoryConfig[],
-): Pick<
-`,
+            /                            <span>\n                              Optional Beer Category \{category\.slot\} ·\{' '\}\n                              \{category\.enabled \? 'Enabled' : 'Disabled'\}\n                            <\/span>/,
+            block([
+              '                            <span>',
+              "                              {getBeerExportCategoryTitle(category)} ·{' '}",
+              "                              {category.enabled ? 'Enabled' : 'Disabled'}",
+              '                            </span>',
+            ]).trimEnd(),
+            'optional category label text',
           )
+
+          index = mustReplace(
+            index,
+            /placeholder=\{`Tall Boy Can, 10oz, or Optional Beer Category \$\{category\.slot\}`\}/,
+            'placeholder="Tall Boy Can, 10oz, or custom label"',
+            'optional category placeholder',
+          )
+
+          index = mustReplace(
+            index,
+            /                          \{category\.slot === visibleOptionalBeerCategoryCount \? \(/,
+            block([
+              '                          <div className="inventory-draft-slots-actions">',
+              '                            <button',
+              '                              type="button"',
+              '                              className="inventory-secondary-button"',
+              '                              disabled={index === 0 || savingOptionalBeerCategories}',
+              "                              onClick={() => moveOptionalBeerCategoryDraft(category.slot, 'up')}",
+              '                            >',
+              '                              Move up',
+              '                            </button>',
+              '                            <button',
+              '                              type="button"',
+              '                              className="inventory-secondary-button"',
+              '                              disabled={',
+              '                                index >= visibleOptionalBeerCategoryCount - 1 ||',
+              '                                savingOptionalBeerCategories',
+              '                              }',
+              "                              onClick={() => moveOptionalBeerCategoryDraft(category.slot, 'down')}",
+              '                            >',
+              '                              Move down',
+              '                            </button>',
+              '                          </div>',
+              '',
+              '                          {index === visibleOptionalBeerCategoryCount - 1 ? (',
+            ]).trimEnd(),
+            'move controls',
+          )
+
+          index = mustReplace(index, /Remove Optional Beer Category/g, 'Remove category', 'remove label')
+          index = mustReplace(index, /Add Optional Beer Category/g, 'Add category', 'add label')
+          index = mustReplace(index, /Set a label for Optional Beer Category \$\{missingLabel\.slot\}\./, 'Set a label for the Beer export category.', 'missing label message')
+          index = mustReplace(index, /Optional Beer Category \$\{disabledAssignedCategory\.slot\} is still assigned to catalog items\. Reassign those items before disabling it\./, 'This Beer export category is still assigned to catalog items. Reassign those items before disabling it.', 'disabled assigned message')
+
+          index = mustReplace(
+            index,
+            /function buildOptionalBeerCategoryConfig\(\n  categories: readonly OptionalBeerCategoryConfig\[],\n\): Pick</,
+            block([
+              'function getBeerExportCategoryTitle(category: OptionalBeerCategoryConfig) {',
+              "  return isDefaultOptionalBeerCategoryLabel(category.label, category.slot - 1)",
+              "    ? 'Beer export category'",
+              '    : category.label.trim()',
+              '}',
+              '',
+              'function buildOptionalBeerCategoryConfig(',
+              '  categories: readonly OptionalBeerCategoryConfig[],',
+              '): Pick<',
+            ]).trimEnd(),
+            'category title helper',
+          )
+
           fs.writeFileSync(indexPath, index)
           NODE
       - name: Commit source patch
