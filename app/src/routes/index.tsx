@@ -575,9 +575,9 @@ function CatalogPage() {
                       </th>
                     ) : null}
                     <th>Item</th>
-                    <th>Price</th>
-                    <th>Happy hour</th>
-                    <th>Available here</th>
+                    <th className="inventory-catalog-price-column">Price</th>
+                    <th className="inventory-catalog-happy-hour-column">Happy hour</th>
+                    <th className="inventory-catalog-availability-column">Available here</th>
                     <th />
                   </tr>
                 </thead>
@@ -632,9 +632,9 @@ function CatalogPage() {
                             </div>
                           </div>
                         </td>
-                        <td>{getPriceRange(visibleItems)}</td>
-                        <td>{getHappyHourRange(visibleItems)}</td>
-                        <td>
+                        <td className="inventory-catalog-price-column">{getPriceRange(visibleItems)}</td>
+                        <td className="inventory-catalog-happy-hour-column">{getHappyHourRange(visibleItems)}</td>
+                        <td className="inventory-catalog-availability-column">
                           <span className={carried ? 'inventory-carry-status is-on' : 'inventory-carry-status'}>
                             {carried ? 'Yes' : 'No'}
                           </span>
