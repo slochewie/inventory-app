@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { CircleCheckBig, CircleOff, CircleX, Info, ListChecks, Upload } from 'lucide-react'
+import { CircleCheckBig, CircleOff, CircleX, DollarSign, Info, ListChecks, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AuthenticatedInventoryShell,
@@ -57,6 +57,9 @@ function CatalogPage() {
   const [bulkEditEnabled, setBulkEditEnabled] = useState(false)
   const [bulkUpdating, setBulkUpdating] = useState(false)
   const [bulkHelpOpen, setBulkHelpOpen] = useState(false)
+  const [bulkPriceOpen, setBulkPriceOpen] = useState(false)
+  const [bulkPriceStep, setBulkPriceStep] = useState<'entry' | 'review'>('entry')
+  const [bulkPriceValue, setBulkPriceValue] = useState('')
   const [bulkHelpPosition, setBulkHelpPosition] = useState<{
     top: number
     left: number
@@ -285,6 +288,75 @@ function CatalogPage() {
       }
       return next
     })
+  }
+
+  function getBulkPriceItems() {
+    return pageGroups.flatMap((group) => {
+      if (!selectedBulkGroupIds.has(group.id)) return []
+
+      return group.items
+        .filter((item) => item.organizationEnabled === true)
+        .map((item) => ({
+          id: item.id,
+          itemName: group.name,
+          format: item.variantLabel || 'Standard',
+          currentPriceCents: item.basePriceCents,
+        }))
+    })
+  }
+
+  function openBulkPrice() {
+    if (selectedBulkGroupIds.size === 0 || bulkUpdating) return
+    setBulkPriceStep('entry')
+    setBulkPriceValue('')
+    setBulkPriceOpen(true)
+  }
+
+  function closeBulkPrice() {
+    if (bulkUpdating) return
+    setBulkPriceOpen(false)
+    setBulkPriceStep('entry')
+    setBulkPriceValue('')
+  }
+
+  function parseBulkPriceCents() {
+    const numeric = Number(bulkPriceValue)
+    if (!Number.isFinite(numeric) || numeric < 0) return null
+    return Math.round(numeric * 100)
+  }
+
+  async function saveBulkPrice() {
+    if (!canEdit || !activeOrganization?.id || bulkUpdating) return
+
+    const priceCents = parseBulkPriceCents()
+    const affectedItems = getBulkPriceItems()
+    if (priceCents === null || affectedItems.length === 0) return
+
+    setBulkUpdating(true)
+    setError(null)
+
+    try {
+      await updateInventoryOrganizationVariants({
+        organizationId: activeOrganization.id,
+        variantIds: affectedItems.map((item) => item.id),
+        priceOverrideCents: priceCents,
+      })
+
+      const catalog = await listInventoryCatalog(activeOrganization.id)
+      setItems(catalog.items.map(catalogRowToNormalizedItem))
+      setSelectedBulkGroupIds(new Set())
+      setBulkPriceOpen(false)
+      setBulkPriceStep('entry')
+      setBulkPriceValue('')
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to apply the bulk price update.',
+      )
+    } finally {
+      setBulkUpdating(false)
+    }
   }
 
   function getBulkVariantIds(action: 'enable' | 'disable' | 'export' | 'no-export') {
@@ -642,6 +714,10 @@ function CatalogPage() {
                       <span><CircleOff aria-hidden="true" /></span>
                       <p><b>Do not export</b> — keep the selected items carried but exclude them from Toast export.</p>
                     </div>
+                    <div>
+                      <span><DollarSign aria-hidden="true" /></span>
+                      <p><b>Set price</b> — review and apply one price to the carried formats in the selected rows.</p>
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -688,10 +764,33 @@ function CatalogPage() {
                     >
                       <CircleOff aria-hidden="true" />
                     </button>
+                    <button
+                      type="button"
+                      title="Set price for selected items"
+                      aria-label="Set price for selected items"
+                      disabled={selectedBulkGroupIds.size === 0 || bulkUpdating}
+                      onClick={openBulkPrice}
+                    >
+                      <DollarSign aria-hidden="true" />
+                    </button>
                   </div>
                 </>
               ) : null}
             </div>
+          ) : null}
+
+          {bulkPriceOpen ? (
+            <BulkPriceDialog
+              items={getBulkPriceItems()}
+              priceValue={bulkPriceValue}
+              step={bulkPriceStep}
+              saving={bulkUpdating}
+              onPriceChange={setBulkPriceValue}
+              onReview={() => setBulkPriceStep('review')}
+              onBack={() => setBulkPriceStep('entry')}
+              onCancel={closeBulkPrice}
+              onSave={() => void saveBulkPrice()}
+            />
           ) : null}
 
           {loading ? <p>Loading catalog…</p> : null}
@@ -834,6 +933,178 @@ function CatalogPage() {
         ) : null}
       </section>
     </AuthenticatedInventoryShell>
+  )
+}
+
+function BulkPriceDialog({
+  items,
+  priceValue,
+  step,
+  saving,
+  onPriceChange,
+  onReview,
+  onBack,
+  onCancel,
+  onSave,
+}: {
+  items: Array<{
+    id: string
+    itemName: string
+    format: string
+    currentPriceCents: number | null
+  }>
+  priceValue: string
+  step: 'entry' | 'review'
+  saving: boolean
+  onPriceChange: (value: string) => void
+  onReview: () => void
+  onBack: () => void
+  onCancel: () => void
+  onSave: () => void
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const numericPrice = Number(priceValue)
+  const validPrice =
+    priceValue.trim() !== '' &&
+    Number.isFinite(numericPrice) &&
+    numericPrice >= 0
+  const nextPrice = validPrice ? formatCurrency(Math.round(numericPrice * 100)) : '—'
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (!dialog.open) dialog.showModal()
+    return () => {
+      if (dialog.open) dialog.close()
+    }
+  }, [])
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="inventory-bulk-price-dialog"
+      aria-labelledby="inventory-bulk-price-title"
+      onCancel={(event) => {
+        event.preventDefault()
+        onCancel()
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel()
+      }}
+    >
+      <div className="inventory-bulk-price-dialog-card">
+        <div className="inventory-bulk-price-dialog-heading">
+          <div>
+            <p className="inventory-kicker">Bulk edit</p>
+            <h2 id="inventory-bulk-price-title">
+              {step === 'entry' ? 'Set price' : 'Review price changes'}
+            </h2>
+          </div>
+        </div>
+
+        {step === 'entry' ? (
+          <>
+            <p className="inventory-bulk-price-dialog-copy">
+              Enter the new price. Nothing changes until you review the affected items and confirm the update.
+            </p>
+            <label className="inventory-bulk-price-field">
+              <span>New price</span>
+              <div>
+                <span aria-hidden="true">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={priceValue}
+                  disabled={saving}
+                  onChange={(event) => onPriceChange(event.target.value)}
+                  placeholder="0.00"
+                  autoFocus
+                />
+              </div>
+            </label>
+            <p className="inventory-bulk-price-note">
+              {items.length} carried format{items.length === 1 ? '' : 's'} will be reviewed. Selected rows with no carried format are not changed.
+            </p>
+            <div className="inventory-bulk-price-actions">
+              <button
+                type="button"
+                className="inventory-secondary-button"
+                disabled={saving}
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="inventory-primary-button"
+                disabled={!validPrice || items.length === 0 || saving}
+                onClick={onReview}
+              >
+                Review changes
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="inventory-bulk-price-warning">
+              <strong>Are you sure?</strong>
+              <span>
+                Confirming will change the price for {items.length} carried format{items.length === 1 ? '' : 's'}.
+              </span>
+            </div>
+            <div className="inventory-bulk-price-review">
+              <div className="inventory-bulk-price-review-head">
+                <span>Item</span>
+                <span>Current</span>
+                <span>New</span>
+              </div>
+              {items.map((item) => (
+                <div key={item.id} className="inventory-bulk-price-review-row">
+                  <div>
+                    <strong>{item.itemName}</strong>
+                    <span>{item.format}</span>
+                  </div>
+                  <span>
+                    {item.currentPriceCents === null
+                      ? '—'
+                      : formatCurrency(item.currentPriceCents)}
+                  </span>
+                  <strong>{nextPrice}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="inventory-bulk-price-actions">
+              <button
+                type="button"
+                className="inventory-secondary-button"
+                disabled={saving}
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="inventory-secondary-button"
+                disabled={saving}
+                onClick={onBack}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className="inventory-primary-button"
+                disabled={!validPrice || items.length === 0 || saving}
+                onClick={onSave}
+              >
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </dialog>
   )
 }
 
