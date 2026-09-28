@@ -2934,3 +2934,30 @@ select {
   height: 2.75rem;
   padding: 0;
 }
+
+
+.inventory-reconcile-candidate-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.inventory-reconcile-candidate {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.75rem;
+  text-align: left;
+  background: var(--inventory-surface, #fff);
+  border: 1px solid var(--inventory-border, #d9dde5);
+  border-radius: 0.75rem;
+}
+
+.inventory-reconcile-candidate span {
+  color: var(--inventory-muted, #667085);
+  font-size: 0.85rem;
+}
+
+.inventory-reconcile-candidate.is-selected {
+  border-color: currentColor;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
