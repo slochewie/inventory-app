@@ -94,7 +94,7 @@ function MenuCategoriesPage() {
             <div>
               <h2>Optional categories</h2>
               <p>
-                Add Retail when this organization needs it. Built-in categories are already available automatically.
+                Add Retail or Open Items when this organization needs them. Built-in categories are already available automatically.
               </p>
             </div>
           </div>
