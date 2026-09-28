@@ -213,6 +213,766 @@ export function validatePopulatedBeerWorkbook({
   const optionalBeerCategoryRows = optionalPackagedSlots.map(
     (definition) => definition.rows.length,
   )
+  const bottleRows = beerRows
+    .filter((row) => row.bottlePrice !== null)
+    .map((row) => ({ row, kind: 'bottle' as const }))
+
+  draftRows.forEach((row, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    if (mapping.draftNameCol !== null) {
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        mapping.draftNameCol,
+        rowNumber,
+        row.beerName,
+        `${row.beerName} draft name`,
+      )
+    }
+
+    normalizedDraftSlotMappings.forEach((draftMapping) => {
+      const toastSlot = findDraftSlot(mapping, draftMapping.toastSizeOz)
+      if (!toastSlot) {
+        issues.push(
+          `Toast Beer tab is missing configured draft slot ${formatToastDraftSlot(draftMapping.toastSizeOz)}`,
+        )
+        return
+      }
+
+      const draftPrice = getDraftBeerPrice(row, draftMapping.actualSizeOz)
+
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        toastSlot.priceCol,
+        rowNumber,
+        centsToDollars(draftPrice?.price ?? null),
+        `${row.beerName} ${draftMapping.actualSizeOz}oz price in Toast ${toastSlot.label} slot`,
+      )
+
+      if (toastSlot.happyHourCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          toastSlot.happyHourCol,
+          rowNumber,
+          centsToDollars(draftPrice?.happyHour ?? null),
+          `${row.beerName} ${draftMapping.actualSizeOz}oz Happy Hour in Toast ${toastSlot.label} slot`,
+        )
+      }
+    })
+
+    mapping.draftSizes
+      .filter(
+        (toastSlot) =>
+          !normalizedDraftSlotMappings.some((draftMapping) =>
+            draftMapping.toastSizeOz === toastSlot.sizeOz,
+          ),
+      )
+      .forEach((toastSlot) => {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          toastSlot.priceCol,
+          rowNumber,
+          null,
+          `${row.beerName} disabled Toast ${toastSlot.label} draft price`,
+        )
+
+        if (toastSlot.happyHourCol) {
+          validateCellValue(
+            issues,
+            sheetDoc,
+            workbookPackage.sharedStrings,
+            toastSlot.happyHourCol,
+            rowNumber,
+            null,
+            `${row.beerName} disabled Toast ${toastSlot.label} Happy Hour`,
+          )
+        }
+      })
+  })
+
+  const canSlot = findPackagedSlot(mapping, 'can')
+  if (canSlot) {
+    canRows.forEach((row, index) => {
+      const rowNumber = mapping.dataStartRow + index
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        canSlot.nameCol,
+        rowNumber,
+        row.beerName,
+        `${row.beerName} can name`,
+      )
+      if (canSlot.priceCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          canSlot.priceCol,
+          rowNumber,
+          centsToDollars(row.canPrice),
+          `${row.beerName} can price`,
+        )
+      }
+      if (canSlot.happyHourCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          canSlot.happyHourCol,
+          rowNumber,
+          centsToDollars(row.canHappyHour),
+          `${row.beerName} can Happy Hour`,
+        )
+      }
+    })
+  }
+
+  optionalPackagedSlots.forEach((definition) => {
+    validateOptionalPackagedSlot({
+      issues,
+      sheetDoc,
+      sharedStrings: workbookPackage.sharedStrings,
+      mapping,
+      options: definition,
+      rows: definition.rows,
+      getName: (row) => row.beerName,
+      getPrice: definition.getPrice,
+      getHappyHour: definition.getHappyHour,
+      description: definition.description,
+    })
+  })
+
+  const bottleSlot = findPackagedSlot(mapping, 'bottle')
+  if (bottleSlot) {
+    bottleRows.forEach(({ row, kind }, index) => {
+      const rowNumber = mapping.dataStartRow + index
+      const price = kind === '24oz can' ? row.can24ozPrice : row.bottlePrice
+      const happyHour =
+        kind === '24oz can' ? row.can24ozHappyHour : row.bottleHappyHour
+
+      validateCellValue(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        bottleSlot.nameCol,
+        rowNumber,
+        row.beerName,
+        `${row.beerName} ${kind} name in Bottle slot`,
+      )
+      if (bottleSlot.priceCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          bottleSlot.priceCol,
+          rowNumber,
+          centsToDollars(price),
+          `${row.beerName} ${kind} price in Bottle slot`,
+        )
+      }
+      if (bottleSlot.happyHourCol) {
+        validateCellValue(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          bottleSlot.happyHourCol,
+          rowNumber,
+          centsToDollars(happyHour),
+          `${row.beerName} ${kind} Happy Hour in Bottle slot`,
+        )
+      }
+    })
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    draftRows: draftRows.length,
+    canRows: canRows.length,
+    bottleSlotRows: bottleRows.length,
+    optionalBeerCategory1Rows: optionalBeerCategoryRows[0] ?? 0,
+    optionalBeerCategoryRows,
+  }
+}
+
+export async function buildToastWorkbookZip(filename: string, workbook: Blob) {
+  const bytes = new Uint8Array(await workbook.arrayBuffer())
+  return new Blob(
+    [zipSync({ [filename]: bytes }, { level: 6 })],
+    { type: 'application/zip' },
+  )
+}
+
+export async function downloadToastWorkbookFile(filename: string, blob: Blob) {
+  const response = await fetch('/api/toast-download', {
+    method: 'POST',
+    headers: {
+      'Content-Type': blob.type || 'application/octet-stream',
+      'X-Toast-Filename': filename,
+    },
+    body: blob,
+  })
+
+  const result = (await response.json()) as {
+    token?: string
+    error?: string
+  }
+
+  if (!response.ok || !result.token) {
+    throw new Error(
+      typeof result.error === 'string'
+        ? result.error
+        : 'Unable to prepare Toast download.',
+    )
+  }
+
+  window.location.assign(
+    `/api/toast-download?token=${encodeURIComponent(result.token)}`,
+  )
+}
+
+export function buildToastWorkbookFilename(organizationName: string, now = new Date()) {
+  const safeOrganizationName = organizationName
+    .replace(/[’']/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'Organization'
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(now)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  )
+
+  return [
+    'Toast-Menu-Template',
+    safeOrganizationName,
+    `${parts.month}-${parts.day}-${parts.year}-${parts.hour}${parts.minute}`,
+  ].join('-') + '.xlsx'
+}
+
+function populateBeerSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+) {
+  const mapping = getBeerTemplateMapping(workbookPackage)
+  const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
+  const sheetDoc = parseXml(sheetXml)
+  const beerRows = buildWorkbookBeerRows(
+    items,
+    happyHourEnabled,
+    draftSlotMappings,
+    optionalBeerCategories,
+  )
+  const writtenRowCount = writeBeerRowsToSheet(
+    sheetDoc,
+    mapping,
+    beerRows,
+    draftSlotMappings,
+    optionalBeerCategories,
+  )
+
+  writeDraftSizeHeaders(sheetDoc, mapping, draftSlotMappings)
+  updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
+  workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
+}
+
+function buildWorkbookBeerRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+) {
+  const merged = new Map<string, BeerTabPreviewRow>()
+
+  buildBeerTabPreviewRows(items, happyHourEnabled)
+    .filter(
+      (row) =>
+        hasAnyBeerPrice(row, draftSlotMappings, optionalBeerCategories) &&
+        !isOmittedWorkbookBeer(row.beerName),
+    )
+    .forEach((row) => {
+      const key = workbookBeerKey(row.beerName)
+      const existing = merged.get(key)
+
+      if (!existing) {
+        merged.set(key, {
+          ...row,
+          beerName: titleWorkbookBeerName(row.beerName),
+          draftBySizeOz: { ...row.draftBySizeOz },
+          optionalBySlot: { ...row.optionalBySlot },
+          reviewNotes: [...row.reviewNotes],
+        })
+        return
+      }
+
+      mergeWorkbookBeerRow(existing, row)
+    })
+
+  return [...merged.values()].sort((left, right) => left.beerName.localeCompare(right.beerName))
+}
+
+function mergeWorkbookBeerRow(target: BeerTabPreviewRow, source: BeerTabPreviewRow) {
+  Object.entries(source.draftBySizeOz).forEach(([sizeOz, price]) => {
+    target.draftBySizeOz[sizeOz] = price
+  })
+  if (source.canPrice !== null) target.canPrice = source.canPrice
+  if (source.canHappyHour !== null) target.canHappyHour = source.canHappyHour
+  if (source.can24ozPrice !== null) target.can24ozPrice = source.can24ozPrice
+  if (source.can24ozHappyHour !== null) target.can24ozHappyHour = source.can24ozHappyHour
+  Object.entries(source.optionalBySlot).forEach(([slot, price]) => {
+    target.optionalBySlot[slot] = price
+  })
+  if (source.bottlePrice !== null) target.bottlePrice = source.bottlePrice
+  if (source.bottleHappyHour !== null) target.bottleHappyHour = source.bottleHappyHour
+  target.reviewNotes.push(...source.reviewNotes)
+}
+
+function isOmittedWorkbookBeer(beerName: string) {
+  const key = normalizeWorkbookBeerName(beerName)
+  const compactKey = workbookBeerKey(beerName)
+  return OMIT_WORKBOOK_BEERS.has(key)
+    || OMIT_WORKBOOK_BEERS.has(compactKey)
+    || /^\$?\d+(?:\.\d{2})?$/.test(key)
+    || /^\$?\d+(?:\.\d{2})?$/.test(compactKey)
+}
+
+function normalizeWorkbookBeerName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[.’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function workbookBeerKey(value: string) {
+  return normalizeWorkbookBeerName(value)
+    .replace(/\b\d+(?:\.\d+)?\s*oz\b/gi, '')
+    .replace(/\b(draft|pint|imperial|imp|reg|regular|can|bottle|btl|tall)\b/gi, '')
+    .replace(/[.'’]/g, '')
+    .replace(/[^a-z0-9$]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function titleWorkbookBeerName(value: string) {
+  return value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .replace(/\bIpa\b/g, 'IPA')
+    .replace(/\bNa\b/g, 'NA')
+}
+
+function writeBeerRowsToSheet(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  beerRows: BeerTabPreviewRow[],
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+) {
+  const draftRows = beerRows.filter((row) =>
+    hasConfiguredDraftBeerPrice(row, draftSlotMappings),
+  )
+  const canRows = beerRows.filter((row) => row.canPrice !== null)
+  const optionalPackagedSlots = buildOptionalPackagedBeerSlotDefinitions(
+    beerRows,
+    optionalBeerCategories,
+  )
+  const bottleSlotRows = beerRows
+    .filter((row) => row.bottlePrice !== null)
+    .map((row) => ({ row, kind: 'bottle' as const }))
+  const writtenRowCount = Math.max(
+    draftRows.length,
+    canRows.length,
+    ...optionalPackagedSlots.map((definition) => definition.rows.length),
+    bottleSlotRows.length,
+  )
+  const clearToRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount + DATA_ROW_BUFFER)
+  const targetColumns = getBeerTargetColumns(mapping)
+
+  clearCells(sheetDoc, targetColumns, mapping.dataStartRow, clearToRow)
+
+  draftRows.forEach((beerRow, index) => {
+    writeDraftBeerRow(
+      sheetDoc,
+      mapping,
+      mapping.dataStartRow + index,
+      beerRow,
+      draftSlotMappings,
+    )
+  })
+
+  canRows.forEach((beerRow, index) => {
+    writeCanBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, beerRow)
+  })
+
+  optionalPackagedSlots.forEach((definition) => {
+    writeOptionalPackagedSlotRows({
+      sheetDoc,
+      mapping,
+      options: definition,
+      rows: definition.rows,
+      getName: (row) => row.beerName,
+      getPrice: definition.getPrice,
+      getHappyHour: definition.getHappyHour,
+    })
+  })
+
+  bottleSlotRows.forEach(({ row, kind }, index) => {
+    writeBottleSlotBeerRow(sheetDoc, mapping, mapping.dataStartRow + index, row, kind)
+  })
+
+  return writtenRowCount
+}
+
+function writeDraftBeerRow(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  rowNumber: number,
+  beerRow: BeerTabPreviewRow,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+) {
+  if (mapping.draftNameCol === null) return
+
+  writeCellValue(
+    sheetDoc,
+    mapping.draftNameCol,
+    rowNumber,
+    beerRow.beerName,
+    mapping.dataStartRow,
+  )
+
+  draftSlotMappings.forEach((draftMapping) => {
+    const toastSlot = findDraftSlot(mapping, draftMapping.toastSizeOz)
+    if (!toastSlot) return
+
+    const draftPrice = getDraftBeerPrice(beerRow, draftMapping.actualSizeOz)
+
+    writeCellValue(
+      sheetDoc,
+      toastSlot.priceCol,
+      rowNumber,
+      centsToDollars(draftPrice?.price ?? null),
+      mapping.dataStartRow,
+    )
+    if (toastSlot.happyHourCol) {
+      writeCellValue(
+        sheetDoc,
+        toastSlot.happyHourCol,
+        rowNumber,
+        centsToDollars(draftPrice?.happyHour ?? null),
+        mapping.dataStartRow,
+      )
+    }
+  })
+}
+
+function writeDraftSizeHeaders(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+) {
+  draftSlotMappings.forEach((draftMapping) => {
+    if (draftMapping.toastSizeOz === null) return
+
+    const toastSlot = findDraftSlot(mapping, draftMapping.toastSizeOz)
+    if (!toastSlot) return
+
+    writeCellValue(
+      sheetDoc,
+      toastSlot.priceCol,
+      mapping.headerRow,
+      `${draftMapping.actualSizeOz}oz`,
+      mapping.headerRow,
+    )
+  })
+}
+
+function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNumber: number, beerRow: BeerTabPreviewRow) {
+  const canSlot = findPackagedSlot(mapping, 'can')
+  if (!canSlot || beerRow.canPrice === null) return
+
+  writeCellValue(sheetDoc, canSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
+  if (canSlot.priceCol) writeCellValue(sheetDoc, canSlot.priceCol, rowNumber, centsToDollars(beerRow.canPrice), mapping.dataStartRow)
+  if (canSlot.happyHourCol) writeCellValue(sheetDoc, canSlot.happyHourCol, rowNumber, centsToDollars(beerRow.canHappyHour), mapping.dataStartRow)
+}
+
+function buildOptionalPackagedBeerSlotDefinitions(
+  beerRows: BeerTabPreviewRow[],
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+): OptionalPackagedBeerSlotDefinition[] {
+  const effectiveOptionalBeerCategories = getEffectiveOptionalBeerCategories(
+    beerRows,
+    optionalBeerCategories,
+  )
+
+  return DEFAULT_OPTIONAL_BEER_CATEGORIES.map((defaultOptions, slotIndex) => {
+    const configured = effectiveOptionalBeerCategories[slotIndex] ?? defaultOptions
+    const slotKey = `optional-beer-${slotIndex + 1}`
+    const draftSizeOz = parseOptionalDraftSize(configured.label)
+    const draftSizeLabel = draftSizeOz === null ? null : formatDraftSizeLabel(draftSizeOz)
+    const tallBoyCan = isTallBoyCanCategory(configured.label)
+    const description = draftSizeLabel
+      ? `${draftSizeLabel} draft`
+      : tallBoyCan
+        ? 'Tall Boy Can'
+        : configured.label.trim() || `Optional Beer Category ${slotIndex + 1}`
+    const rows = configured.enabled
+      ? beerRows.filter((row) => {
+          if (draftSizeOz !== null) {
+            return getDraftBeerPrice(row, draftSizeOz)?.price !== null &&
+              getDraftBeerPrice(row, draftSizeOz)?.price !== undefined
+          }
+
+          if (tallBoyCan) return row.can24ozPrice !== null
+
+          return row.optionalBySlot[slotKey]?.price !== null &&
+            row.optionalBySlot[slotKey]?.price !== undefined
+        })
+      : []
+
+    return {
+      enabled: configured.enabled,
+      label: configured.label,
+      slotIndex,
+      categoryHeader: draftSizeLabel ? 'Draft Beer' : description,
+      priceHeader: draftSizeLabel ? `${draftSizeLabel} import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
+import { buildBeerTabPreviewRows, getDraftBeerPrice, type BeerTabPreviewRow } from './beer-preview'
+import type { NormalizedMenuItem } from './types'
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const WORKBOOK_PATH = 'xl/workbook.xml'
+const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
+const SPREADSHEET_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+const RELATIONSHIP_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+const DATA_ROW_BUFFER = 20
+
+const OMIT_WORKBOOK_BEERS = new Set([
+  '$5', '$5 can', 'domestic', 'domestic can', 'import', 'import can', 'tall',
+  'malibu boo', 'pb & j', 'the setup', 'cc 1.00', 'cc 100', 'cc 1', 'c', 'c-',
+  'sierra pale', 'stiegl radler', 'fig. mtn. agua santa', 'fig mtn agua santa',
+  'sierra torpedo', 'blue moon', 'banquet', 'bd', 'bd lite', 'm lite', 'h life', 'tec',
+  'bavic pilsner', 'ashland seltzer', 'ashland 16', 'jameson can', 'jameson', 'draft',
+  'dba', 'weinstephan', 'stone', 'rogue', 'liquid gravity', 'fig mtn davy brown',
+  'pizza port', 'alesmith', 'maui brewing', 'voodoo ranger', 'lg dope melody',
+  'wandering don', 'weihenstephan', "killian's", 'tap it', 'weihensteph',
+  'new beer', 'tdne', 'silva',
+])
+
+export type ToastTemplateWorkbookInfo = {
+  fileName: string
+  sheetNames: string[]
+  beer?: BeerTemplateInfo
+  warnings: string[]
+}
+
+export type BeerTemplateInfo = {
+  sheetName: string
+  headerRow: number
+  draftSizes: string[]
+  packagedGroups: string[]
+  dataStartRow: number
+}
+
+type WorkbookPackage = {
+  files: Record<string, Uint8Array>
+  sharedStrings: string[]
+  workbook: Document
+  workbookRelationships: Document
+}
+
+type BeerTemplateMapping = {
+  sheetPath: string
+  sheetName: string
+  headerRow: number
+  dataStartRow: number
+  lastTemplateRow: number
+  draftNameCol: number | null
+  draftSizes: DraftSizeSlot[]
+  packagedGroups: PackagedGroupSlot[]
+  warnings: string[]
+}
+
+type DraftSizeSlot = {
+  label: string
+  sizeOz: number | null
+  priceCol: number
+  happyHourCol: number | null
+}
+
+export type ToastDraftSlotMapping = {
+  toastSizeOz: number | null
+  actualSizeOz: number
+}
+
+export type OptionalBeerCategoryOptions = {
+  enabled: boolean
+  label: string
+}
+
+type OptionalPackagedSlotOptions = {
+  enabled: boolean
+  label: string
+  slotIndex: number
+}
+
+type OptionalPackagedBeerSlotDefinition = OptionalPackagedSlotOptions & {
+  categoryHeader: string
+  priceHeader: string
+  happyHourHeader: string
+  description: string
+  rows: BeerTabPreviewRow[]
+  getPrice: (row: BeerTabPreviewRow) => number | null
+  getHappyHour: (row: BeerTabPreviewRow) => number | null
+}
+
+const DEFAULT_OPTIONAL_BEER_CATEGORIES: readonly OptionalBeerCategoryOptions[] = [
+  { enabled: false, label: 'Optional Beer Category 1' },
+  { enabled: false, label: 'Optional Beer Category 2' },
+  { enabled: false, label: 'Optional Beer Category 3' },
+  { enabled: false, label: 'Optional Beer Category 4' },
+  { enabled: false, label: 'Optional Beer Category 5' },
+]
+
+const DEFAULT_DRAFT_SLOT_MAPPINGS: ToastDraftSlotMapping[] = [
+  { toastSizeOz: 8, actualSizeOz: 8 },
+  { toastSizeOz: 16, actualSizeOz: 16 },
+  { toastSizeOz: 24, actualSizeOz: 24 },
+]
+
+type PackagedGroupSlot = {
+  label: string
+  kind: 'can' | 'bottle' | 'can24oz' | 'optional'
+  nameCol: number
+  priceCol: number | null
+  happyHourCol: number | null
+}
+
+export function inspectToastTemplateWorkbook(arrayBuffer: ArrayBuffer, fileName: string): ToastTemplateWorkbookInfo {
+  const workbookPackage = readWorkbookPackage(arrayBuffer)
+  const sheetNames = getWorkbookSheets(workbookPackage).map((sheet) => sheet.name)
+  const warnings: string[] = []
+  let beer: BeerTemplateInfo | undefined
+
+  try {
+    const mapping = getBeerTemplateMapping(workbookPackage)
+    warnings.push(...mapping.warnings)
+    beer = {
+      sheetName: mapping.sheetName,
+      headerRow: mapping.headerRow,
+      draftSizes: mapping.draftSizes.map((slot) => slot.label),
+      packagedGroups: mapping.packagedGroups.map((slot) => slot.label),
+      dataStartRow: mapping.dataStartRow,
+    }
+  } catch (error) {
+    warnings.push(error instanceof Error ? error.message : 'Unable to inspect Beer tab')
+  }
+
+  return { fileName, sheetNames, beer, warnings }
+}
+
+export function buildPopulatedToastTemplateWorkbook({
+  templateArrayBuffer,
+  items,
+  happyHourEnabled = true,
+  draftSlotMappings = DEFAULT_DRAFT_SLOT_MAPPINGS,
+  optionalBeerCategories = DEFAULT_OPTIONAL_BEER_CATEGORIES,
+}: {
+  templateArrayBuffer: ArrayBuffer
+  items: NormalizedMenuItem[]
+  happyHourEnabled?: boolean
+  draftSlotMappings?: readonly ToastDraftSlotMapping[]
+  optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
+}) {
+  const workbookPackage = readWorkbookPackage(templateArrayBuffer)
+  populateBeerSheet(
+    workbookPackage,
+    items,
+    happyHourEnabled,
+    normalizeDraftSlotMappings(draftSlotMappings),
+    optionalBeerCategories,
+  )
+  return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
+}
+
+export function validatePopulatedBeerWorkbook({
+  workbookArrayBuffer,
+  items,
+  happyHourEnabled = true,
+  draftSlotMappings = DEFAULT_DRAFT_SLOT_MAPPINGS,
+  optionalBeerCategories = DEFAULT_OPTIONAL_BEER_CATEGORIES,
+}: {
+  workbookArrayBuffer: ArrayBuffer
+  items: NormalizedMenuItem[]
+  happyHourEnabled?: boolean
+  draftSlotMappings?: readonly ToastDraftSlotMapping[]
+  optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
+}) {
+  const normalizedDraftSlotMappings = normalizeDraftSlotMappings(draftSlotMappings)
+  const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
+  const mapping = getBeerTemplateMapping(workbookPackage)
+  const sheetDoc = parseXml(getTextFile(workbookPackage.files, mapping.sheetPath))
+  const beerRows = buildWorkbookBeerRows(
+    items,
+    happyHourEnabled,
+    normalizedDraftSlotMappings,
+    optionalBeerCategories,
+  )
+  const issues: string[] = []
+
+  normalizedDraftSlotMappings.forEach((draftMapping) => {
+    if (draftMapping.toastSizeOz === null) return
+
+    const toastSlot = findDraftSlot(mapping, draftMapping.toastSizeOz)
+    if (!toastSlot) {
+      issues.push(
+        `Toast Beer tab is missing configured draft slot ${formatToastDraftSlot(draftMapping.toastSizeOz)}`,
+      )
+      return
+    }
+
+    validateCellValue(
+      issues,
+      sheetDoc,
+      workbookPackage.sharedStrings,
+      toastSlot.priceCol,
+      mapping.headerRow,
+      `${draftMapping.actualSizeOz}oz`,
+      `Toast ${formatToastDraftSlot(draftMapping.toastSizeOz)} draft header`,
+    )
+  })
+
+  const draftRows = beerRows.filter((row) => hasConfiguredDraftBeerPrice(row, normalizedDraftSlotMappings))
+  const canRows = beerRows.filter((row) => row.canPrice !== null)
+  const optionalPackagedSlots = buildOptionalPackagedBeerSlotDefinitions(
+    beerRows,
+    optionalBeerCategories,
+  )
+  const optionalBeerCategoryRows = optionalPackagedSlots.map(
+    (definition) => definition.rows.length,
+  )
   const bottleRows = [
     ...beerRows
       .filter((row) => row.can24ozPrice !== null)
@@ -729,47 +1489,1794 @@ function writeCanBeerRow(sheetDoc: Document, mapping: BeerTemplateMapping, rowNu
   if (canSlot.happyHourCol) writeCellValue(sheetDoc, canSlot.happyHourCol, rowNumber, centsToDollars(beerRow.canHappyHour), mapping.dataStartRow)
 }
 
-function buildOptionalPackagedBeerSlotDefinitions(
-  beerRows: BeerTabPreviewRow[],
+ : 'Price <T>({
+  sheetDoc,
+  mapping,
+  options,
+  rows,
+  getName,
+  getPrice,
+  getHappyHour,
+}: {
+  sheetDoc: Document
+  mapping: BeerTemplateMapping
+  options: OptionalPackagedBeerSlotDefinition
+  rows: T[]
+  getName: (row: T) => string
+  getPrice: (row: T) => number | null
+  getHappyHour: (row: T) => number | null
+}) {
+  if (!options.enabled) return
+
+  const slot = findOptionalPackagedSlot(mapping, options.slotIndex)
+  if (!slot) return
+
+  writeCellValue(
+    sheetDoc,
+    slot.nameCol,
+    mapping.headerRow,
+    options.categoryHeader,
+    mapping.headerRow,
+  )
+  if (slot.priceCol) {
+    writeCellValue(
+      sheetDoc,
+      slot.priceCol,
+      mapping.headerRow,
+      options.priceHeader,
+      mapping.headerRow,
+    )
+  }
+  if (slot.happyHourCol) {
+    writeCellValue(
+      sheetDoc,
+      slot.happyHourCol,
+      mapping.headerRow,
+      options.happyHourHeader,
+      mapping.headerRow,
+    )
+  }
+
+  setColumnsHidden(
+    sheetDoc,
+    [slot.nameCol, slot.priceCol, slot.happyHourCol]
+      .filter((column): column is number => column !== null),
+    false,
+  )
+
+  rows.forEach((row, index) => {
+    const price = getPrice(row)
+    if (price === null) return
+
+    const rowNumber = mapping.dataStartRow + index
+    writeCellValue(
+      sheetDoc,
+      slot.nameCol,
+      rowNumber,
+      getName(row),
+      mapping.dataStartRow,
+    )
+    if (slot.priceCol) {
+      writeCellValue(
+        sheetDoc,
+        slot.priceCol,
+        rowNumber,
+        centsToDollars(price),
+        mapping.dataStartRow,
+      )
+    }
+    if (slot.happyHourCol) {
+      writeCellValue(
+        sheetDoc,
+        slot.happyHourCol,
+        rowNumber,
+        centsToDollars(getHappyHour(row)),
+        mapping.dataStartRow,
+      )
+    }
+  })
+}
+
+function validateOptionalPackagedSlot<T>({
+  issues,
+  sheetDoc,
+  sharedStrings,
+  mapping,
+  options,
+  rows,
+  getName,
+  getPrice,
+  getHappyHour,
+  description,
+}: {
+  issues: string[]
+  sheetDoc: Document
+  sharedStrings: string[]
+  mapping: BeerTemplateMapping
+  options: OptionalPackagedBeerSlotDefinition
+  rows: T[]
+  getName: (row: T) => string
+  getPrice: (row: T) => number | null
+  getHappyHour: (row: T) => number | null
+  description: string
+}) {
+  if (!options.enabled) return
+
+  const slot = findOptionalPackagedSlot(mapping, options.slotIndex)
+  if (!slot) {
+    issues.push(
+      `Toast Beer tab is missing Optional Beer Category slot ${options.slotIndex + 1}`,
+    )
+    return
+  }
+
+  validateCellValue(
+    issues,
+    sheetDoc,
+    sharedStrings,
+    slot.nameCol,
+    mapping.headerRow,
+    options.categoryHeader,
+    `${description} category header`,
+  )
+  if (slot.priceCol) {
+    validateCellValue(
+      issues,
+      sheetDoc,
+      sharedStrings,
+      slot.priceCol,
+      mapping.headerRow,
+      options.priceHeader,
+      `${description} price header`,
+    )
+  }
+  if (slot.happyHourCol) {
+    validateCellValue(
+      issues,
+      sheetDoc,
+      sharedStrings,
+      slot.happyHourCol,
+      mapping.headerRow,
+      options.happyHourHeader,
+      `${description} Happy Hour header`,
+    )
+  }
+
+  rows.forEach((row, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    const name = getName(row)
+
+    validateCellValue(
+      issues,
+      sheetDoc,
+      sharedStrings,
+      slot.nameCol,
+      rowNumber,
+      name,
+      `${name} ${description} name`,
+    )
+    if (slot.priceCol) {
+      validateCellValue(
+        issues,
+        sheetDoc,
+        sharedStrings,
+        slot.priceCol,
+        rowNumber,
+        centsToDollars(getPrice(row)),
+        `${name} ${description} price`,
+      )
+    }
+    if (slot.happyHourCol) {
+      validateCellValue(
+        issues,
+        sheetDoc,
+        sharedStrings,
+        slot.happyHourCol,
+        rowNumber,
+        centsToDollars(getHappyHour(row)),
+        `${name} ${description} Happy Hour`,
+      )
+    }
+  })
+
+  validateColumnsVisible(
+    issues,
+    sheetDoc,
+    [slot.nameCol, slot.priceCol, slot.happyHourCol]
+      .filter((column): column is number => column !== null),
+    `${description} columns`,
+  )
+}
+
+function writeBottleSlotBeerRow(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  rowNumber: number,
+  beerRow: BeerTabPreviewRow,
+  kind: 'can24oz' | 'bottle',
+) {
+  const bottleSlot = findPackagedSlot(mapping, 'bottle')
+  const price = kind === 'can24oz' ? beerRow.can24ozPrice : beerRow.bottlePrice
+  const happyHour = kind === 'can24oz' ? beerRow.can24ozHappyHour : beerRow.bottleHappyHour
+  if (!bottleSlot || price === null) return
+
+  writeCellValue(sheetDoc, bottleSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
+  if (bottleSlot.priceCol) writeCellValue(sheetDoc, bottleSlot.priceCol, rowNumber, centsToDollars(price), mapping.dataStartRow)
+  if (bottleSlot.happyHourCol) writeCellValue(sheetDoc, bottleSlot.happyHourCol, rowNumber, centsToDollars(happyHour), mapping.dataStartRow)
+}
+
+function findDraftSlot(
+  mapping: BeerTemplateMapping,
+  toastSizeOz: number | null,
+) {
+  return mapping.draftSizes.find((slot) =>
+    toastSizeOz === null
+      ? slot.sizeOz === null && /^pitcher$/i.test(slot.label)
+      : slot.sizeOz === toastSizeOz,
+  ) ?? null
+}
+
+function formatToastDraftSlot(toastSizeOz: number | null) {
+  return toastSizeOz === null ? 'Pitcher' : `${toastSizeOz}oz`
+}
+
+function findPackagedSlot(mapping: BeerTemplateMapping, kind: 'can' | 'bottle') {
+  return mapping.packagedGroups.find((slot) => slot.kind === kind) ?? null
+}
+
+function findOptionalPackagedSlot(
+  mapping: BeerTemplateMapping,
+  slotIndex: number,
+) {
+  return mapping.packagedGroups
+    .filter((slot) => slot.kind === 'optional')
+    .sort((left, right) => left.nameCol - right.nameCol)[slotIndex] ?? null
+}
+
+function readWorkbookPackage(arrayBuffer: ArrayBuffer): WorkbookPackage {
+  const files = unzipSync(new Uint8Array(arrayBuffer.slice(0)))
+  const workbookXml = getTextFile(files, WORKBOOK_PATH)
+  const workbookRelationshipsXml = getTextFile(files, WORKBOOK_RELS_PATH)
+
+  return {
+    files,
+    sharedStrings: getSharedStrings(files),
+    workbook: parseXml(workbookXml),
+    workbookRelationships: parseXml(workbookRelationshipsXml),
+  }
+}
+
+function getBeerTemplateMapping(workbookPackage: WorkbookPackage): BeerTemplateMapping {
+  const beerSheet = getWorkbookSheets(workbookPackage).find((sheet) => sheet.name.toLowerCase() === 'beer')
+  if (!beerSheet) throw new Error('Toast template is missing a Beer tab')
+
+  const sheetDoc = parseXml(getTextFile(workbookPackage.files, beerSheet.path))
+  const headerRow = findBeerHeaderRow(sheetDoc, workbookPackage.sharedStrings)
+  if (!headerRow) throw new Error('Beer tab is missing the expected Toast header row')
+
+  const rowValues = getRowValues(sheetDoc, headerRow, workbookPackage.sharedStrings)
+  const lastTemplateRow = getLastWorksheetRow(sheetDoc)
+  const draftNameCol = findColumn(rowValues, /^draft\s+beer$/i)
+  const canColumn = findColumn(rowValues, /^can$/i)
+  const firstPackagedCol = getFirstPackagedColumn(rowValues)
+  const draftSizes = getDraftSizeSlots(rowValues, draftNameCol, firstPackagedCol)
+  const packagedGroups = getPackagedGroupSlots(rowValues)
+  const warnings: string[] = []
+
+  if (draftNameCol === null) warnings.push('Beer tab has no Draft Beer column')
+  if (draftSizes.length === 0) warnings.push('Beer tab has no draft size columns')
+  if (canColumn === null) warnings.push('Beer tab has no Can column')
+  if (!packagedGroups.some((slot) => slot.kind === 'bottle')) {
+    warnings.push('Beer tab has no Bottle column; bottle items cannot be written to the Toast template')
+  }
+
+  return {
+    sheetPath: beerSheet.path,
+    sheetName: beerSheet.name,
+    headerRow,
+    dataStartRow: headerRow + 1,
+    lastTemplateRow,
+    draftNameCol,
+    draftSizes,
+    packagedGroups,
+    warnings,
+  }
+}
+
+function getWorkbookSheets(workbookPackage: WorkbookPackage) {
+  const relationshipById = new Map<string, string>()
+  Array.from(workbookPackage.workbookRelationships.getElementsByTagName('Relationship')).forEach((relationship) => {
+    const id = relationship.getAttribute('Id')
+    const target = relationship.getAttribute('Target')
+    if (id && target) relationshipById.set(id, resolveXlsxPath(WORKBOOK_PATH, target))
+  })
+
+  return Array.from(workbookPackage.workbook.getElementsByTagName('sheet')).flatMap((sheet) => {
+    const name = sheet.getAttribute('name')
+    const relationshipId = sheet.getAttributeNS(RELATIONSHIP_NS, 'id') ?? sheet.getAttribute('r:id')
+    const path = relationshipId ? relationshipById.get(relationshipId) : null
+
+    return name && path ? [{ name, path }] : []
+  })
+}
+
+function findBeerHeaderRow(sheetDoc: Document, sharedStrings: string[]) {
+  for (let rowNumber = 1; rowNumber <= 40; rowNumber += 1) {
+    const rowValues = getRowValues(sheetDoc, rowNumber, sharedStrings)
+    const values = rowValues.map((cell) => cell.value.toLowerCase())
+
+    if (values.includes('draft beer') && values.includes('can')) return rowNumber
+  }
+
+  return null
+}
+
+function getRowValues(sheetDoc: Document, rowNumber: number, sharedStrings: string[]) {
+  const row = findRow(sheetDoc, rowNumber)
+  if (!row) return []
+
+  return Array.from(row.getElementsByTagName('c')).map((cell) => ({
+    col: columnLettersToNumber(getCellReferenceColumn(cell.getAttribute('r') ?? '')),
+    value: getCellDisplayValue(cell, sharedStrings),
+  })).filter((cell) => cell.col > 0)
+}
+
+function getDraftSizeSlots(rowValues: { col: number, value: string }[], draftNameCol: number | null, firstPackagedCol: number | null): DraftSizeSlot[] {
+  if (draftNameCol === null) return []
+
+  const upperBound = firstPackagedCol ?? Number.POSITIVE_INFINITY
+  const slots: DraftSizeSlot[] = []
+
+  rowValues
+    .filter((cell) => cell.col > draftNameCol && cell.col < upperBound)
+    .forEach((cell) => {
+      if (/happy\s*hour/i.test(cell.value)) return
+
+      const sizeMatch = cell.value.match(/(\d+)\s*oz/i)
+      const isPitcher = /^pitcher$/i.test(cell.value)
+      if (!sizeMatch && !isPitcher) return
+
+      const happyHourCol = rowValues.find((candidate) => (
+        candidate.col > cell.col
+        && candidate.col < upperBound
+        && candidate.col <= cell.col + 1
+        && /happy\s*hour/i.test(candidate.value)
+      ))?.col ?? null
+
+      slots.push({
+        label: cell.value,
+        sizeOz: getToastDraftSlotSizeOz(cell.col, cell.value),
+        priceCol: cell.col,
+        happyHourCol,
+      })
+    })
+
+  return slots
+}
+
+function getToastDraftSlotSizeOz(column: number, label: string) {
+  if (column === 2) return 8
+  if (column === 4) return 16
+  if (column === 6) return 24
+  if (/^pitcher$/i.test(label)) return null
+
+  const sizeMatch = label.match(/(\d+)\s*oz/i)
+  return sizeMatch ? Number(sizeMatch[1]) : null
+}
+
+function getPackagedGroupSlots(rowValues: { col: number, value: string }[]): PackagedGroupSlot[] {
+  return rowValues.flatMap((cell) => {
+    const label = cell.value.trim()
+    if (!label) return []
+    if (/^(price\s*\$?|happy\s*hour\s*\$?|\d+\s*oz\s*\$?|\d+\s*oz|pitcher)$/i.test(label)) return []
+
+    const kind = getPackagedKind(label) ?? getRenamedOptionalPackagedKind(rowValues, cell)
+    if (!kind) return []
+
+    if (kind === 'can') return getCanGroupSlots(rowValues, cell)
+
+    const nextCells = rowValues.filter((candidate) => candidate.col > cell.col && candidate.col <= cell.col + 3)
+    const priceCol = nextCells.find((candidate) => isPriceHeader(candidate.value))?.col ?? cell.col + 1
+    const happyHourCol = nextCells.find((candidate) => /happy\s*hour/i.test(candidate.value))?.col ?? null
+
+    return [{ label, kind, nameCol: cell.col, priceCol, happyHourCol }]
+  })
+}
+
+function getCanGroupSlots(rowValues: { col: number, value: string }[], canCell: { col: number, value: string }): PackagedGroupSlot[] {
+  const nextPackagedHeader = rowValues
+    .filter((candidate) => candidate.col > canCell.col && getPackagedKind(candidate.value) !== null)
+    .map((candidate) => candidate.col)
+    .sort((left, right) => left - right)[0] ?? Number.POSITIVE_INFINITY
+  const canGroupCells = rowValues.filter((candidate) => candidate.col > canCell.col && candidate.col < nextPackagedHeader)
+  const regularPriceCell = canGroupCells.find((candidate) => (
+    !/happy\s*hour/i.test(candidate.value)
+    && !/^24\s*oz(?:\s*can)?$/i.test(candidate.value)
+  ))
+  const regularPriceCol = regularPriceCell?.col ?? canCell.col + 1
+  const regularHappyHourCol = canGroupCells.find((candidate) => (
+    candidate.col > regularPriceCol
+    && candidate.col <= regularPriceCol + 1
+    && /happy\s*hour/i.test(candidate.value)
+  ))?.col ?? null
+  const can24ozCell = canGroupCells.find((candidate) => /^24\s*oz(?:\s*can)?$/i.test(candidate.value))
+  const can24ozHappyHourCol = can24ozCell
+    ? canGroupCells.find((candidate) => (
+      candidate.col > can24ozCell.col
+      && candidate.col <= can24ozCell.col + 1
+      && /happy\s*hour/i.test(candidate.value)
+    ))?.col ?? null
+    : null
+  const slots: PackagedGroupSlot[] = [{
+    label: regularPriceCell?.value ? `${canCell.value} ${regularPriceCell.value}` : canCell.value,
+    kind: 'can',
+    nameCol: canCell.col,
+    priceCol: regularPriceCol,
+    happyHourCol: regularHappyHourCol,
+  }]
+
+  if (can24ozCell) {
+    slots.push({
+      label: can24ozCell.value,
+      kind: 'can24oz',
+      nameCol: canCell.col,
+      priceCol: can24ozCell.col,
+      happyHourCol: can24ozHappyHourCol,
+    })
+  }
+
+  return slots
+}
+
+function getRenamedOptionalPackagedKind(
+  rowValues: { col: number, value: string }[],
+  cell: { col: number, value: string },
+): PackagedGroupSlot['kind'] | null {
+  const hasEarlierPackagedSlot = rowValues.some((candidate) =>
+    candidate.col < cell.col && getPackagedKind(candidate.value) !== null,
+  )
+  if (!hasEarlierPackagedSlot) return null
+
+  const nextCells = rowValues.filter((candidate) =>
+    candidate.col > cell.col && candidate.col <= cell.col + 3,
+  )
+  const hasPriceCol = nextCells.some((candidate) => isPriceHeader(candidate.value))
+  const hasHappyHourCol = nextCells.some((candidate) => /happy\s*hour/i.test(candidate.value))
+
+  return hasPriceCol || hasHappyHourCol ? 'optional' : null
+}
+
+function getPackagedKind(label: string): PackagedGroupSlot['kind'] | null {
+  if (/24\s*oz.*can/i.test(label)) return 'can24oz'
+  if (/^can$/i.test(label)) return 'can'
+  if (/bottle/i.test(label)) return 'bottle'
+  if (/optional/i.test(label)) return 'optional'
+  return null
+}
+
+function getFirstPackagedColumn(rowValues: { col: number, value: string }[]) {
+  return rowValues
+    .filter((cell) => getPackagedKind(cell.value) !== null)
+    .map((cell) => cell.col)
+    .sort((left, right) => left - right)[0] ?? null
+}
+
+function getBeerTargetColumns(mapping: BeerTemplateMapping) {
+  const columns = new Set<number>()
+  if (mapping.draftNameCol !== null) columns.add(mapping.draftNameCol)
+  mapping.draftSizes.forEach((slot) => {
+    columns.add(slot.priceCol)
+    if (slot.happyHourCol) columns.add(slot.happyHourCol)
+  })
+  mapping.packagedGroups.forEach((slot) => {
+    columns.add(slot.nameCol)
+    if (slot.priceCol) columns.add(slot.priceCol)
+    if (slot.happyHourCol) columns.add(slot.happyHourCol)
+  })
+  return [...columns]
+}
+
+function setColumnsHidden(
+  sheetDoc: Document,
+  columns: number[],
+  hidden: boolean,
+) {
+  const columnSet = new Set(columns)
+
+  Array.from(sheetDoc.getElementsByTagName('col')).forEach((columnNode) => {
+    const min = Number(columnNode.getAttribute('min'))
+    const max = Number(columnNode.getAttribute('max'))
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return
+
+    const intersects = [...columnSet].some(
+      (column) => column >= min && column <= max,
+    )
+    if (!intersects) return
+
+    if (min !== max) {
+      throw new Error(
+        `Unable to change Toast column visibility for grouped column range ${min}-${max}`,
+      )
+    }
+
+    if (hidden) columnNode.setAttribute('hidden', '1')
+    else columnNode.removeAttribute('hidden')
+  })
+}
+
+function validateColumnsVisible(
+  issues: string[],
+  sheetDoc: Document,
+  columns: number[],
+  label: string,
+) {
+  columns.forEach((column) => {
+    const columnNode = Array.from(sheetDoc.getElementsByTagName('col')).find((node) => {
+      const min = Number(node.getAttribute('min'))
+      const max = Number(node.getAttribute('max'))
+      return column >= min && column <= max
+    })
+
+    if (columnNode?.getAttribute('hidden') === '1') {
+      issues.push(`${label}: column ${numberToColumnLetters(column)} is still hidden`)
+    }
+  })
+}
+
+function clearCells(sheetDoc: Document, columns: number[], fromRow: number, toRow: number) {
+  for (let rowNumber = fromRow; rowNumber <= toRow; rowNumber += 1) {
+    columns.forEach((column) => clearCellValue(sheetDoc, column, rowNumber))
+  }
+}
+
+function writeCellValue(sheetDoc: Document, column: number, rowNumber: number, value: string | number | null, templateRow: number) {
+  if (value === null || value === '') return
+
+  const cell = getOrCreateCell(sheetDoc, column, rowNumber, templateRow)
+  setCellValue(sheetDoc, cell, value)
+}
+
+function setCellValue(sheetDoc: Document, cell: Element, value: string | number) {
+  removeChildren(cell, ['v', 'is'])
+
+  if (typeof value === 'number') {
+    cell.removeAttribute('t')
+    const valueNode = sheetDoc.createElementNS(SPREADSHEET_NS, 'v')
+    valueNode.textContent = formatNumberForCell(value)
+    cell.appendChild(valueNode)
+    return
+  }
+
+  cell.setAttribute('t', 'inlineStr')
+  const inlineString = sheetDoc.createElementNS(SPREADSHEET_NS, 'is')
+  const text = sheetDoc.createElementNS(SPREADSHEET_NS, 't')
+  text.textContent = value
+  inlineString.appendChild(text)
+  cell.appendChild(inlineString)
+}
+
+function clearCellValue(sheetDoc: Document, column: number, rowNumber: number) {
+  const cell = findCell(sheetDoc, column, rowNumber)
+  if (!cell) return
+
+  cell.removeAttribute('t')
+  removeChildren(cell, ['v', 'is'])
+}
+
+function getOrCreateCell(sheetDoc: Document, column: number, rowNumber: number, templateRow: number) {
+  const row = getOrCreateRow(sheetDoc, rowNumber)
+  const reference = `${numberToColumnLetters(column)}${rowNumber}`
+  const existing = findCellInRow(row, reference)
+  if (existing) return existing
+
+  const cell = sheetDoc.createElementNS(SPREADSHEET_NS, 'c')
+  cell.setAttribute('r', reference)
+
+  const templateCell = findCell(sheetDoc, column, templateRow)
+  const styleId = templateCell?.getAttribute('s')
+  if (styleId) cell.setAttribute('s', styleId)
+
+  insertCellSorted(row, cell, column)
+  return cell
+}
+
+function getOrCreateRow(sheetDoc: Document, rowNumber: number) {
+  const existing = findRow(sheetDoc, rowNumber)
+  if (existing) return existing
+
+  const sheetData = sheetDoc.getElementsByTagName('sheetData')[0]
+  const row = sheetDoc.createElementNS(SPREADSHEET_NS, 'row')
+  row.setAttribute('r', String(rowNumber))
+
+  const rows = Array.from(sheetData.getElementsByTagName('row'))
+  const nextRow = rows.find((candidate) => Number(candidate.getAttribute('r')) > rowNumber)
+  sheetData.insertBefore(row, nextRow ?? null)
+  return row
+}
+
+function insertCellSorted(row: Element, cell: Element, column?: number) {
+  const targetColumn = column ?? columnLettersToNumber(getCellReferenceColumn(cell.getAttribute('r') ?? ''))
+  const cells = Array.from(row.getElementsByTagName('c'))
+  const nextCell = cells.find((candidate) => columnLettersToNumber(getCellReferenceColumn(candidate.getAttribute('r') ?? '')) > targetColumn)
+  row.insertBefore(cell, nextCell ?? null)
+}
+
+function findRow(sheetDoc: Document, rowNumber: number) {
+  return Array.from(sheetDoc.getElementsByTagName('row')).find((row) => Number(row.getAttribute('r')) === rowNumber) ?? null
+}
+
+function findCell(sheetDoc: Document, column: number, rowNumber: number) {
+  const row = findRow(sheetDoc, rowNumber)
+  if (!row) return null
+
+  return findCellInRow(row, `${numberToColumnLetters(column)}${rowNumber}`)
+}
+
+function findCellInRow(row: Element, reference: string) {
+  return Array.from(row.getElementsByTagName('c')).find((cell) => cell.getAttribute('r') === reference) ?? null
+}
+
+function removeChildren(element: Element, tagNames: string[]) {
+  tagNames.forEach((tagName) => {
+    Array.from(element.getElementsByTagName(tagName)).forEach((child) => {
+      if (child.parentNode === element) element.removeChild(child)
+    })
+  })
+}
+
+function updateWorksheetDimension(sheetDoc: Document, mapping: BeerTemplateMapping, writtenRowCount: number) {
+  const dimension = sheetDoc.getElementsByTagName('dimension')[0]
+  if (!dimension) return
+
+  const endRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount - 1)
+  const maxColumn = Math.max(
+    1,
+    ...Array.from(sheetDoc.getElementsByTagName('c')).map((cell) => (
+      columnLettersToNumber(getCellReferenceColumn(cell.getAttribute('r') ?? ''))
+    )),
+  )
+
+  dimension.setAttribute('ref', `A1:${numberToColumnLetters(maxColumn)}${endRow}`)
+}
+
+function getLastWorksheetRow(sheetDoc: Document) {
+  return Math.max(
+    1,
+    ...Array.from(sheetDoc.getElementsByTagName('row')).map((row) => Number(row.getAttribute('r')) || 1),
+  )
+}
+
+function getCellDisplayValue(cell: Element, sharedStrings: string[]) {
+  const type = cell.getAttribute('t')
+  if (type === 'inlineStr') return cell.getElementsByTagName('t')[0]?.textContent?.trim() ?? ''
+
+  const value = cell.getElementsByTagName('v')[0]?.textContent ?? ''
+  if (type === 's') return sharedStrings[Number(value)]?.trim() ?? ''
+
+  return value.trim()
+}
+
+function getSharedStrings(files: Record<string, Uint8Array>) {
+  const sharedStringsFile = files['xl/sharedStrings.xml']
+  if (!sharedStringsFile) return []
+
+  const sharedStringsDoc = parseXml(strFromU8(sharedStringsFile))
+  return Array.from(sharedStringsDoc.getElementsByTagName('si')).map((sharedString) => (
+    Array.from(sharedString.getElementsByTagName('t')).map((node) => node.textContent ?? '').join('')
+  ))
+}
+
+function getTextFile(files: Record<string, Uint8Array>, path: string) {
+  const file = files[path]
+  if (!file) throw new Error(`Workbook is missing ${path}`)
+  return strFromU8(file)
+}
+
+function parseXml(xml: string) {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml')
+  const parseError = doc.getElementsByTagName('parsererror')[0]
+  if (parseError) throw new Error(parseError.textContent ?? 'Unable to parse workbook XML')
+  return doc
+}
+
+function serializeXml(doc: Document) {
+  return new XMLSerializer().serializeToString(doc)
+}
+
+function resolveXlsxPath(basePath: string, target: string) {
+  if (target.startsWith('/')) return target.slice(1)
+
+  const baseParts = basePath.split('/')
+  baseParts.pop()
+  const parts = `${baseParts.join('/')}/${target}`.split('/')
+  const resolved: string[] = []
+
+  parts.forEach((part) => {
+    if (!part || part === '.') return
+    if (part === '..') resolved.pop()
+    else resolved.push(part)
+  })
+
+  return resolved.join('/')
+}
+
+function findColumn(rowValues: { col: number, value: string }[], matcher: RegExp) {
+  return rowValues.find((cell) => matcher.test(cell.value))?.col ?? null
+}
+
+function getCellReferenceColumn(reference: string) {
+  return reference.match(/^[A-Z]+/i)?.[0] ?? ''
+}
+
+function columnLettersToNumber(letters: string) {
+  return letters.toUpperCase().split('').reduce((total, char) => total * 26 + char.charCodeAt(0) - 64, 0)
+}
+
+function numberToColumnLetters(input: number) {
+  let number = input
+  let output = ''
+
+  while (number > 0) {
+    const remainder = (number - 1) % 26
+    output = String.fromCharCode(65 + remainder) + output
+    number = Math.floor((number - 1) / 26)
+  }
+
+  return output
+}
+
+function validateCellValue(
+  issues: string[],
+  sheetDoc: Document,
+  sharedStrings: string[],
+  column: number,
+  rowNumber: number,
+  expected: string | number | null,
+  label: string,
+) {
+  const cell = findCell(sheetDoc, column, rowNumber)
+  const actual = cell ? getCellDisplayValue(cell, sharedStrings) : ''
+  const expectedText =
+    expected === null || expected === ''
+      ? ''
+      : typeof expected === 'number'
+        ? formatNumberForCell(expected)
+        : String(expected)
+
+  if (actual !== expectedText) {
+    issues.push(
+      `${label}: expected "${expectedText || 'blank'}" but found "${actual || 'blank'}"`,
+    )
+  }
+}
+
+function hasAnyBeerPrice(
+  row: BeerTabPreviewRow,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
   optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
-): OptionalPackagedBeerSlotDefinition[] {
-  return DEFAULT_OPTIONAL_BEER_CATEGORIES.map((defaultOptions, slotIndex) => {
-    const configured = optionalBeerCategories[slotIndex] ?? defaultOptions
-    const slotKey = `optional-beer-${slotIndex + 1}`
-    const draftSizeOz = parseOptionalDraftSize(configured.label)
-    const draftSizeLabel = draftSizeOz === null ? null : formatDraftSizeLabel(draftSizeOz)
-    const description = draftSizeLabel
-      ? `${draftSizeLabel} draft`
-      : configured.label.trim() || `Optional Beer Category ${slotIndex + 1}`
-    const rows = configured.enabled
-      ? beerRows.filter((row) => {
-          if (draftSizeOz !== null) {
-            return getDraftBeerPrice(row, draftSizeOz)?.price !== null &&
-              getDraftBeerPrice(row, draftSizeOz)?.price !== undefined
-          }
+) {
+  return (
+    hasConfiguredDraftBeerPrice(row, draftSlotMappings) ||
+    hasCustomDraftBeerPrice(row) ||
+    hasOptionalBeerCategoryPrice(row, optionalBeerCategories) ||
+    [row.canPrice, row.can24ozPrice, row.bottlePrice].some(
+      (value) => value !== null,
+    ) ||
+    Object.values(row.optionalBySlot).some(
+      (value) => value.price !== null,
+    )
+  )
+}
 
-          return row.optionalBySlot[slotKey]?.price !== null &&
-            row.optionalBySlot[slotKey]?.price !== undefined
-        })
-      : []
+function hasConfiguredDraftBeerPrice(
+  row: BeerTabPreviewRow,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+) {
+  return draftSlotMappings.some(
+    (mapping) => getDraftBeerPrice(row, mapping.actualSizeOz)?.price !== null &&
+      getDraftBeerPrice(row, mapping.actualSizeOz)?.price !== undefined,
+  )
+}
 
+function hasCustomDraftBeerPrice(row: BeerTabPreviewRow) {
+  return Object.entries(row.draftBySizeOz).some(([sizeOz, price]) => {
+    const parsedSizeOz = Number(sizeOz)
+    return isCustomDraftSize(parsedSizeOz) &&
+      price.price !== null &&
+      price.price !== undefined
+  })
+}
+
+function getEffectiveOptionalBeerCategories(
+  beerRows: readonly BeerTabPreviewRow[],
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+): OptionalBeerCategoryOptions[] {
+  const configuredCategories = DEFAULT_OPTIONAL_BEER_CATEGORIES.map(
+    (defaultOptions, index) => optionalBeerCategories[index] ?? defaultOptions,
+  )
+  const assignedDraftSizes = new Set(
+    configuredCategories.flatMap((category) => {
+      const draftSizeOz = parseOptionalDraftSize(category.label)
+      return draftSizeOz === null ? [] : [draftSizeOz]
+    }),
+  )
+  const customDraftSizes = getCustomDraftSizes(beerRows)
+    .filter((sizeOz) => !assignedDraftSizes.has(sizeOz))
+    .sort((left, right) => left - right)
+  let shouldAutoAddTallBoyCan =
+    beerRows.some((row) => row.can24ozPrice !== null) &&
+    !configuredCategories.some((category) => isTallBoyCanCategory(category.label))
+  let nextCustomDraftSizeIndex = 0
+
+  return configuredCategories.map((category, index) => {
+    const hasConfiguredDraftSize = parseOptionalDraftSize(category.label) !== null
+    const hasTallBoyCanLabel = isTallBoyCanCategory(category.label)
+    const hasCustomLabel = !isDefaultOptionalBeerCategoryLabel(category.label, index)
+
+    if (category.enabled || hasConfiguredDraftSize || hasTallBoyCanLabel || hasCustomLabel) {
+      return category
+    }
+
+    if (shouldAutoAddTallBoyCan) {
+      shouldAutoAddTallBoyCan = false
+      return {
+        enabled: true,
+        label: 'Tall Boy Can',
+      }
+    }
+
+    const customDraftSize = customDraftSizes[nextCustomDraftSizeIndex]
+    if (customDraftSize === undefined) return category
+
+    nextCustomDraftSizeIndex += 1
     return {
-      enabled: configured.enabled,
-      label: configured.label,
-      slotIndex,
-      categoryHeader: draftSizeLabel ? 'Draft Beer' : description,
-      priceHeader: draftSizeLabel ? `${draftSizeLabel} $` : 'Price $',
-      happyHourHeader: 'Happy Hour $',
+      enabled: true,
+      label: formatDraftSizeLabel(customDraftSize),
+    }
+  })
+}
+
+function getCustomDraftSizes(beerRows: readonly BeerTabPreviewRow[]) {
+  const sizes = new Set<number>()
+
+  beerRows.forEach((row) => {
+    Object.keys(row.draftBySizeOz).forEach((sizeOz) => {
+      const parsedSizeOz = Number(sizeOz)
+      if (isCustomDraftSize(parsedSizeOz)) sizes.add(parsedSizeOz)
+    })
+  })
+
+  return [...sizes]
+}
+
+function isCustomDraftSize(sizeOz: number) {
+  return Number.isFinite(sizeOz) && ![8, 16, 24].includes(sizeOz)
+}
+
+function isDefaultOptionalBeerCategoryLabel(label: string, index: number) {
+  const normalized = label.trim().toLowerCase()
+  return !normalized ||
+    normalized === `optional beer category ${index + 1}`
+}
+
+function isTallBoyCanCategory(label: string) {
+  return /\btall\s*boy\s*can\b/i.test(label) ||
+    /\b2[45]\s*oz\s*can\b/i.test(label)
+}
+
+function hasOptionalBeerCategoryPrice(
+  row: BeerTabPreviewRow,
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+) {
+  return optionalBeerCategories.some((category) => {
+    if (!category.enabled) return false
+
+    if (isTallBoyCanCategory(category.label)) {
+      return row.can24ozPrice !== null
+    }
+
+    const draftSizeOz = parseOptionalDraftSize(category.label)
+    return draftSizeOz !== null &&
+      getDraftBeerPrice(row, draftSizeOz)?.price !== null &&
+      getDraftBeerPrice(row, draftSizeOz)?.price !== undefined
+  })
+}
+
+function normalizeDraftSlotMappings(
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+): ToastDraftSlotMapping[] {
+  return draftSlotMappings.flatMap((mapping) => {
+    if (mapping.toastSizeOz === null) return [mapping]
+
+    // Toast's built-in draft headers are fixed slots. Do not rename 8oz to
+    // 10oz or otherwise map unlike sizes. Custom draft sizes are written to
+    // Optional Beer Category columns instead.
+    if (mapping.toastSizeOz !== mapping.actualSizeOz) return []
+
+    return [mapping]
+  })
+}
+
+function parseOptionalDraftSize(label: string) {
+  const match = label.match(/\b(\d+(?:\.\d+)?)\s*oz\b/i) ??
+    label.match(/^\s*(\d+(?:\.\d+)?)\s*$/)
+  if (!match) return null
+
+  const parsed = Number(match[1])
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function formatDraftSizeLabel(sizeOz: number) {
+  return `${Number.isInteger(sizeOz) ? sizeOz.toString() : sizeOz.toFixed(1)}oz`
+}
+
+function isPriceHeader(value: string) {
+  return /price/i.test(value) || /\b\d+(?:\.\d+)?\s*oz\s*\$?\b/i.test(value)
+}
+
+function centsToDollars(cents: number | null) {
+  return cents === null ? null : cents / 100
+}
+
+function formatNumberForCell(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
+,
+      happyHourHeader: 'Happy Hour <T>({
+  sheetDoc,
+  mapping,
+  options,
+  rows,
+  getName,
+  getPrice,
+  getHappyHour,
+}: {
+  sheetDoc: Document
+  mapping: BeerTemplateMapping
+  options: OptionalPackagedBeerSlotDefinition
+  rows: T[]
+  getName: (row: T) => string
+  getPrice: (row: T) => number | null
+  getHappyHour: (row: T) => number | null
+}) {
+  if (!options.enabled) return
+
+  const slot = findOptionalPackagedSlot(mapping, options.slotIndex)
+  if (!slot) return
+
+  writeCellValue(
+    sheetDoc,
+    slot.nameCol,
+    mapping.headerRow,
+    options.categoryHeader,
+    mapping.headerRow,
+  )
+  if (slot.priceCol) {
+    writeCellValue(
+      sheetDoc,
+      slot.priceCol,
+      mapping.headerRow,
+      options.priceHeader,
+      mapping.headerRow,
+    )
+  }
+  if (slot.happyHourCol) {
+    writeCellValue(
+      sheetDoc,
+      slot.happyHourCol,
+      mapping.headerRow,
+      options.happyHourHeader,
+      mapping.headerRow,
+    )
+  }
+
+  setColumnsHidden(
+    sheetDoc,
+    [slot.nameCol, slot.priceCol, slot.happyHourCol]
+      .filter((column): column is number => column !== null),
+    false,
+  )
+
+  rows.forEach((row, index) => {
+    const price = getPrice(row)
+    if (price === null) return
+
+    const rowNumber = mapping.dataStartRow + index
+    writeCellValue(
+      sheetDoc,
+      slot.nameCol,
+      rowNumber,
+      getName(row),
+      mapping.dataStartRow,
+    )
+    if (slot.priceCol) {
+      writeCellValue(
+        sheetDoc,
+        slot.priceCol,
+        rowNumber,
+        centsToDollars(price),
+        mapping.dataStartRow,
+      )
+    }
+    if (slot.happyHourCol) {
+      writeCellValue(
+        sheetDoc,
+        slot.happyHourCol,
+        rowNumber,
+        centsToDollars(getHappyHour(row)),
+        mapping.dataStartRow,
+      )
+    }
+  })
+}
+
+function validateOptionalPackagedSlot<T>({
+  issues,
+  sheetDoc,
+  sharedStrings,
+  mapping,
+  options,
+  rows,
+  getName,
+  getPrice,
+  getHappyHour,
+  description,
+}: {
+  issues: string[]
+  sheetDoc: Document
+  sharedStrings: string[]
+  mapping: BeerTemplateMapping
+  options: OptionalPackagedBeerSlotDefinition
+  rows: T[]
+  getName: (row: T) => string
+  getPrice: (row: T) => number | null
+  getHappyHour: (row: T) => number | null
+  description: string
+}) {
+  if (!options.enabled) return
+
+  const slot = findOptionalPackagedSlot(mapping, options.slotIndex)
+  if (!slot) {
+    issues.push(
+      `Toast Beer tab is missing Optional Beer Category slot ${options.slotIndex + 1}`,
+    )
+    return
+  }
+
+  validateCellValue(
+    issues,
+    sheetDoc,
+    sharedStrings,
+    slot.nameCol,
+    mapping.headerRow,
+    options.categoryHeader,
+    `${description} category header`,
+  )
+  if (slot.priceCol) {
+    validateCellValue(
+      issues,
+      sheetDoc,
+      sharedStrings,
+      slot.priceCol,
+      mapping.headerRow,
+      options.priceHeader,
+      `${description} price header`,
+    )
+  }
+  if (slot.happyHourCol) {
+    validateCellValue(
+      issues,
+      sheetDoc,
+      sharedStrings,
+      slot.happyHourCol,
+      mapping.headerRow,
+      options.happyHourHeader,
+      `${description} Happy Hour header`,
+    )
+  }
+
+  rows.forEach((row, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    const name = getName(row)
+
+    validateCellValue(
+      issues,
+      sheetDoc,
+      sharedStrings,
+      slot.nameCol,
+      rowNumber,
+      name,
+      `${name} ${description} name`,
+    )
+    if (slot.priceCol) {
+      validateCellValue(
+        issues,
+        sheetDoc,
+        sharedStrings,
+        slot.priceCol,
+        rowNumber,
+        centsToDollars(getPrice(row)),
+        `${name} ${description} price`,
+      )
+    }
+    if (slot.happyHourCol) {
+      validateCellValue(
+        issues,
+        sheetDoc,
+        sharedStrings,
+        slot.happyHourCol,
+        rowNumber,
+        centsToDollars(getHappyHour(row)),
+        `${name} ${description} Happy Hour`,
+      )
+    }
+  })
+
+  validateColumnsVisible(
+    issues,
+    sheetDoc,
+    [slot.nameCol, slot.priceCol, slot.happyHourCol]
+      .filter((column): column is number => column !== null),
+    `${description} columns`,
+  )
+}
+
+function writeBottleSlotBeerRow(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  rowNumber: number,
+  beerRow: BeerTabPreviewRow,
+  kind: 'can24oz' | 'bottle',
+) {
+  const bottleSlot = findPackagedSlot(mapping, 'bottle')
+  const price = kind === 'can24oz' ? beerRow.can24ozPrice : beerRow.bottlePrice
+  const happyHour = kind === 'can24oz' ? beerRow.can24ozHappyHour : beerRow.bottleHappyHour
+  if (!bottleSlot || price === null) return
+
+  writeCellValue(sheetDoc, bottleSlot.nameCol, rowNumber, beerRow.beerName, mapping.dataStartRow)
+  if (bottleSlot.priceCol) writeCellValue(sheetDoc, bottleSlot.priceCol, rowNumber, centsToDollars(price), mapping.dataStartRow)
+  if (bottleSlot.happyHourCol) writeCellValue(sheetDoc, bottleSlot.happyHourCol, rowNumber, centsToDollars(happyHour), mapping.dataStartRow)
+}
+
+function findDraftSlot(
+  mapping: BeerTemplateMapping,
+  toastSizeOz: number | null,
+) {
+  return mapping.draftSizes.find((slot) =>
+    toastSizeOz === null
+      ? slot.sizeOz === null && /^pitcher$/i.test(slot.label)
+      : slot.sizeOz === toastSizeOz,
+  ) ?? null
+}
+
+function formatToastDraftSlot(toastSizeOz: number | null) {
+  return toastSizeOz === null ? 'Pitcher' : `${toastSizeOz}oz`
+}
+
+function findPackagedSlot(mapping: BeerTemplateMapping, kind: 'can' | 'bottle') {
+  return mapping.packagedGroups.find((slot) => slot.kind === kind) ?? null
+}
+
+function findOptionalPackagedSlot(
+  mapping: BeerTemplateMapping,
+  slotIndex: number,
+) {
+  return mapping.packagedGroups
+    .filter((slot) => slot.kind === 'optional')
+    .sort((left, right) => left.nameCol - right.nameCol)[slotIndex] ?? null
+}
+
+function readWorkbookPackage(arrayBuffer: ArrayBuffer): WorkbookPackage {
+  const files = unzipSync(new Uint8Array(arrayBuffer.slice(0)))
+  const workbookXml = getTextFile(files, WORKBOOK_PATH)
+  const workbookRelationshipsXml = getTextFile(files, WORKBOOK_RELS_PATH)
+
+  return {
+    files,
+    sharedStrings: getSharedStrings(files),
+    workbook: parseXml(workbookXml),
+    workbookRelationships: parseXml(workbookRelationshipsXml),
+  }
+}
+
+function getBeerTemplateMapping(workbookPackage: WorkbookPackage): BeerTemplateMapping {
+  const beerSheet = getWorkbookSheets(workbookPackage).find((sheet) => sheet.name.toLowerCase() === 'beer')
+  if (!beerSheet) throw new Error('Toast template is missing a Beer tab')
+
+  const sheetDoc = parseXml(getTextFile(workbookPackage.files, beerSheet.path))
+  const headerRow = findBeerHeaderRow(sheetDoc, workbookPackage.sharedStrings)
+  if (!headerRow) throw new Error('Beer tab is missing the expected Toast header row')
+
+  const rowValues = getRowValues(sheetDoc, headerRow, workbookPackage.sharedStrings)
+  const lastTemplateRow = getLastWorksheetRow(sheetDoc)
+  const draftNameCol = findColumn(rowValues, /^draft\s+beer$/i)
+  const canColumn = findColumn(rowValues, /^can$/i)
+  const firstPackagedCol = getFirstPackagedColumn(rowValues)
+  const draftSizes = getDraftSizeSlots(rowValues, draftNameCol, firstPackagedCol)
+  const packagedGroups = getPackagedGroupSlots(rowValues)
+  const warnings: string[] = []
+
+  if (draftNameCol === null) warnings.push('Beer tab has no Draft Beer column')
+  if (draftSizes.length === 0) warnings.push('Beer tab has no draft size columns')
+  if (canColumn === null) warnings.push('Beer tab has no Can column')
+  if (!packagedGroups.some((slot) => slot.kind === 'bottle')) {
+    warnings.push('Beer tab has no Bottle column; bottle items cannot be written to the Toast template')
+  }
+
+  return {
+    sheetPath: beerSheet.path,
+    sheetName: beerSheet.name,
+    headerRow,
+    dataStartRow: headerRow + 1,
+    lastTemplateRow,
+    draftNameCol,
+    draftSizes,
+    packagedGroups,
+    warnings,
+  }
+}
+
+function getWorkbookSheets(workbookPackage: WorkbookPackage) {
+  const relationshipById = new Map<string, string>()
+  Array.from(workbookPackage.workbookRelationships.getElementsByTagName('Relationship')).forEach((relationship) => {
+    const id = relationship.getAttribute('Id')
+    const target = relationship.getAttribute('Target')
+    if (id && target) relationshipById.set(id, resolveXlsxPath(WORKBOOK_PATH, target))
+  })
+
+  return Array.from(workbookPackage.workbook.getElementsByTagName('sheet')).flatMap((sheet) => {
+    const name = sheet.getAttribute('name')
+    const relationshipId = sheet.getAttributeNS(RELATIONSHIP_NS, 'id') ?? sheet.getAttribute('r:id')
+    const path = relationshipId ? relationshipById.get(relationshipId) : null
+
+    return name && path ? [{ name, path }] : []
+  })
+}
+
+function findBeerHeaderRow(sheetDoc: Document, sharedStrings: string[]) {
+  for (let rowNumber = 1; rowNumber <= 40; rowNumber += 1) {
+    const rowValues = getRowValues(sheetDoc, rowNumber, sharedStrings)
+    const values = rowValues.map((cell) => cell.value.toLowerCase())
+
+    if (values.includes('draft beer') && values.includes('can')) return rowNumber
+  }
+
+  return null
+}
+
+function getRowValues(sheetDoc: Document, rowNumber: number, sharedStrings: string[]) {
+  const row = findRow(sheetDoc, rowNumber)
+  if (!row) return []
+
+  return Array.from(row.getElementsByTagName('c')).map((cell) => ({
+    col: columnLettersToNumber(getCellReferenceColumn(cell.getAttribute('r') ?? '')),
+    value: getCellDisplayValue(cell, sharedStrings),
+  })).filter((cell) => cell.col > 0)
+}
+
+function getDraftSizeSlots(rowValues: { col: number, value: string }[], draftNameCol: number | null, firstPackagedCol: number | null): DraftSizeSlot[] {
+  if (draftNameCol === null) return []
+
+  const upperBound = firstPackagedCol ?? Number.POSITIVE_INFINITY
+  const slots: DraftSizeSlot[] = []
+
+  rowValues
+    .filter((cell) => cell.col > draftNameCol && cell.col < upperBound)
+    .forEach((cell) => {
+      if (/happy\s*hour/i.test(cell.value)) return
+
+      const sizeMatch = cell.value.match(/(\d+)\s*oz/i)
+      const isPitcher = /^pitcher$/i.test(cell.value)
+      if (!sizeMatch && !isPitcher) return
+
+      const happyHourCol = rowValues.find((candidate) => (
+        candidate.col > cell.col
+        && candidate.col < upperBound
+        && candidate.col <= cell.col + 1
+        && /happy\s*hour/i.test(candidate.value)
+      ))?.col ?? null
+
+      slots.push({
+        label: cell.value,
+        sizeOz: getToastDraftSlotSizeOz(cell.col, cell.value),
+        priceCol: cell.col,
+        happyHourCol,
+      })
+    })
+
+  return slots
+}
+
+function getToastDraftSlotSizeOz(column: number, label: string) {
+  if (column === 2) return 8
+  if (column === 4) return 16
+  if (column === 6) return 24
+  if (/^pitcher$/i.test(label)) return null
+
+  const sizeMatch = label.match(/(\d+)\s*oz/i)
+  return sizeMatch ? Number(sizeMatch[1]) : null
+}
+
+function getPackagedGroupSlots(rowValues: { col: number, value: string }[]): PackagedGroupSlot[] {
+  return rowValues.flatMap((cell) => {
+    const label = cell.value.trim()
+    if (!label) return []
+    if (/^(price\s*\$?|happy\s*hour\s*\$?|\d+\s*oz\s*\$?|\d+\s*oz|pitcher)$/i.test(label)) return []
+
+    const kind = getPackagedKind(label) ?? getRenamedOptionalPackagedKind(rowValues, cell)
+    if (!kind) return []
+
+    if (kind === 'can') return getCanGroupSlots(rowValues, cell)
+
+    const nextCells = rowValues.filter((candidate) => candidate.col > cell.col && candidate.col <= cell.col + 3)
+    const priceCol = nextCells.find((candidate) => isPriceHeader(candidate.value))?.col ?? cell.col + 1
+    const happyHourCol = nextCells.find((candidate) => /happy\s*hour/i.test(candidate.value))?.col ?? null
+
+    return [{ label, kind, nameCol: cell.col, priceCol, happyHourCol }]
+  })
+}
+
+function getCanGroupSlots(rowValues: { col: number, value: string }[], canCell: { col: number, value: string }): PackagedGroupSlot[] {
+  const nextPackagedHeader = rowValues
+    .filter((candidate) => candidate.col > canCell.col && getPackagedKind(candidate.value) !== null)
+    .map((candidate) => candidate.col)
+    .sort((left, right) => left - right)[0] ?? Number.POSITIVE_INFINITY
+  const canGroupCells = rowValues.filter((candidate) => candidate.col > canCell.col && candidate.col < nextPackagedHeader)
+  const regularPriceCell = canGroupCells.find((candidate) => (
+    !/happy\s*hour/i.test(candidate.value)
+    && !/^24\s*oz(?:\s*can)?$/i.test(candidate.value)
+  ))
+  const regularPriceCol = regularPriceCell?.col ?? canCell.col + 1
+  const regularHappyHourCol = canGroupCells.find((candidate) => (
+    candidate.col > regularPriceCol
+    && candidate.col <= regularPriceCol + 1
+    && /happy\s*hour/i.test(candidate.value)
+  ))?.col ?? null
+  const can24ozCell = canGroupCells.find((candidate) => /^24\s*oz(?:\s*can)?$/i.test(candidate.value))
+  const can24ozHappyHourCol = can24ozCell
+    ? canGroupCells.find((candidate) => (
+      candidate.col > can24ozCell.col
+      && candidate.col <= can24ozCell.col + 1
+      && /happy\s*hour/i.test(candidate.value)
+    ))?.col ?? null
+    : null
+  const slots: PackagedGroupSlot[] = [{
+    label: regularPriceCell?.value ? `${canCell.value} ${regularPriceCell.value}` : canCell.value,
+    kind: 'can',
+    nameCol: canCell.col,
+    priceCol: regularPriceCol,
+    happyHourCol: regularHappyHourCol,
+  }]
+
+  if (can24ozCell) {
+    slots.push({
+      label: can24ozCell.value,
+      kind: 'can24oz',
+      nameCol: canCell.col,
+      priceCol: can24ozCell.col,
+      happyHourCol: can24ozHappyHourCol,
+    })
+  }
+
+  return slots
+}
+
+function getRenamedOptionalPackagedKind(
+  rowValues: { col: number, value: string }[],
+  cell: { col: number, value: string },
+): PackagedGroupSlot['kind'] | null {
+  const hasEarlierPackagedSlot = rowValues.some((candidate) =>
+    candidate.col < cell.col && getPackagedKind(candidate.value) !== null,
+  )
+  if (!hasEarlierPackagedSlot) return null
+
+  const nextCells = rowValues.filter((candidate) =>
+    candidate.col > cell.col && candidate.col <= cell.col + 3,
+  )
+  const hasPriceCol = nextCells.some((candidate) => isPriceHeader(candidate.value))
+  const hasHappyHourCol = nextCells.some((candidate) => /happy\s*hour/i.test(candidate.value))
+
+  return hasPriceCol || hasHappyHourCol ? 'optional' : null
+}
+
+function getPackagedKind(label: string): PackagedGroupSlot['kind'] | null {
+  if (/24\s*oz.*can/i.test(label)) return 'can24oz'
+  if (/^can$/i.test(label)) return 'can'
+  if (/bottle/i.test(label)) return 'bottle'
+  if (/optional/i.test(label)) return 'optional'
+  return null
+}
+
+function getFirstPackagedColumn(rowValues: { col: number, value: string }[]) {
+  return rowValues
+    .filter((cell) => getPackagedKind(cell.value) !== null)
+    .map((cell) => cell.col)
+    .sort((left, right) => left - right)[0] ?? null
+}
+
+function getBeerTargetColumns(mapping: BeerTemplateMapping) {
+  const columns = new Set<number>()
+  if (mapping.draftNameCol !== null) columns.add(mapping.draftNameCol)
+  mapping.draftSizes.forEach((slot) => {
+    columns.add(slot.priceCol)
+    if (slot.happyHourCol) columns.add(slot.happyHourCol)
+  })
+  mapping.packagedGroups.forEach((slot) => {
+    columns.add(slot.nameCol)
+    if (slot.priceCol) columns.add(slot.priceCol)
+    if (slot.happyHourCol) columns.add(slot.happyHourCol)
+  })
+  return [...columns]
+}
+
+function setColumnsHidden(
+  sheetDoc: Document,
+  columns: number[],
+  hidden: boolean,
+) {
+  const columnSet = new Set(columns)
+
+  Array.from(sheetDoc.getElementsByTagName('col')).forEach((columnNode) => {
+    const min = Number(columnNode.getAttribute('min'))
+    const max = Number(columnNode.getAttribute('max'))
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return
+
+    const intersects = [...columnSet].some(
+      (column) => column >= min && column <= max,
+    )
+    if (!intersects) return
+
+    if (min !== max) {
+      throw new Error(
+        `Unable to change Toast column visibility for grouped column range ${min}-${max}`,
+      )
+    }
+
+    if (hidden) columnNode.setAttribute('hidden', '1')
+    else columnNode.removeAttribute('hidden')
+  })
+}
+
+function validateColumnsVisible(
+  issues: string[],
+  sheetDoc: Document,
+  columns: number[],
+  label: string,
+) {
+  columns.forEach((column) => {
+    const columnNode = Array.from(sheetDoc.getElementsByTagName('col')).find((node) => {
+      const min = Number(node.getAttribute('min'))
+      const max = Number(node.getAttribute('max'))
+      return column >= min && column <= max
+    })
+
+    if (columnNode?.getAttribute('hidden') === '1') {
+      issues.push(`${label}: column ${numberToColumnLetters(column)} is still hidden`)
+    }
+  })
+}
+
+function clearCells(sheetDoc: Document, columns: number[], fromRow: number, toRow: number) {
+  for (let rowNumber = fromRow; rowNumber <= toRow; rowNumber += 1) {
+    columns.forEach((column) => clearCellValue(sheetDoc, column, rowNumber))
+  }
+}
+
+function writeCellValue(sheetDoc: Document, column: number, rowNumber: number, value: string | number | null, templateRow: number) {
+  if (value === null || value === '') return
+
+  const cell = getOrCreateCell(sheetDoc, column, rowNumber, templateRow)
+  setCellValue(sheetDoc, cell, value)
+}
+
+function setCellValue(sheetDoc: Document, cell: Element, value: string | number) {
+  removeChildren(cell, ['v', 'is'])
+
+  if (typeof value === 'number') {
+    cell.removeAttribute('t')
+    const valueNode = sheetDoc.createElementNS(SPREADSHEET_NS, 'v')
+    valueNode.textContent = formatNumberForCell(value)
+    cell.appendChild(valueNode)
+    return
+  }
+
+  cell.setAttribute('t', 'inlineStr')
+  const inlineString = sheetDoc.createElementNS(SPREADSHEET_NS, 'is')
+  const text = sheetDoc.createElementNS(SPREADSHEET_NS, 't')
+  text.textContent = value
+  inlineString.appendChild(text)
+  cell.appendChild(inlineString)
+}
+
+function clearCellValue(sheetDoc: Document, column: number, rowNumber: number) {
+  const cell = findCell(sheetDoc, column, rowNumber)
+  if (!cell) return
+
+  cell.removeAttribute('t')
+  removeChildren(cell, ['v', 'is'])
+}
+
+function getOrCreateCell(sheetDoc: Document, column: number, rowNumber: number, templateRow: number) {
+  const row = getOrCreateRow(sheetDoc, rowNumber)
+  const reference = `${numberToColumnLetters(column)}${rowNumber}`
+  const existing = findCellInRow(row, reference)
+  if (existing) return existing
+
+  const cell = sheetDoc.createElementNS(SPREADSHEET_NS, 'c')
+  cell.setAttribute('r', reference)
+
+  const templateCell = findCell(sheetDoc, column, templateRow)
+  const styleId = templateCell?.getAttribute('s')
+  if (styleId) cell.setAttribute('s', styleId)
+
+  insertCellSorted(row, cell, column)
+  return cell
+}
+
+function getOrCreateRow(sheetDoc: Document, rowNumber: number) {
+  const existing = findRow(sheetDoc, rowNumber)
+  if (existing) return existing
+
+  const sheetData = sheetDoc.getElementsByTagName('sheetData')[0]
+  const row = sheetDoc.createElementNS(SPREADSHEET_NS, 'row')
+  row.setAttribute('r', String(rowNumber))
+
+  const rows = Array.from(sheetData.getElementsByTagName('row'))
+  const nextRow = rows.find((candidate) => Number(candidate.getAttribute('r')) > rowNumber)
+  sheetData.insertBefore(row, nextRow ?? null)
+  return row
+}
+
+function insertCellSorted(row: Element, cell: Element, column?: number) {
+  const targetColumn = column ?? columnLettersToNumber(getCellReferenceColumn(cell.getAttribute('r') ?? ''))
+  const cells = Array.from(row.getElementsByTagName('c'))
+  const nextCell = cells.find((candidate) => columnLettersToNumber(getCellReferenceColumn(candidate.getAttribute('r') ?? '')) > targetColumn)
+  row.insertBefore(cell, nextCell ?? null)
+}
+
+function findRow(sheetDoc: Document, rowNumber: number) {
+  return Array.from(sheetDoc.getElementsByTagName('row')).find((row) => Number(row.getAttribute('r')) === rowNumber) ?? null
+}
+
+function findCell(sheetDoc: Document, column: number, rowNumber: number) {
+  const row = findRow(sheetDoc, rowNumber)
+  if (!row) return null
+
+  return findCellInRow(row, `${numberToColumnLetters(column)}${rowNumber}`)
+}
+
+function findCellInRow(row: Element, reference: string) {
+  return Array.from(row.getElementsByTagName('c')).find((cell) => cell.getAttribute('r') === reference) ?? null
+}
+
+function removeChildren(element: Element, tagNames: string[]) {
+  tagNames.forEach((tagName) => {
+    Array.from(element.getElementsByTagName(tagName)).forEach((child) => {
+      if (child.parentNode === element) element.removeChild(child)
+    })
+  })
+}
+
+function updateWorksheetDimension(sheetDoc: Document, mapping: BeerTemplateMapping, writtenRowCount: number) {
+  const dimension = sheetDoc.getElementsByTagName('dimension')[0]
+  if (!dimension) return
+
+  const endRow = Math.max(mapping.lastTemplateRow, mapping.dataStartRow + writtenRowCount - 1)
+  const maxColumn = Math.max(
+    1,
+    ...Array.from(sheetDoc.getElementsByTagName('c')).map((cell) => (
+      columnLettersToNumber(getCellReferenceColumn(cell.getAttribute('r') ?? ''))
+    )),
+  )
+
+  dimension.setAttribute('ref', `A1:${numberToColumnLetters(maxColumn)}${endRow}`)
+}
+
+function getLastWorksheetRow(sheetDoc: Document) {
+  return Math.max(
+    1,
+    ...Array.from(sheetDoc.getElementsByTagName('row')).map((row) => Number(row.getAttribute('r')) || 1),
+  )
+}
+
+function getCellDisplayValue(cell: Element, sharedStrings: string[]) {
+  const type = cell.getAttribute('t')
+  if (type === 'inlineStr') return cell.getElementsByTagName('t')[0]?.textContent?.trim() ?? ''
+
+  const value = cell.getElementsByTagName('v')[0]?.textContent ?? ''
+  if (type === 's') return sharedStrings[Number(value)]?.trim() ?? ''
+
+  return value.trim()
+}
+
+function getSharedStrings(files: Record<string, Uint8Array>) {
+  const sharedStringsFile = files['xl/sharedStrings.xml']
+  if (!sharedStringsFile) return []
+
+  const sharedStringsDoc = parseXml(strFromU8(sharedStringsFile))
+  return Array.from(sharedStringsDoc.getElementsByTagName('si')).map((sharedString) => (
+    Array.from(sharedString.getElementsByTagName('t')).map((node) => node.textContent ?? '').join('')
+  ))
+}
+
+function getTextFile(files: Record<string, Uint8Array>, path: string) {
+  const file = files[path]
+  if (!file) throw new Error(`Workbook is missing ${path}`)
+  return strFromU8(file)
+}
+
+function parseXml(xml: string) {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml')
+  const parseError = doc.getElementsByTagName('parsererror')[0]
+  if (parseError) throw new Error(parseError.textContent ?? 'Unable to parse workbook XML')
+  return doc
+}
+
+function serializeXml(doc: Document) {
+  return new XMLSerializer().serializeToString(doc)
+}
+
+function resolveXlsxPath(basePath: string, target: string) {
+  if (target.startsWith('/')) return target.slice(1)
+
+  const baseParts = basePath.split('/')
+  baseParts.pop()
+  const parts = `${baseParts.join('/')}/${target}`.split('/')
+  const resolved: string[] = []
+
+  parts.forEach((part) => {
+    if (!part || part === '.') return
+    if (part === '..') resolved.pop()
+    else resolved.push(part)
+  })
+
+  return resolved.join('/')
+}
+
+function findColumn(rowValues: { col: number, value: string }[], matcher: RegExp) {
+  return rowValues.find((cell) => matcher.test(cell.value))?.col ?? null
+}
+
+function getCellReferenceColumn(reference: string) {
+  return reference.match(/^[A-Z]+/i)?.[0] ?? ''
+}
+
+function columnLettersToNumber(letters: string) {
+  return letters.toUpperCase().split('').reduce((total, char) => total * 26 + char.charCodeAt(0) - 64, 0)
+}
+
+function numberToColumnLetters(input: number) {
+  let number = input
+  let output = ''
+
+  while (number > 0) {
+    const remainder = (number - 1) % 26
+    output = String.fromCharCode(65 + remainder) + output
+    number = Math.floor((number - 1) / 26)
+  }
+
+  return output
+}
+
+function validateCellValue(
+  issues: string[],
+  sheetDoc: Document,
+  sharedStrings: string[],
+  column: number,
+  rowNumber: number,
+  expected: string | number | null,
+  label: string,
+) {
+  const cell = findCell(sheetDoc, column, rowNumber)
+  const actual = cell ? getCellDisplayValue(cell, sharedStrings) : ''
+  const expectedText =
+    expected === null || expected === ''
+      ? ''
+      : typeof expected === 'number'
+        ? formatNumberForCell(expected)
+        : String(expected)
+
+  if (actual !== expectedText) {
+    issues.push(
+      `${label}: expected "${expectedText || 'blank'}" but found "${actual || 'blank'}"`,
+    )
+  }
+}
+
+function hasAnyBeerPrice(
+  row: BeerTabPreviewRow,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+) {
+  return (
+    hasConfiguredDraftBeerPrice(row, draftSlotMappings) ||
+    hasOptionalBeerCategoryPrice(row, optionalBeerCategories) ||
+    [row.canPrice, row.can24ozPrice, row.bottlePrice].some(
+      (value) => value !== null,
+    ) ||
+    Object.values(row.optionalBySlot).some(
+      (value) => value.price !== null,
+    )
+  )
+}
+
+function hasConfiguredDraftBeerPrice(
+  row: BeerTabPreviewRow,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+) {
+  return draftSlotMappings.some(
+    (mapping) => getDraftBeerPrice(row, mapping.actualSizeOz)?.price !== null &&
+      getDraftBeerPrice(row, mapping.actualSizeOz)?.price !== undefined,
+  )
+}
+
+function hasOptionalBeerCategoryPrice(
+  row: BeerTabPreviewRow,
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+) {
+  return optionalBeerCategories.some((category) => {
+    if (!category.enabled) return false
+    const draftSizeOz = parseOptionalDraftSize(category.label)
+    return draftSizeOz !== null &&
+      getDraftBeerPrice(row, draftSizeOz)?.price !== null &&
+      getDraftBeerPrice(row, draftSizeOz)?.price !== undefined
+  })
+}
+
+function normalizeDraftSlotMappings(
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+): ToastDraftSlotMapping[] {
+  return draftSlotMappings.flatMap((mapping) => {
+    if (mapping.toastSizeOz === null) return [mapping]
+
+    // Toast's built-in draft headers are fixed slots. Do not rename 8oz to
+    // 10oz or otherwise map unlike sizes. Custom draft sizes are written to
+    // Optional Beer Category columns instead.
+    if (mapping.toastSizeOz !== mapping.actualSizeOz) return []
+
+    return [mapping]
+  })
+}
+
+function parseOptionalDraftSize(label: string) {
+  const match = label.match(/\b(\d+(?:\.\d+)?)\s*oz\b/i) ??
+    label.match(/^\s*(\d+(?:\.\d+)?)\s*$/)
+  if (!match) return null
+
+  const parsed = Number(match[1])
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function formatDraftSizeLabel(sizeOz: number) {
+  return `${Number.isInteger(sizeOz) ? sizeOz.toString() : sizeOz.toFixed(1)}oz`
+}
+
+function isPriceHeader(value: string) {
+  return /price/i.test(value) || /\b\d+(?:\.\d+)?\s*oz\s*\$?\b/i.test(value)
+}
+
+function centsToDollars(cents: number | null) {
+  return cents === null ? null : cents / 100
+}
+
+function formatNumberForCell(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
+,
       description,
       rows,
       getPrice: (row) =>
         draftSizeOz !== null
           ? getDraftBeerPrice(row, draftSizeOz)?.price ?? null
-          : row.optionalBySlot[slotKey]?.price ?? null,
+          : tallBoyCan
+            ? row.can24ozPrice
+            : row.optionalBySlot[slotKey]?.price ?? null,
       getHappyHour: (row) =>
         draftSizeOz !== null
           ? getDraftBeerPrice(row, draftSizeOz)?.happyHour ?? null
-          : row.optionalBySlot[slotKey]?.happyHour ?? null,
+          : tallBoyCan
+            ? row.can24ozHappyHour
+            : row.optionalBySlot[slotKey]?.happyHour ?? null,
     }
   })
 }
