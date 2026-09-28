@@ -16,7 +16,15 @@ import {
 import { authClient } from '#/lib/auth-client'
 import { persistInventoryImport } from '#/lib/inventory-access'
 
-export const Route = createFileRoute('/import-review')({ component: ImportReviewPage })
+export const Route = createFileRoute('/import-review')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    workspace:
+      search.workspace === 'mappings' || search.workspace === 'history'
+        ? search.workspace
+        : undefined,
+  }),
+  component: ImportReviewPage,
+})
 
 type ReviewFilter = 'review' | 'included' | 'excluded' | 'all'
 
@@ -34,8 +42,9 @@ function ImportReviewPage() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const search = Route.useSearch()
   const [workspace, setWorkspace] = useState<'new' | 'history' | 'mappings'>(
-    canImportExport ? 'new' : 'history',
+    search.workspace ?? (canImportExport ? 'new' : 'history'),
   )
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
