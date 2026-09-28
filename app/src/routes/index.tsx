@@ -355,7 +355,15 @@ function CatalogPage() {
                 </thead>
                 <tbody>
                   {pageGroups.map((group) => {
-                    const carried = group.items.some((item) => item.organizationEnabled === true)
+                    const carried = group.items.some(
+                      (item) => item.organizationEnabled === true,
+                    )
+                    const visibleItems =
+                      availability === 'carried'
+                        ? group.items.filter(
+                            (item) => item.organizationEnabled === true,
+                          )
+                        : group.items
 
                     return (
                       <tr
@@ -375,14 +383,16 @@ function CatalogPage() {
                             <strong>{group.name}</strong>
                             <span>{group.category}</span>
                             <div className="inventory-format-list">
-                              {group.items.map((item) => (
-                                <span key={item.id}>{item.variantLabel || 'Standard'}</span>
+                              {visibleItems.map((item) => (
+                                <span key={item.id}>
+                                  {item.variantLabel || 'Standard'}
+                                </span>
                               ))}
                             </div>
                           </div>
                         </td>
-                        <td>{getPriceRange(group.items)}</td>
-                        <td>{getHappyHourRange(group.items)}</td>
+                        <td>{getPriceRange(visibleItems)}</td>
+                        <td>{getHappyHourRange(visibleItems)}</td>
                         <td>
                           <span className={carried ? 'inventory-carry-status is-on' : 'inventory-carry-status'}>
                             {carried ? 'Yes' : 'No'}
