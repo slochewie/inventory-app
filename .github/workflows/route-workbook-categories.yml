@@ -1,0 +1,124 @@
+name: Workbook category routing patch
+
+on:
+  push:
+    paths:
+      - .github/workflows/route-workbook-categories.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch source
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+
+          function replaceOnce(text, from, to) {
+            if (!text.includes(from)) {
+              throw new Error('Missing expected block:\n' + from)
+            }
+            return text.replace(from, to)
+          }
+
+          const workbookPath = 'app/src/features/menu-import/toast-template-workbook.ts'
+          let workbook = fs.readFileSync(workbookPath, 'utf8')
+
+          workbook = replaceOnce(
+            workbook,
+            "import { buildBeerTabPreviewRows, getDraftBeerPrice, type BeerTabPreviewRow } from './beer-preview'\nimport type { NormalizedMenuItem } from './types'\n",
+            "import { buildBeerTabPreviewRows, getDraftBeerPrice, type BeerTabPreviewRow } from './beer-preview'\nimport type { NormalizedMenuItem } from './types'\nimport { getToastWorkbookCategory } from './workbook-routing'\n",
+          )
+
+          workbook = replaceOnce(
+            workbook,
+`function buildWorkbookBeerRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+) {
+  const merged = new Map<string, BeerTabPreviewRow>()
+
+  buildBeerTabPreviewRows(items, happyHourEnabled)
+`,
+`function buildWorkbookBeerRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+  draftSlotMappings: readonly ToastDraftSlotMapping[],
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+) {
+  const merged = new Map<string, BeerTabPreviewRow>()
+  const beerItems = items.filter(
+    (item) => getToastWorkbookCategory(item) === 'Beer',
+  )
+
+  buildBeerTabPreviewRows(beerItems, happyHourEnabled)
+`,
+          )
+
+          fs.writeFileSync(workbookPath, workbook)
+
+          const liquorPath = 'app/src/features/menu-import/toast-template-liquor-workbook.ts'
+          let liquor = fs.readFileSync(liquorPath, 'utf8')
+
+          liquor = replaceOnce(
+            liquor,
+            "import { buildToastExportFiles } from './toast-export'\n",
+            "import { buildToastExportFiles } from './toast-export'\nimport { getToastWorkbookCategory } from './workbook-routing'\n",
+          )
+
+          liquor = replaceOnce(
+            liquor,
+`function matchesSimpleWorkbookDestination(
+  item: NormalizedMenuItem,
+  workbookCategory: 'NA Bev' | 'Retail',
+) {
+  const destination = clean(item.toastDestination)
+
+  if (workbookCategory === 'NA Bev') {
+    return /^(?:toast\\s+)?na\\s*bev(?:\\s+tab)?(?:\\b|:)/i.test(destination)
+      || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
+  }
+
+  return /^(?:toast\\s+)?retail(?:\\s+tab)?(?:\\b|:)/i.test(destination)
+    || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
+}
+`,
+`function matchesSimpleWorkbookDestination(
+  item: NormalizedMenuItem,
+  workbookCategory: 'NA Bev' | 'Retail',
+) {
+  if (getToastWorkbookCategory(item) === workbookCategory) return true
+
+  const destination = clean(item.toastDestination)
+
+  if (workbookCategory === 'NA Bev') {
+    return /^(?:toast\\s+)?na\\s*bev(?:\\s+tab)?(?:\\b|:)/i.test(destination)
+      || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)
+      || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
+  }
+
+  return /^(?:toast\\s+)?retail(?:\\s+tab)?(?:\\b|:)/i.test(destination)
+    || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)
+    || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
+}
+`,
+          )
+
+          fs.writeFileSync(liquorPath, liquor)
+          NODE
+      - name: Commit source patch
+        run: |
+          rm -f .github/workflows/route-workbook-categories.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/features/menu-import/toast-template-workbook.ts app/src/features/menu-import/toast-template-liquor-workbook.ts .github/workflows/route-workbook-categories.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "Route workbook tabs from canonical category"
+          git push
