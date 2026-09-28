@@ -157,6 +157,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
     happyHourRange2End,
     happyHourRange2Days,
   )
+  moveNotesSheetToEnd(workbookPackage)
 
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
@@ -844,6 +845,28 @@ function ensureRetailSheet(workbookPackage: WorkbookPackage) {
   )
   workbookPackage.files[CONTENT_TYPES_PATH] = strToU8(
     serializeXml(contentTypes),
+  )
+}
+
+function moveNotesSheetToEnd(workbookPackage: WorkbookPackage) {
+  const sheets = workbookPackage.workbook.getElementsByTagName('sheets')[0]
+  if (!sheets) {
+    throw new Error('Toast template is missing the workbook sheets collection')
+  }
+
+  const notesSheet = Array.from(sheets.getElementsByTagName('sheet')).find(
+    (sheet) => sheet.getAttribute('name')?.trim().toLowerCase() === 'notes',
+  )
+  if (!notesSheet) {
+    throw new Error('Toast template is missing a Notes tab')
+  }
+
+  if (notesSheet !== sheets.lastElementChild) {
+    sheets.appendChild(notesSheet)
+  }
+
+  workbookPackage.files[WORKBOOK_PATH] = strToU8(
+    serializeXml(workbookPackage.workbook),
   )
 }
 
