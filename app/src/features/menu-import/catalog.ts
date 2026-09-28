@@ -7,11 +7,17 @@ export function catalogRowToNormalizedItem(
   const variantLabel = getInventoryVariantLabel(row.variant)
 
   const categoryName = row.category?.name ?? undefined
-  const toastCategory =
-    row.organization.toastCategoryOverride ??
+  const canonicalToastCategory =
     row.category?.toastCategory ??
-    categoryName ??
+    categoryName
+  const toastCategory =
+    canonicalToastCategory ??
+    row.organization.toastCategoryOverride ??
     'Uncategorized'
+  const toastDestination =
+    canonicalToastCategory && isCanonicalLiquorCategory(canonicalToastCategory)
+      ? canonicalToastCategory
+      : row.organization.toastDestinationOverride ?? ''
 
   return {
     id: row.variant.id,
@@ -26,7 +32,7 @@ export function catalogRowToNormalizedItem(
     name: row.organization.toastNameOverride ?? row.name,
     category: categoryName,
     toastCategory,
-    toastDestination: row.organization.toastDestinationOverride ?? '',
+    toastDestination,
     toastSlot: row.organization.toastSlot,
     basePriceCents: row.effectivePriceCents,
     happyHourPriceCents: row.organization.happyHourPriceCents,
@@ -78,4 +84,27 @@ export function getInventoryVariantLabel(variant: {
   ]
     .filter(Boolean)
     .join(' ') || 'Standard'
+}
+
+
+function isCanonicalLiquorCategory(value: string) {
+  const normalized = value
+    .trim()
+    .toUpperCase()
+    .replace(/&/g, '/')
+    .replace(/\s+/g, ' ')
+
+  return (
+    normalized.includes('VODKA') ||
+    normalized.includes('GIN') ||
+    normalized.includes('RUM') ||
+    normalized.includes('TEQUILA') ||
+    normalized.includes('SCOTCH') ||
+    normalized.includes('WHISKEY') ||
+    normalized.includes('BOURBON') ||
+    normalized.includes('LIQUEUR') ||
+    normalized.includes('CORDIAL') ||
+    normalized.includes('BRANDY') ||
+    normalized.includes('COGNAC')
+  )
 }
