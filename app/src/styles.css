@@ -3180,3 +3180,56 @@ select {
   border-color: currentColor;
   box-shadow: inset 0 0 0 1px currentColor;
 }
+
+
+/* Catalog bulk controls mobile override */
+@media (max-width: 700px) {
+  .inventory-catalog-bulk-toolbar {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 0.55rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .inventory-catalog-bulk-toggle {
+    min-width: 0;
+    min-height: 2.5rem;
+    padding-inline: 0.75rem;
+  }
+
+  .inventory-catalog-bulk-help {
+    justify-self: start;
+  }
+
+  .inventory-catalog-bulk-count {
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  .inventory-catalog-bulk-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-left: 0;
+  }
+
+  .inventory-catalog-bulk-actions > button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .inventory-catalog-bulk-help-popover {
+    position: fixed;
+    z-index: 100;
+    top: auto;
+    right: 1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+    left: 1rem;
+    width: auto;
+    max-width: none;
+    max-height: min(70vh, 30rem);
+    overflow-y: auto;
+  }
+}
