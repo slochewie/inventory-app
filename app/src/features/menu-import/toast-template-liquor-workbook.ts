@@ -4,6 +4,7 @@ import { getToastWorkbookCategory } from './workbook-routing'
 import {
   buildPopulatedToastTemplateWorkbook,
   validatePopulatedBeerWorkbook,
+  type BeerBuiltInFormatVisibility,
   type OptionalBeerCategoryOptions,
   type ToastDraftSlotMapping,
 } from './toast-template-workbook'
