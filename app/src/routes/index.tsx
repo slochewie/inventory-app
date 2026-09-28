@@ -981,7 +981,7 @@ function getCustomDraftSizesFromCatalog(items: readonly NormalizedMenuItem[]) {
   const sizes = new Set<number>()
 
   items.forEach((item) => {
-    if (item.variantKind !== 'draft') return
+    if (item.organizationEnabled !== true || item.variantKind !== 'draft') return
 
     const sizeOz = item.variantSizeOz ?? parseOptionalBeerCategoryDraftSize(item.variantLabel ?? '')
     if (sizeOz !== null && ![8, 16, 24].includes(sizeOz)) {
