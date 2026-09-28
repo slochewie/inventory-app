@@ -10,11 +10,9 @@ import {
   getInventoryOrganizationConfig,
   getOptionalBeerCategories,
   listInventoryCatalog,
-  listInventorySourceMappings,
   persistInventoryImport,
   type InventoryCatalogRow,
   type InventoryOrganizationConfig,
-  type InventorySourceMapping,
 } from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import {
@@ -170,7 +168,6 @@ function ToastWorkbook() {
   const [importingReviewedItems, setImportingReviewedItems] = useState(false)
   const [importReviewedError, setImportReviewedError] = useState<string | null>(null)
   const [masterCatalog, setMasterCatalog] = useState<InventoryCatalogRow[]>([])
-  const [sourceMappings, setSourceMappings] = useState<InventorySourceMapping[]>([])
   const [reconciliationActive, setReconciliationActive] = useState(false)
   const [reconciliationDecisions, setReconciliationDecisions] = useState<
     Record<string, ReconciliationDecision>
@@ -300,12 +297,10 @@ function ToastWorkbook() {
     void Promise.all([
       listInventoryCatalog(organizationId, controller.signal),
       getInventoryOrganizationConfig(organizationId, controller.signal),
-      listInventorySourceMappings(organizationId, controller.signal),
     ])
-      .then(([catalog, config, mappings]) => {
+      .then(([catalog, config]) => {
         setOrganizationConfig(config)
         setMasterCatalog(catalog.items)
-        setSourceMappings(mappings)
 
         if (savedReviewSession?.items.length) return
 
@@ -412,16 +407,14 @@ function ToastWorkbook() {
     setCatalogLoading(true)
 
     try {
-      const [catalog, config, mappings] = await Promise.all([
+      const [catalog, config] = await Promise.all([
         listInventoryCatalog(activeOrganization.id),
         getInventoryOrganizationConfig(activeOrganization.id),
-        listInventorySourceMappings(activeOrganization.id),
       ])
       const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
 
       setOrganizationConfig(config)
       setMasterCatalog(catalog.items)
-      setSourceMappings(mappings)
       setImportFile({
         sourceKind: 'toast-template-sheet',
         sourceName: 'Persistent Inventory catalog',
@@ -594,36 +587,7 @@ function ToastWorkbook() {
   }
 
   function beginReconciliation() {
-    const reviewedItems = items.filter(
-      (item) => item.status === 'ready' && item.exportIncluded,
-    )
-
-    const mappedDecisions: Record<string, ReconciliationDecision> = {}
-
-    reviewedItems.forEach((item) => {
-      const sourceKey = item.sourceItemNumber?.trim() || item.id
-      const existingMapping = sourceMappings.find(
-        (mapping) =>
-          mapping.sourceType === 'toast-template' &&
-          mapping.sourceKey === sourceKey &&
-          mapping.inventoryItemVariantId,
-      )
-
-      if (
-        existingMapping?.inventoryItemVariantId &&
-        masterCatalog.some(
-          (candidate) =>
-            candidate.variant.id === existingMapping.inventoryItemVariantId,
-        )
-      ) {
-        mappedDecisions[item.id] = {
-          kind: 'existing',
-          variantId: existingMapping.inventoryItemVariantId,
-        }
-      }
-    })
-
-    setReconciliationDecisions(mappedDecisions)
+    setReconciliationDecisions({})
     setReconciliationActive(true)
     setSelectedReconciliationItemId(null)
     setReconciliationQuery('')
