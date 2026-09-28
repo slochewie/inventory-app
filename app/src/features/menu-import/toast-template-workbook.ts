@@ -213,14 +213,9 @@ export function validatePopulatedBeerWorkbook({
   const optionalBeerCategoryRows = optionalPackagedSlots.map(
     (definition) => definition.rows.length,
   )
-  const bottleRows = [
-    ...beerRows
-      .filter((row) => row.can24ozPrice !== null)
-      .map((row) => ({ row, kind: '24oz can' as const })),
-    ...beerRows
-      .filter((row) => row.bottlePrice !== null)
-      .map((row) => ({ row, kind: 'bottle' as const })),
-  ]
+  const bottleRows = beerRows
+    .filter((row) => row.bottlePrice !== null)
+    .map((row) => ({ row, kind: 'bottle' as const }))
 
   draftRows.forEach((row, index) => {
     const rowNumber = mapping.dataStartRow + index
@@ -605,14 +600,9 @@ function writeBeerRowsToSheet(
     beerRows,
     optionalBeerCategories,
   )
-  const bottleSlotRows = [
-    ...beerRows
-      .filter((row) => row.can24ozPrice !== null)
-      .map((row) => ({ row, kind: 'can24oz' as const })),
-    ...beerRows
-      .filter((row) => row.bottlePrice !== null)
-      .map((row) => ({ row, kind: 'bottle' as const })),
-  ]
+  const bottleSlotRows = beerRows
+    .filter((row) => row.bottlePrice !== null)
+    .map((row) => ({ row, kind: 'bottle' as const }))
   const writtenRowCount = Math.max(
     draftRows.length,
     canRows.length,
@@ -733,20 +723,30 @@ function buildOptionalPackagedBeerSlotDefinitions(
   beerRows: BeerTabPreviewRow[],
   optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
 ): OptionalPackagedBeerSlotDefinition[] {
+  const effectiveOptionalBeerCategories = getEffectiveOptionalBeerCategories(
+    beerRows,
+    optionalBeerCategories,
+  )
+
   return DEFAULT_OPTIONAL_BEER_CATEGORIES.map((defaultOptions, slotIndex) => {
-    const configured = optionalBeerCategories[slotIndex] ?? defaultOptions
+    const configured = effectiveOptionalBeerCategories[slotIndex] ?? defaultOptions
     const slotKey = `optional-beer-${slotIndex + 1}`
     const draftSizeOz = parseOptionalDraftSize(configured.label)
     const draftSizeLabel = draftSizeOz === null ? null : formatDraftSizeLabel(draftSizeOz)
+    const tallBoyCan = isTallBoyCanCategory(configured.label)
     const description = draftSizeLabel
       ? `${draftSizeLabel} draft`
-      : configured.label.trim() || `Optional Beer Category ${slotIndex + 1}`
+      : tallBoyCan
+        ? 'Tall Boy Can'
+        : configured.label.trim() || `Optional Beer Category ${slotIndex + 1}`
     const rows = configured.enabled
       ? beerRows.filter((row) => {
           if (draftSizeOz !== null) {
             return getDraftBeerPrice(row, draftSizeOz)?.price !== null &&
               getDraftBeerPrice(row, draftSizeOz)?.price !== undefined
           }
+
+          if (tallBoyCan) return row.can24ozPrice !== null
 
           return row.optionalBySlot[slotKey]?.price !== null &&
             row.optionalBySlot[slotKey]?.price !== undefined
@@ -765,11 +765,15 @@ function buildOptionalPackagedBeerSlotDefinitions(
       getPrice: (row) =>
         draftSizeOz !== null
           ? getDraftBeerPrice(row, draftSizeOz)?.price ?? null
-          : row.optionalBySlot[slotKey]?.price ?? null,
+          : tallBoyCan
+            ? row.can24ozPrice
+            : row.optionalBySlot[slotKey]?.price ?? null,
       getHappyHour: (row) =>
         draftSizeOz !== null
           ? getDraftBeerPrice(row, draftSizeOz)?.happyHour ?? null
-          : row.optionalBySlot[slotKey]?.happyHour ?? null,
+          : tallBoyCan
+            ? row.can24ozHappyHour
+            : row.optionalBySlot[slotKey]?.happyHour ?? null,
     }
   })
 }
@@ -1542,6 +1546,7 @@ function hasAnyBeerPrice(
 ) {
   return (
     hasConfiguredDraftBeerPrice(row, draftSlotMappings) ||
+    hasCustomDraftBeerPrice(row) ||
     hasOptionalBeerCategoryPrice(row, optionalBeerCategories) ||
     [row.canPrice, row.can24ozPrice, row.bottlePrice].some(
       (value) => value !== null,
@@ -1562,12 +1567,103 @@ function hasConfiguredDraftBeerPrice(
   )
 }
 
+function hasCustomDraftBeerPrice(row: BeerTabPreviewRow) {
+  return Object.entries(row.draftBySizeOz).some(([sizeOz, price]) => {
+    const parsedSizeOz = Number(sizeOz)
+    return isCustomDraftSize(parsedSizeOz) &&
+      price.price !== null &&
+      price.price !== undefined
+  })
+}
+
+function getEffectiveOptionalBeerCategories(
+  beerRows: readonly BeerTabPreviewRow[],
+  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+): OptionalBeerCategoryOptions[] {
+  const configuredCategories = DEFAULT_OPTIONAL_BEER_CATEGORIES.map(
+    (defaultOptions, index) => optionalBeerCategories[index] ?? defaultOptions,
+  )
+  const assignedDraftSizes = new Set(
+    configuredCategories.flatMap((category) => {
+      const draftSizeOz = parseOptionalDraftSize(category.label)
+      return draftSizeOz === null ? [] : [draftSizeOz]
+    }),
+  )
+  const customDraftSizes = getCustomDraftSizes(beerRows)
+    .filter((sizeOz) => !assignedDraftSizes.has(sizeOz))
+    .sort((left, right) => left - right)
+  let shouldAutoAddTallBoyCan =
+    beerRows.some((row) => row.can24ozPrice !== null) &&
+    !configuredCategories.some((category) => isTallBoyCanCategory(category.label))
+  let nextCustomDraftSizeIndex = 0
+
+  return configuredCategories.map((category, index) => {
+    const hasConfiguredDraftSize = parseOptionalDraftSize(category.label) !== null
+    const hasTallBoyCanLabel = isTallBoyCanCategory(category.label)
+    const hasCustomLabel = !isDefaultOptionalBeerCategoryLabel(category.label, index)
+
+    if (category.enabled || hasConfiguredDraftSize || hasTallBoyCanLabel || hasCustomLabel) {
+      return category
+    }
+
+    if (shouldAutoAddTallBoyCan) {
+      shouldAutoAddTallBoyCan = false
+      return {
+        enabled: true,
+        label: 'Tall Boy Can',
+      }
+    }
+
+    const customDraftSize = customDraftSizes[nextCustomDraftSizeIndex]
+    if (customDraftSize === undefined) return category
+
+    nextCustomDraftSizeIndex += 1
+    return {
+      enabled: true,
+      label: formatDraftSizeLabel(customDraftSize),
+    }
+  })
+}
+
+function getCustomDraftSizes(beerRows: readonly BeerTabPreviewRow[]) {
+  const sizes = new Set<number>()
+
+  beerRows.forEach((row) => {
+    Object.keys(row.draftBySizeOz).forEach((sizeOz) => {
+      const parsedSizeOz = Number(sizeOz)
+      if (isCustomDraftSize(parsedSizeOz)) sizes.add(parsedSizeOz)
+    })
+  })
+
+  return [...sizes]
+}
+
+function isCustomDraftSize(sizeOz: number) {
+  return Number.isFinite(sizeOz) && ![8, 16, 24].includes(sizeOz)
+}
+
+function isDefaultOptionalBeerCategoryLabel(label: string, index: number) {
+  const normalized = label.trim().toLowerCase()
+  return !normalized ||
+    normalized === `optional beer category ${index + 1}`
+}
+
+function isTallBoyCanCategory(label: string) {
+  return /\btall\s*boy\s*can\b/i.test(label) ||
+    /\b2[45]\s*oz\s*can\b/i.test(label)
+}
+
 function hasOptionalBeerCategoryPrice(
   row: BeerTabPreviewRow,
   optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
 ) {
   return optionalBeerCategories.some((category) => {
     if (!category.enabled) return false
+
+    if (isTallBoyCanCategory(category.label)) {
+      return row.can24ozPrice !== null
+    }
+
     const draftSizeOz = parseOptionalDraftSize(category.label)
     return draftSizeOz !== null &&
       getDraftBeerPrice(row, draftSizeOz)?.price !== null &&
