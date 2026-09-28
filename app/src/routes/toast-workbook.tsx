@@ -752,6 +752,7 @@ function ToastWorkbook() {
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
       draftSlotMappings,
       optionalBeerCategories,
+      builtInFormatVisibility,
     })
 
     if (!validation.valid) {
