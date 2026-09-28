@@ -1181,6 +1181,10 @@ function CatalogDrawer({
   const mergeCandidates = allGroups.filter((candidate) => candidate.id !== group.id)
   const categoryChanged =
     Boolean(draftCategoryId) && draftCategoryId !== (group.categoryId ?? '')
+  const selectedCategoryName =
+    categoryOptions.find((option) => option.id === draftCategoryId)?.name ??
+    group.category
+  const selectedCategoryIsBeer = isBeerCategoryName(selectedCategoryName)
 
   const hasChanges = categoryChanged || draftItems.some((draftItem) => {
     const original = group.items.find((item) => item.id === draftItem.id)
@@ -1246,7 +1250,11 @@ function CatalogDrawer({
         if (draftItem.happyHourPriceCents !== original.happyHourPriceCents) {
           patch.happyHourPriceCents = draftItem.happyHourPriceCents
         }
-        if (draftItem.toastSlot !== original.toastSlot) {
+        if (!selectedCategoryIsBeer) {
+          if (draftItem.toastSlot !== null || original.toastSlot !== null) {
+            patch.toastSlot = null
+          }
+        } else if (draftItem.toastSlot !== original.toastSlot) {
           patch.toastSlot = draftItem.toastSlot
         }
 
@@ -1278,7 +1286,7 @@ function CatalogDrawer({
     >
       <div className="inventory-catalog-drawer-heading">
         <div>
-          <p className="inventory-kicker">{group.category}</p>
+          <p className="inventory-kicker">{selectedCategoryName}</p>
           <h2 id="inventory-catalog-drawer-title">{group.name}</h2>
           <p>
             {group.items.length} format{group.items.length === 1 ? '' : 's'} · {carriedCount} available here
@@ -1334,7 +1342,7 @@ function CatalogDrawer({
                   <div>
                     <strong>{item.variantLabel || 'Standard'}</strong>
                     <span>
-                      {item.toastDestination || 'No Toast destination'}
+                      {getVariantDestinationLabel(item, selectedCategoryName)}
                     </span>
                   </div>
                   <div className="inventory-variant-toggles">
@@ -1384,7 +1392,7 @@ function CatalogDrawer({
                   onCommit={(value) => updateDraft(item.id, { name: value })}
                 />
 
-                {group.category === 'Beer' && item.variantKind !== 'draft' ? (
+                {selectedCategoryIsBeer && item.variantKind !== 'draft' ? (
                   <label className="inventory-search-control">
                     <span>Toast beer slot</span>
                     <select
@@ -1430,7 +1438,7 @@ function CatalogDrawer({
                 </div>
 
                 <div className="inventory-variant-meta">
-                  <span>{item.toastCategory}</span>
+                  <span>{getVariantCategoryMetaLabel(item, selectedCategoryName)}</span>
                   {saving ? <span className="inventory-save-note">Saving…</span> : null}
                 </div>
               </article>
@@ -1568,6 +1576,51 @@ function NameField({
       ) : null}
     </label>
   )
+}
+
+function getVariantDestinationLabel(item: NormalizedMenuItem, categoryName: string) {
+  const workbookCategory = getCatalogWorkbookCategoryName(categoryName)
+  if (workbookCategory && workbookCategory !== 'Beer') {
+    return workbookCategory + ' tab'
+  }
+
+  return item.toastDestination || 'No Toast destination'
+}
+
+function getVariantCategoryMetaLabel(item: NormalizedMenuItem, categoryName: string) {
+  const workbookCategory = getCatalogWorkbookCategoryName(categoryName)
+  if (workbookCategory && workbookCategory !== 'Beer') {
+    return 'Exports to ' + workbookCategory
+  }
+
+  return item.toastCategory
+}
+
+function getCatalogWorkbookCategoryName(categoryName: string) {
+  const normalized = normalizeCatalogCategoryName(categoryName)
+
+  if (normalized === 'beer') return 'Beer'
+  if (normalized === 'cocktail' || normalized === 'cocktails') return 'Cocktails'
+  if (
+    normalized === 'na bev' ||
+    normalized === 'na beverage' ||
+    normalized === 'na beverages' ||
+    normalized === 'non alcoholic' ||
+    normalized === 'non-alcoholic'
+  ) {
+    return 'NA Bev'
+  }
+  if (normalized === 'retail') return 'Retail'
+
+  return null
+}
+
+function isBeerCategoryName(categoryName: string) {
+  return normalizeCatalogCategoryName(categoryName) === 'beer'
+}
+
+function normalizeCatalogCategoryName(categoryName: string) {
+  return categoryName.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 function getBeerExportCategoryTitle(category: OptionalBeerCategoryConfig) {
