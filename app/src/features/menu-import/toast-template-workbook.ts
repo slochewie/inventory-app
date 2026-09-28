@@ -73,6 +73,24 @@ export type OptionalBeerCategoryOptions = {
   label: string
 }
 
+export type BeerBuiltInFormatVisibility = {
+  draft8Enabled: boolean
+  draft16Enabled: boolean
+  draft24Enabled: boolean
+  pitcherEnabled: boolean
+  canEnabled: boolean
+  bottleEnabled: boolean
+}
+
+const DEFAULT_BEER_BUILT_IN_FORMAT_VISIBILITY: BeerBuiltInFormatVisibility = {
+  draft8Enabled: true,
+  draft16Enabled: true,
+  draft24Enabled: true,
+  pitcherEnabled: true,
+  canEnabled: true,
+  bottleEnabled: true,
+}
+
 type OptionalPackagedSlotOptions = {
   enabled: boolean
   label: string
@@ -140,12 +158,14 @@ export function buildPopulatedToastTemplateWorkbook({
   happyHourEnabled = true,
   draftSlotMappings = DEFAULT_DRAFT_SLOT_MAPPINGS,
   optionalBeerCategories = DEFAULT_OPTIONAL_BEER_CATEGORIES,
+  builtInFormatVisibility = DEFAULT_BEER_BUILT_IN_FORMAT_VISIBILITY,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
   optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
+  builtInFormatVisibility?: BeerBuiltInFormatVisibility
 }) {
   const workbookPackage = readWorkbookPackage(templateArrayBuffer)
   populateBeerSheet(
@@ -154,6 +174,7 @@ export function buildPopulatedToastTemplateWorkbook({
     happyHourEnabled,
     normalizeDraftSlotMappings(draftSlotMappings),
     optionalBeerCategories,
+    builtInFormatVisibility,
   )
   return new Blob([zipSync(workbookPackage.files, { level: 6 })], { type: XLSX_MIME })
 }
@@ -164,12 +185,14 @@ export function validatePopulatedBeerWorkbook({
   happyHourEnabled = true,
   draftSlotMappings = DEFAULT_DRAFT_SLOT_MAPPINGS,
   optionalBeerCategories = DEFAULT_OPTIONAL_BEER_CATEGORIES,
+  builtInFormatVisibility = DEFAULT_BEER_BUILT_IN_FORMAT_VISIBILITY,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
   happyHourEnabled?: boolean
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
   optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
+  builtInFormatVisibility?: BeerBuiltInFormatVisibility
 }) {
   const normalizedDraftSlotMappings = normalizeDraftSlotMappings(draftSlotMappings)
   const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
@@ -182,6 +205,13 @@ export function validatePopulatedBeerWorkbook({
     optionalBeerCategories,
   )
   const issues: string[] = []
+
+  validateBuiltInBeerColumnVisibility(
+    issues,
+    sheetDoc,
+    mapping,
+    builtInFormatVisibility,
+  )
 
   normalizedDraftSlotMappings.forEach((draftMapping) => {
     if (draftMapping.toastSizeOz === null) return
@@ -476,6 +506,7 @@ function populateBeerSheet(
   happyHourEnabled: boolean,
   draftSlotMappings: readonly ToastDraftSlotMapping[],
   optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
+  builtInFormatVisibility: BeerBuiltInFormatVisibility,
 ) {
   const mapping = getBeerTemplateMapping(workbookPackage)
   const sheetXml = getTextFile(workbookPackage.files, mapping.sheetPath)
@@ -495,6 +526,11 @@ function populateBeerSheet(
   )
 
   writeDraftSizeHeaders(sheetDoc, mapping, draftSlotMappings)
+  applyBuiltInBeerColumnVisibility(
+    sheetDoc,
+    mapping,
+    builtInFormatVisibility,
+  )
   updateWorksheetDimension(sheetDoc, mapping, writtenRowCount)
   workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
 }
@@ -1267,6 +1303,150 @@ function getBeerTargetColumns(mapping: BeerTemplateMapping) {
     if (slot.happyHourCol) columns.add(slot.happyHourCol)
   })
   return [...columns]
+}
+
+function applyBuiltInBeerColumnVisibility(
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  visibility: BeerBuiltInFormatVisibility,
+) {
+  const draftVisibility = new Map<number | null, boolean>([
+    [8, visibility.draft8Enabled],
+    [16, visibility.draft16Enabled],
+    [24, visibility.draft24Enabled],
+    [null, visibility.pitcherEnabled],
+  ])
+
+  const anyBuiltInDraftEnabled = [...draftVisibility.values()].some(Boolean)
+  if (mapping.draftNameCol !== null) {
+    setColumnsHidden(
+      sheetDoc,
+      [mapping.draftNameCol],
+      !anyBuiltInDraftEnabled,
+    )
+  }
+
+  mapping.draftSizes.forEach((slot) => {
+    const enabled =
+      slot.sizeOz === null
+        ? visibility.pitcherEnabled
+        : draftVisibility.get(slot.sizeOz) ?? true
+    setColumnsHidden(
+      sheetDoc,
+      [slot.priceCol, slot.happyHourCol]
+        .filter((column): column is number => column !== null),
+      !enabled,
+    )
+  })
+
+  const canSlot = findPackagedSlot(mapping, 'can')
+  if (canSlot) {
+    setColumnsHidden(
+      sheetDoc,
+      [canSlot.nameCol, canSlot.priceCol, canSlot.happyHourCol]
+        .filter((column): column is number => column !== null),
+      !visibility.canEnabled,
+    )
+  }
+
+  const bottleSlot = findPackagedSlot(mapping, 'bottle')
+  if (bottleSlot) {
+    setColumnsHidden(
+      sheetDoc,
+      [bottleSlot.nameCol, bottleSlot.priceCol, bottleSlot.happyHourCol]
+        .filter((column): column is number => column !== null),
+      !visibility.bottleEnabled,
+    )
+  }
+}
+
+function validateBuiltInBeerColumnVisibility(
+  issues: string[],
+  sheetDoc: Document,
+  mapping: BeerTemplateMapping,
+  visibility: BeerBuiltInFormatVisibility,
+) {
+  const checks: Array<{
+    label: string
+    enabled: boolean
+    columns: number[]
+  }> = []
+
+  const builtInDraftEnabled = [
+    visibility.draft8Enabled,
+    visibility.draft16Enabled,
+    visibility.draft24Enabled,
+    visibility.pitcherEnabled,
+  ].some(Boolean)
+
+  if (mapping.draftNameCol !== null) {
+    checks.push({
+      label: 'Draft Beer name',
+      enabled: builtInDraftEnabled,
+      columns: [mapping.draftNameCol],
+    })
+  }
+
+  mapping.draftSizes.forEach((slot) => {
+    const enabled =
+      slot.sizeOz === 8
+        ? visibility.draft8Enabled
+        : slot.sizeOz === 16
+          ? visibility.draft16Enabled
+          : slot.sizeOz === 24
+            ? visibility.draft24Enabled
+            : slot.sizeOz === null
+              ? visibility.pitcherEnabled
+              : true
+
+    checks.push({
+      label: `Toast ${slot.label} draft`,
+      enabled,
+      columns: [slot.priceCol, slot.happyHourCol]
+        .filter((column): column is number => column !== null),
+    })
+  })
+
+  const canSlot = findPackagedSlot(mapping, 'can')
+  if (canSlot) {
+    checks.push({
+      label: 'Toast Can',
+      enabled: visibility.canEnabled,
+      columns: [canSlot.nameCol, canSlot.priceCol, canSlot.happyHourCol]
+        .filter((column): column is number => column !== null),
+    })
+  }
+
+  const bottleSlot = findPackagedSlot(mapping, 'bottle')
+  if (bottleSlot) {
+    checks.push({
+      label: 'Toast Bottle',
+      enabled: visibility.bottleEnabled,
+      columns: [bottleSlot.nameCol, bottleSlot.priceCol, bottleSlot.happyHourCol]
+        .filter((column): column is number => column !== null),
+    })
+  }
+
+  checks.forEach(({ label, enabled, columns }) => {
+    columns.forEach((column) => {
+      const hidden = isColumnHidden(sheetDoc, column)
+      if (enabled && hidden) {
+        issues.push(`${label}: column ${numberToColumnLetters(column)} should be visible`)
+      }
+      if (!enabled && !hidden) {
+        issues.push(`${label}: column ${numberToColumnLetters(column)} should be hidden`)
+      }
+    })
+  })
+}
+
+function isColumnHidden(sheetDoc: Document, column: number) {
+  const columnNode = Array.from(sheetDoc.getElementsByTagName('col')).find((node) => {
+    const min = Number(node.getAttribute('min'))
+    const max = Number(node.getAttribute('max'))
+    return column >= min && column <= max
+  })
+  return columnNode?.getAttribute('hidden') === '1'
 }
 
 function setColumnsHidden(
