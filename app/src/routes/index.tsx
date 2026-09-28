@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { CircleCheckBig, CircleOff, CircleX, ListChecks, Upload } from 'lucide-react'
+import { CircleCheckBig, CircleOff, CircleX, Info, ListChecks, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AuthenticatedInventoryShell,
@@ -56,6 +56,7 @@ function CatalogPage() {
   const [addingFormatKey, setAddingFormatKey] = useState<string | null>(null)
   const [bulkEditEnabled, setBulkEditEnabled] = useState(false)
   const [bulkUpdating, setBulkUpdating] = useState(false)
+  const [bulkHelpOpen, setBulkHelpOpen] = useState(false)
   const [selectedBulkGroupIds, setSelectedBulkGroupIds] = useState<Set<string>>(
     () => new Set(),
   )
@@ -503,6 +504,45 @@ function CatalogPage() {
                 <ListChecks aria-hidden="true" />
                 <span>Bulk edit</span>
               </button>
+
+              <div className="inventory-catalog-bulk-help">
+                <button
+                  type="button"
+                  className="inventory-catalog-bulk-help-button"
+                  aria-label="Bulk edit button key"
+                  aria-expanded={bulkHelpOpen}
+                  title="Bulk edit button key"
+                  onClick={() => setBulkHelpOpen((current) => !current)}
+                >
+                  <Info aria-hidden="true" />
+                </button>
+
+                {bulkHelpOpen ? (
+                  <div
+                    className="inventory-catalog-bulk-help-popover"
+                    role="dialog"
+                    aria-label="Bulk edit button key"
+                  >
+                    <strong>Bulk edit key</strong>
+                    <div>
+                      <span><CircleCheckBig aria-hidden="true" /></span>
+                      <p><b>Available here</b> — carry the selected items at this organization.</p>
+                    </div>
+                    <div>
+                      <span><CircleX aria-hidden="true" /></span>
+                      <p><b>Not carried here</b> — disable the selected items for this organization.</p>
+                    </div>
+                    <div>
+                      <span><Upload aria-hidden="true" /></span>
+                      <p><b>Export to Toast</b> — include the selected carried items in Toast export.</p>
+                    </div>
+                    <div>
+                      <span><CircleOff aria-hidden="true" /></span>
+                      <p><b>Do not export</b> — keep the selected items carried but exclude them from Toast export.</p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
 
               {bulkEditEnabled ? (
                 <>
