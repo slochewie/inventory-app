@@ -818,7 +818,7 @@ function CatalogPage() {
                 <div className="inventory-draft-slots-copy">
                   <h2>Beer export categories</h2>
                   <p>
-                    Map non-standard Beer formats to Toast Optional Beer Category slots. Custom draft sizes and tall boy cans detected in the catalog are shown here; click Update to save them.
+                    Map non-standard Beer formats to Toast Optional Beer Category slots. Custom draft sizes detected in the catalog are shown here; click Update to save them.
                   </p>
                 </div>
 
@@ -1591,27 +1591,14 @@ function getEffectiveOptionalBeerCategoriesForCatalog(
   const customDraftSizes = getCustomDraftSizesFromCatalog(items)
     .filter((sizeOz) => !assignedDraftSizes.has(sizeOz))
     .sort((left, right) => left - right)
-  let shouldSuggestTallBoyCan =
-    items.some(isTallBoyCanCatalogItem) &&
-    !categories.some((category) => isTallBoyCanCategoryLabel(category.label))
   let nextCustomDraftSizeIndex = 0
 
   return categories.map((category, index) => {
     const configuredDraftSize = parseOptionalBeerCategoryDraftSize(category.label)
-    const hasTallBoyLabel = isTallBoyCanCategoryLabel(category.label)
     const hasCustomLabel = !isDefaultOptionalBeerCategoryLabel(category.label, index)
 
-    if (category.enabled || configuredDraftSize !== null || hasTallBoyLabel || hasCustomLabel) {
+    if (category.enabled || configuredDraftSize !== null || hasCustomLabel) {
       return category
-    }
-
-    if (shouldSuggestTallBoyCan) {
-      shouldSuggestTallBoyCan = false
-      return {
-        ...category,
-        enabled: true,
-        label: 'Tall Boy Can',
-      }
     }
 
     const customDraftSize = customDraftSizes[nextCustomDraftSizeIndex]
@@ -1641,21 +1628,6 @@ function getCustomDraftSizesFromCatalog(items: readonly NormalizedMenuItem[]) {
   return [...sizes]
 }
 
-function isTallBoyCanCatalogItem(item: NormalizedMenuItem) {
-  const variantKind = item.variantKind?.toLowerCase() ?? ''
-  const packageType = item.variantPackageType?.toLowerCase() ?? ''
-  const variantLabel = item.variantLabel?.toLowerCase() ?? ''
-  const sizeOz = item.variantSizeOz ?? parseOptionalBeerCategoryDraftSize(variantLabel)
-
-  return (sizeOz === 24 || sizeOz === 25) &&
-    (variantKind !== 'draft') &&
-    (variantKind === 'can' ||
-      variantKind === 'package' ||
-      variantKind === 'packaged' ||
-      packageType === 'can' ||
-      /\bcan\b/.test(variantLabel))
-}
-
 function parseOptionalBeerCategoryDraftSize(label: string) {
   const match = label.match(/\b(\d+(?:\.\d+)?)\s*oz\b/i) ??
     label.match(/^\s*(\d+(?:\.\d+)?)\s*$/)
@@ -1667,11 +1639,6 @@ function parseOptionalBeerCategoryDraftSize(label: string) {
 
 function formatOptionalBeerDraftSizeLabel(sizeOz: number) {
   return `${Number.isInteger(sizeOz) ? sizeOz.toString() : sizeOz.toFixed(1)}oz`
-}
-
-function isTallBoyCanCategoryLabel(label: string) {
-  return /\btall\s*boy\s*can\b/i.test(label) ||
-    /\b2[45]\s*oz\s*can\b/i.test(label)
 }
 
 function isDefaultOptionalBeerCategoryLabel(label: string, index: number) {
