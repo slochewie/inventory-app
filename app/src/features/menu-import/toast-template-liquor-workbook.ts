@@ -116,6 +116,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
   draftSlotMappings,
   optionalBeerCategories,
+  builtInFormatVisibility,
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -129,6 +130,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   happyHourRange2Days?: readonly string[]
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
   optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
+  builtInFormatVisibility?: BeerBuiltInFormatVisibility
 }) {
   const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({
     templateArrayBuffer,
@@ -136,6 +138,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
     happyHourEnabled,
     draftSlotMappings,
     optionalBeerCategories,
+    builtInFormatVisibility,
   })
   const beerWorkbookBuffer = await beerPopulatedWorkbook.arrayBuffer()
   const workbookPackage = readWorkbookPackage(beerWorkbookBuffer)
@@ -176,6 +179,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourRange2Days = DEFAULT_HAPPY_HOUR_DAYS,
   draftSlotMappings,
   optionalBeerCategories,
+  builtInFormatVisibility,
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -189,6 +193,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   happyHourRange2Days?: readonly string[]
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
   optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
+  builtInFormatVisibility?: BeerBuiltInFormatVisibility
 }) {
   const beer = validatePopulatedBeerWorkbook({
     workbookArrayBuffer,
@@ -196,6 +201,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     happyHourEnabled,
     draftSlotMappings,
     optionalBeerCategories,
+    builtInFormatVisibility,
   })
   const workbookPackage = readWorkbookPackage(workbookArrayBuffer)
   const mapping = getLiquorTemplateMapping(workbookPackage)
