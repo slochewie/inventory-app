@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AuthenticatedInventoryShell,
@@ -10,6 +10,7 @@ import {
   getInventoryOrganizationConfig,
   getOptionalBeerCategories,
   listInventoryCatalog,
+  persistInventoryImport,
   type InventoryOrganizationConfig,
 } from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
@@ -125,6 +126,7 @@ function loadOrganizationReviewSession(organizationId: string) {
 }
 
 function ToastWorkbook() {
+  const navigate = useNavigate()
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [importFile, setImportFile] = useState<ParsedMenuImport | null>(null)
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
@@ -158,6 +160,8 @@ function ToastWorkbook() {
   const [stagedReviewPage, setStagedReviewPage] = useState(1)
   const [selectedStagedItemId, setSelectedStagedItemId] =
     useState<string | null>(null)
+  const [importingReviewedItems, setImportingReviewedItems] = useState(false)
+  const [importReviewedError, setImportReviewedError] = useState<string | null>(null)
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const beerExportItemCount = items.filter(
@@ -560,6 +564,73 @@ function ToastWorkbook() {
       setReviewSource(null)
       setReviewSavedAt(null)
       setAlohaError(error instanceof Error ? error.message : 'Unable to restore the selected Toast export review CSV')
+    }
+  }
+
+  async function handleImportReviewedItems() {
+    if (
+      !activeOrganization?.id ||
+      !importFile ||
+      reviewSource !== 'toast-workbook' ||
+      importingReviewedItems
+    ) {
+      return
+    }
+
+    const unresolvedItems = items.filter((item) => item.status === 'review')
+    if (unresolvedItems.length > 0) {
+      setImportReviewedError(
+        `Resolve or ignore all staged review items before importing. ${unresolvedItems.length.toLocaleString()} still need review.`,
+      )
+      return
+    }
+
+    const reviewedItems = items.filter(
+      (item) => item.status === 'ready' && item.exportIncluded,
+    )
+
+    if (reviewedItems.length === 0) {
+      setImportReviewedError('There are no reviewed items selected for import.')
+      return
+    }
+
+    setImportingReviewedItems(true)
+    setImportReviewedError(null)
+
+    try {
+      await persistInventoryImport({
+        organizationId: activeOrganization.id,
+        sourceType: 'toast-template',
+        sourceName: importFile.sourceName,
+        items: reviewedItems.map((item) => ({
+          id: item.id,
+          sourceItemNumber: item.sourceItemNumber,
+          name: item.name,
+          category: item.category,
+          toastCategory: item.toastCategory,
+          toastDestination: item.toastDestination,
+          basePriceCents: item.basePriceCents,
+          happyHourPriceCents: item.happyHourPriceCents,
+          status: item.status,
+          exportIncluded: item.exportIncluded,
+        })),
+      })
+
+      clearReviewSession(activeOrganization.id)
+      setSelectedStagedItemId(null)
+
+      await navigate({
+        to: '/import-review',
+        search: { workspace: 'mappings' },
+      })
+    } catch (error) {
+      setImportReviewedError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to import the reviewed Toast items.',
+      )
+    } finally {
+      setImportingReviewedItems(false)
     }
   }
 
@@ -977,6 +1048,49 @@ function ToastWorkbook() {
                         Next
                       </button>
                     </div>
+                  ) : null}
+                </section>
+
+                <section className="inventory-card inventory-import-card">
+                  <div className="inventory-table-heading">
+                    <div>
+                      <p className="inventory-kicker">Post staging</p>
+                      <h2>Import reviewed items</h2>
+                      <p>
+                        Save the reviewed rows to Inventory, then continue directly
+                        to Mapping review to reconcile them with the master catalog.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="inventory-primary-button"
+                      disabled={
+                        importingReviewedItems ||
+                        summary.reviewItems > 0 ||
+                        items.filter(
+                          (item) =>
+                            item.status === 'ready' &&
+                            item.exportIncluded,
+                        ).length === 0
+                      }
+                      onClick={() => void handleImportReviewedItems()}
+                    >
+                      {importingReviewedItems
+                        ? 'Importing…'
+                        : 'Import reviewed items'}
+                    </button>
+                  </div>
+
+                  {summary.reviewItems > 0 ? (
+                    <p className="inventory-import-message">
+                      {summary.reviewItems.toLocaleString()} staged item
+                      {summary.reviewItems === 1 ? '' : 's'} still need review or
+                      must be ignored before import.
+                    </p>
+                  ) : null}
+
+                  {importReviewedError ? (
+                    <p className="inventory-error">{importReviewedError}</p>
                   ) : null}
                 </section>
 
