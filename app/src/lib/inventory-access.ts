@@ -163,6 +163,8 @@ export type InventoryImportItem = {
   happyHourPriceCents: number | null
   status: "ready" | "review" | "ignored"
   exportIncluded: boolean
+  targetVariantId?: string
+  createNewMaster?: boolean
 }
 
 type ImportResponse = {
@@ -458,6 +460,7 @@ export async function persistInventoryImport(input: {
   organizationId: string
   sourceType: "aloha-csv" | "toast-template"
   sourceName: string
+  reconciliationMode?: "automatic" | "explicit"
   items: InventoryImportItem[]
 }) {
   const response = await fetch(authEndpoint("/api/auth/inventory/import"), {
