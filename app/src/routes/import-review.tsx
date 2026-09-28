@@ -7,6 +7,7 @@ import {
 import { ImportHistoryPanel } from '#/features/import-review/import-history-panel'
 import { ReconcilePanel } from '#/features/import-review/reconcile-panel'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
+import { parseToastExportReviewCsv } from '#/features/menu-import/toast-review-import'
 import {
   formatCurrency,
   summarizeMenuItems,
@@ -115,6 +116,35 @@ function ImportReviewPage() {
         caught instanceof Error
           ? caught.message
           : 'Unable to read the selected Aloha CSV.',
+      )
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  async function handleReviewCsvChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setError(null)
+    setSaveMessage(null)
+    setSaveState('idle')
+
+    try {
+      const restored = parseToastExportReviewCsv(await file.text(), file.name)
+
+      setImportFile(restored.importFile)
+      setItems(restored.items)
+      setFilter(restored.items.some((item) => item.status === 'review') ? 'review' : 'included')
+      setQuery('')
+      setSelectedItemId(null)
+    } catch (caught) {
+      setImportFile(null)
+      setItems([])
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to read the selected review CSV.',
       )
     } finally {
       event.target.value = ''
@@ -230,6 +260,21 @@ function ImportReviewPage() {
 
                       <div className="inventory-import-source-option">
                         <div>
+                          <strong>Review CSV</strong>
+                          <p>Load a Toast export review CSV into this review table. Nothing is saved until you approve the import.</p>
+                        </div>
+                        {canImportExport ? (
+                          <label className="inventory-upload-control">
+                            <span>Choose review CSV</span>
+                            <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
+                          </label>
+                        ) : null}
+                      </div>
+
+                      <div className="inventory-import-source-divider" aria-hidden="true" />
+
+                      <div className="inventory-import-source-option">
+                        <div>
                           <strong>Toast workbook</strong>
                           <p>Import menu data from a Toast workbook instead of an Aloha CSV.</p>
                         </div>
@@ -297,7 +342,7 @@ function ImportReviewPage() {
                                 type="search"
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Name, Aloha #, category…"
+                                placeholder="Name, source #, category…"
                               />
                             </label>
                           </div>
@@ -314,7 +359,7 @@ function ImportReviewPage() {
                                 <thead>
                                   <tr>
                                     <th>Item</th>
-                                    <th>Aloha category</th>
+                                    <th>Source category</th>
                                     <th>Menu Category</th>
                                     <th>Price</th>
                                     <th>Happy hour</th>
