@@ -203,3 +203,4 @@ function getVisibleOptionalBeerCategoryCount(
           git diff --cached --quiet && exit 0
           git commit -m "Show inferred optional beer categories in Catalog"
           git push
+# retrigger
