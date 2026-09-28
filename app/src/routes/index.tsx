@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { CircleCheckBig, CircleOff, CircleX, ListChecks, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AuthenticatedInventoryShell,
@@ -15,6 +16,7 @@ import {
   mergeInventoryItems,
   updateInventoryItemCategory,
   updateInventoryOrganizationVariant,
+  updateInventoryOrganizationVariants,
   type InventoryOrganizationConfig,
   type OptionalBeerCategoryConfig,
 } from '#/lib/inventory-access'
@@ -52,6 +54,11 @@ function CatalogPage() {
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null)
   const [mergingItemId, setMergingItemId] = useState<string | null>(null)
   const [addingFormatKey, setAddingFormatKey] = useState<string | null>(null)
+  const [bulkEditEnabled, setBulkEditEnabled] = useState(false)
+  const [bulkUpdating, setBulkUpdating] = useState(false)
+  const [selectedBulkGroupIds, setSelectedBulkGroupIds] = useState<Set<string>>(
+    () => new Set(),
+  )
   const [page, setPage] = useState(1)
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryConfig[]>([])
   const [organizationConfig, setOrganizationConfig] =
@@ -150,13 +157,122 @@ function CatalogPage() {
   const pageStart = (clampedPage - 1) * PAGE_SIZE
   const pageGroups = filteredGroups.slice(pageStart, pageStart + PAGE_SIZE)
   const pageEnd = pageStart + pageGroups.length
+  const pageGroupIds = pageGroups.map((group) => group.id)
+  const allVisibleSelected =
+    pageGroupIds.length > 0 &&
+    pageGroupIds.every((groupId) => selectedBulkGroupIds.has(groupId))
 
   useEffect(() => {
     setPage(1)
   }, [availability, category, query])
 
+  useEffect(() => {
+    setSelectedBulkGroupIds(new Set())
+  }, [availability, category, query, clampedPage])
+
+  useEffect(() => {
+    if (!bulkEditEnabled) setSelectedBulkGroupIds(new Set())
+  }, [bulkEditEnabled])
+
   const selectedGroup =
     groups.find((group) => group.id === selectedGroupId) ?? null
+
+  function toggleBulkGroup(groupId: string) {
+    setSelectedBulkGroupIds((current) => {
+      const next = new Set(current)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
+  }
+
+  function toggleAllVisibleBulkGroups() {
+    setSelectedBulkGroupIds((current) => {
+      const next = new Set(current)
+      if (allVisibleSelected) {
+        pageGroupIds.forEach((groupId) => next.delete(groupId))
+      } else {
+        pageGroupIds.forEach((groupId) => next.add(groupId))
+      }
+      return next
+    })
+  }
+
+  function getBulkVariantIds(action: 'enable' | 'disable' | 'export' | 'no-export') {
+    const selectedGroups = pageGroups.filter((group) =>
+      selectedBulkGroupIds.has(group.id),
+    )
+
+    return [
+      ...new Set(
+        selectedGroups.flatMap((group) => {
+          if (action === 'enable') {
+            if (isBeerCategoryName(group.category) && organizationConfig) {
+              return group.items
+                .filter((item) =>
+                  isBeerVariantEnabledForOrganization(
+                    item,
+                    organizationConfig,
+                    optionalBeerCategories,
+                  ),
+                )
+                .map((item) => item.id)
+            }
+            return group.items.map((item) => item.id)
+          }
+
+          return group.items
+            .filter((item) => item.organizationEnabled === true)
+            .map((item) => item.id)
+        }),
+      ),
+    ]
+  }
+
+  async function applyBulkAction(
+    action: 'enable' | 'disable' | 'export' | 'no-export',
+  ) {
+    if (
+      !canEdit ||
+      !activeOrganization?.id ||
+      selectedBulkGroupIds.size === 0 ||
+      bulkUpdating
+    ) {
+      return
+    }
+
+    const variantIds = getBulkVariantIds(action)
+    if (variantIds.length === 0) return
+
+    setBulkUpdating(true)
+    setError(null)
+
+    try {
+      await updateInventoryOrganizationVariants({
+        organizationId: activeOrganization.id,
+        variantIds,
+        ...(action === 'enable'
+          ? { enabled: true }
+          : action === 'disable'
+            ? { enabled: false }
+            : action === 'export'
+              ? { exportToToast: true }
+              : { exportToToast: false }),
+      })
+
+      const catalog = await listInventoryCatalog(activeOrganization.id)
+      setItems(catalog.items.map(catalogRowToNormalizedItem))
+      setSelectedBulkGroupIds(new Set())
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to apply the bulk Catalog update.',
+      )
+    } finally {
+      setBulkUpdating(false)
+    }
+  }
 
   async function updateGroupCategory(
     group: CatalogGroup,
@@ -372,6 +488,70 @@ function CatalogPage() {
             </div>
           </div>
 
+          {canEdit ? (
+            <div
+              className={`inventory-catalog-bulk-toolbar${bulkEditEnabled ? ' is-active' : ''}`}
+              aria-label="Bulk Catalog controls"
+            >
+              <button
+                type="button"
+                className="inventory-catalog-bulk-toggle"
+                aria-pressed={bulkEditEnabled}
+                title={bulkEditEnabled ? 'Exit bulk edit' : 'Bulk edit'}
+                onClick={() => setBulkEditEnabled((current) => !current)}
+              >
+                <ListChecks aria-hidden="true" />
+                <span>Bulk edit</span>
+              </button>
+
+              {bulkEditEnabled ? (
+                <>
+                  <span className="inventory-catalog-bulk-count">
+                    {selectedBulkGroupIds.size} selected
+                  </span>
+                  <div className="inventory-catalog-bulk-actions">
+                    <button
+                      type="button"
+                      title="Set selected items available here"
+                      aria-label="Set selected items available here"
+                      disabled={selectedBulkGroupIds.size === 0 || bulkUpdating}
+                      onClick={() => void applyBulkAction('enable')}
+                    >
+                      <CircleCheckBig aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Set selected items not carried here"
+                      aria-label="Set selected items not carried here"
+                      disabled={selectedBulkGroupIds.size === 0 || bulkUpdating}
+                      onClick={() => void applyBulkAction('disable')}
+                    >
+                      <CircleX aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Export selected items to Toast"
+                      aria-label="Export selected items to Toast"
+                      disabled={selectedBulkGroupIds.size === 0 || bulkUpdating}
+                      onClick={() => void applyBulkAction('export')}
+                    >
+                      <Upload aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Stop exporting selected items to Toast"
+                      aria-label="Stop exporting selected items to Toast"
+                      disabled={selectedBulkGroupIds.size === 0 || bulkUpdating}
+                      onClick={() => void applyBulkAction('no-export')}
+                    >
+                      <CircleOff aria-hidden="true" />
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
           {loading ? <p>Loading catalog…</p> : null}
           {error ? <p className="inventory-error">{error}</p> : null}
 
@@ -384,6 +564,16 @@ function CatalogPage() {
               <table className="inventory-table inventory-catalog-table">
                 <thead>
                   <tr>
+                    {bulkEditEnabled ? (
+                      <th className="inventory-catalog-select-column">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          aria-label="Select all visible rows"
+                          onChange={toggleAllVisibleBulkGroups}
+                        />
+                      </th>
+                    ) : null}
                     <th>Item</th>
                     <th>Price</th>
                     <th>Happy hour</th>
@@ -406,7 +596,7 @@ function CatalogPage() {
                     return (
                       <tr
                         key={group.id}
-                        className="inventory-catalog-row"
+                        className={`inventory-catalog-row${selectedBulkGroupIds.has(group.id) ? ' is-selected' : ''}`}
                         tabIndex={0}
                         onClick={() => setSelectedGroupId(group.id)}
                         onKeyDown={(event) => {
@@ -416,6 +606,19 @@ function CatalogPage() {
                           }
                         }}
                       >
+                        {bulkEditEnabled ? (
+                          <td
+                            className="inventory-catalog-select-column"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedBulkGroupIds.has(group.id)}
+                              aria-label={`Select ${group.name}`}
+                              onChange={() => toggleBulkGroup(group.id)}
+                            />
+                          </td>
+                        ) : null}
                         <td>
                           <div className="inventory-catalog-item-cell">
                             <strong>{group.name}</strong>
