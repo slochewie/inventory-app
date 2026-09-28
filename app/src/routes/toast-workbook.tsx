@@ -1438,6 +1438,13 @@ function StagedReconciliationPanel({
         </table>
       </div>
 
+      {unresolvedCount > 0 ? (
+        <p className="inventory-import-message">
+          {unresolvedCount.toLocaleString()} item
+          {unresolvedCount === 1 ? '' : 's'} will remain staged for later review.
+        </p>
+      ) : null}
+
       <div className="inventory-draft-slots-actions">
         <button
           type="button"
@@ -1450,10 +1457,12 @@ function StagedReconciliationPanel({
         <button
           type="button"
           className="inventory-primary-button"
-          disabled={importing || unresolvedCount > 0 || items.length === 0}
+          disabled={importing || decidedCount === 0}
           onClick={onImport}
         >
-          {importing ? 'Importing…' : 'Import reconciled items'}
+          {importing
+            ? 'Importing…'
+            : `Import ${decidedCount.toLocaleString()} reviewed item${decidedCount === 1 ? '' : 's'}`}
         </button>
       </div>
     </div>
