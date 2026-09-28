@@ -2,42 +2,137 @@
 
 This guide documents the current authenticated Inventory workflow.
 
-The primary operating model is now:
+The normal operating model is:
 
 ```text
-source menu
-   ↓
-Import & Review
-   ↓
-persistent shared Inventory catalog
-   ↓
-organization availability / prices / Toast settings
-   ↓
+source menu / manual item
+        ↓
+Import & Review / Add Item
+        ↓
+shared master Inventory catalog
+        ↓
+organization availability, prices, categories, Beer formats
+        ↓
 Export to Toast
 ```
 
-The old browser-only review-session workflow still exists in frozen/advanced paths, but it is no longer the normal source of truth.
+The frozen `/wip` routes are legacy snapshots and are not the source of truth.
 
-## 1. Sign in and select an organization
+## 1. Sign in and choose an organization
 
-Open Inventory and sign in through the NiteOwl Better Auth service.
+Sign in through the NiteOwl Better Auth service.
 
-The authenticated shell shows only organizations for which your account has Inventory access. Use the organization selector in the header to switch locations.
+The organization selector in the header controls which location you are viewing or editing. Inventory access is organization-specific.
 
-Inventory permissions are organization-specific.
-
-### Role summary
+### Roles
 
 | Role | Main abilities |
 | --- | --- |
-| Viewer | View Catalog and import history |
-| Staff | Viewer abilities + import and export |
-| Manager | Staff abilities + edit Catalog and source mappings |
-| Admin | Manager abilities + manage Assignments and merge master items |
+| Viewer | Browse Catalog and history |
+| Staff | Viewer + import/export |
+| Manager | Staff + edit Catalog, settings, categories, mappings |
+| Admin | Manager + Assignments and shared master-item merge |
 
-If a route requires a capability your current role does not have, Inventory blocks the route and displays an access message.
+Server-side access checks are enforced by the Auth service.
 
-## 2. Import an Aloha menu
+## 2. Add an item manually
+
+Open:
+
+```text
+/manual-item
+```
+
+Use **Add Item** when a product should be created without an Aloha/Toast import.
+
+Choose:
+
+- item name,
+- Menu Category,
+- Beer/Toast placement when applicable,
+- regular price,
+- Happy Hour price when applicable,
+- Available here,
+- Export to Toast.
+
+Beer choices are filtered by the selected organization's Beer Format settings. Disabled built-in Beer formats do not appear as valid choices.
+
+For custom Beer formats, enable the format first in **Organization Settings**.
+
+## 3. Manage optional Menu Categories
+
+Open:
+
+```text
+/menu-categories
+```
+
+Built-in categories always available in Add Item:
+
+- Beer
+- Cocktails
+- NA Bev
+
+Optional organization categories:
+
+- Retail
+- Open Items
+
+Enable only the extra categories the organization uses.
+
+Removing an optional category from this page removes it from future Add Item choices; it does not rewrite existing catalog items.
+
+**Open Items** may have a blank price and can still export.
+
+## 4. Configure Organization Settings
+
+Open:
+
+```text
+/organization-settings
+```
+
+### Happy Hour
+
+Configure:
+
+- Time Range 1 start/end and selected days,
+- optional Time Range 2 start/end and selected days.
+
+Changes require explicit **Update**. **Cancel** restores the current saved state.
+
+The exporter writes the schedule into the Toast Notes tab and validates it before download.
+
+### Beer Formats
+
+Toast built-in Beer formats are fixed workbook structures:
+
+- 8oz Draft
+- 16oz Draft
+- 24oz Draft
+- Pitcher
+- Can
+- Bottle
+
+Enable only the formats the organization actually uses.
+
+Disabled built-in formats:
+
+- stay out of Beer-format dropdowns,
+- are hidden in the generated Beer worksheet.
+
+Custom formats use Toast's hidden Optional Beer Category groups. Use **Add format** to reveal another slot, up to five. Each custom format has:
+
+- enabled state,
+- label/import mapping,
+- order/slot position,
+- remove control.
+
+Examples include custom draft sizes such as 10oz or 12oz and packaged formats such as Tall Boy Can.
+
+Custom formats remain distinct from Toast's built-in formats; they are not remapped into a different built-in size.
+
+## 5. Import an Aloha menu
 
 Open:
 
@@ -45,103 +140,89 @@ Open:
 /import-review
 ```
 
-The **New import** tab is available to Staff, Manager, and Admin roles.
+In **New import**, choose the Aloha CSV.
 
-Choose the Aloha menu-price CSV.
+The app:
 
-Nothing is written to persistent Inventory just by selecting the file.
+1. parses the report,
+2. removes structural noise,
+3. normalizes item/variant data,
+4. detects regular and Happy Hour pricing,
+5. flags suspicious rows,
+6. stages rows for review.
 
-The app will:
+Nothing is persisted just by selecting a file.
 
-1. parse the Aloha report,
-2. remove/ignore structural report noise,
-3. normalize menu items and variants,
-4. detect base and Happy Hour pricing,
-5. classify Menu Category data for internal Toast workbook routing,
-6. flag rows that need review, and
-7. stage the resulting rows for approval.
+Review/edit staged rows, then save approved rows to Inventory.
 
-## 3. Review the staged import
+## 6. Review import history
 
-The review table supports these main filters:
+In `/import-review`, open **History**.
 
-- **Needs review**
-- **Included**
-- **Excluded**
-- **All**
+History records include source type/name, user, counts, conflicts, status, and timestamps.
 
-Search can match item name, Aloha item number, Menu Category, Toast destination, and notes.
+The older `/imports` route exposes the history panel as a standalone compatibility page.
 
-For an individual staged row you can review/edit:
+## 7. Review persistent source mappings
 
-- item name,
-- Menu Category,
-- Toast destination (only when the item has a real Toast destination such as Bar, Dining Room, or Patio),
-- base price,
-- Happy Hour price,
-- whether the row is included in the import.
+Managers/Admins can open **Mapping review** in `/import-review`.
 
-Rows excluded here are not persisted as included import rows.
+A source mapping connects an organization/source row to a shared master item variant.
 
-When review is complete, choose **Save to Inventory**.
+Mappings may be:
 
-The save operation creates or updates persistent Inventory items/variants and records source mappings for the selected organization.
+- automatically created,
+- flagged for review when a similar item could be confused,
+- manually redirected,
+- explicitly confirmed.
 
-## 4. Review import history
+A confirmed mapping no longer remains in **Needs review** simply because a similarity warning originally existed.
 
-In `/import-review`, open the **History** tab.
+The standalone `/reconcile` route remains for compatibility.
 
-History records saved imports including:
+## 8. Stage a populated Toast workbook
 
-- source type,
-- source filename,
-- importing user,
-- item count,
-- variant count,
-- conflict count,
-- recorded conflicts,
-- timestamps/status.
-
-The older `/imports` route exposes the same history panel as a standalone compatibility view.
-
-## 5. Review source mappings
-
-Managers and Admins can open the **Mapping review** tab in `/import-review`.
-
-Source mappings connect an external source row/key to a persistent Inventory master item/variant. They are used so repeated imports can reconcile against the same Inventory identity instead of creating unnecessary duplicates.
-
-Use Mapping review for unmapped rows or mappings that need to be redirected to a different Inventory variant.
-
-The older `/reconcile` route exposes the same reconciliation panel as a standalone compatibility view.
-
-## 6. Import a populated Toast workbook
-
-For a location already using Toast, open:
+The preferred staged Toast-review workflow is on:
 
 ```text
-/toast-template-import
+/toast-workbook
 ```
 
-Choose the populated Toast Menu Template `.xlsx`.
+Use the staged-workbook source controls to load a populated Toast Menu Template.
 
-The importer currently reads common menu tabs including:
+Staging is organization-scoped. Bull's staged workbook does not become McCarthy's staged workbook, and switching organizations restores each organization's own staging state.
 
-- Beer
-- Liquor
-- Wine
-- Cocktails
-- NA Bev
-- Retail
+The staging parser reads business content from relevant visible sheets and ignores generated/helper sheets.
 
-Imported rows retain a user-facing Menu Category that the exporter uses internally to select the workbook worksheet. Worksheet names are not stored as Toast destinations.
+### Staged row review
 
-Retail rows can also be recovered from NA Bev when the row Group is Retail.
+Open a staged row to review/edit it.
 
-After parsing, choose **Save to Inventory** to persist the detected items/variants for the selected organization.
+The drawer uses explicit controls:
 
-The page can also download `toast-export-review.csv` as a portable legacy/diagnostic snapshot, but the persistent Inventory catalog is the normal source of truth after saving.
+- **Update** — save the row edit,
+- **Cancel** — discard row edits,
+- **Ignore** — exclude the row,
+- **Close** — close without autosaving unsaved edits.
 
-## 7. Work with the Catalog
+Do not treat closing the drawer as Save.
+
+## 9. Reconcile staged Toast rows to the master catalog
+
+After staged rows are reviewed, continue to the master reconciliation step.
+
+For each row being imported, explicitly choose either:
+
+- an existing master variant, or
+- **Create new master item**.
+
+The import API's explicit reconciliation mode requires one of those decisions for every row included in that import request.
+
+This prevents a reviewed Toast row from being silently attached to a merely similar master item.
+
+After persistence, source mappings are recorded/confirmed and can be reviewed later in **Mapping review**.
+
+## 10. Use the Catalog
 
 Open:
 
@@ -149,79 +230,122 @@ Open:
 /
 ```
 
-The Catalog is the main Inventory page.
+The Catalog groups organization-visible variants under shared master items.
 
-It loads the selected organization's persistent catalog from the Inventory API and groups variants under their master Inventory item.
+Filters:
+
+- Search
+- Menu Category
+- Availability:
+  - Carried here
+  - Not carried here
+  - All master items
+
+Open a row to use the edit drawer.
+
+### Shared vs organization-specific data
+
+Shared master data includes the canonical item identity and canonical category.
+
+Organization-specific variant data includes:
+
+- Available here,
+- Export to Toast,
+- local price,
+- Happy Hour price,
+- display/Toast name override,
+- Toast placement/slot data.
+
+Changing a shared canonical category affects the master item across organizations. Local availability/pricing changes affect only the selected organization.
+
+### Master item names
+
+The shared master item name is currently read-only in the UI.
 
 You can:
 
-- search items,
-- filter by Menu Category,
-- filter by availability:
-  - **Carried here**
-  - **Not carried here**
-  - **All master items**
-- open an item drawer to inspect its variants.
+- edit organization-specific variant names,
+- change canonical category,
+- merge duplicate master items.
 
-### Available here vs Export to Toast
+There is not yet a dedicated shared master-item rename control.
 
-These are intentionally different controls.
+## 11. Add an organization Beer format to an existing master item
 
-**Available here** means this organization carries the variant.
+When a shared Beer item exists but the selected organization needs a different enabled format, open the Catalog drawer.
 
-**Export to Toast** means the carried variant should be included when generating this organization's Toast workbook.
+The drawer offers only Beer formats enabled for the selected organization.
 
-A variant must be available here before it can be exported to Toast.
+For example, if Bull's enables Can, Bottle, and a custom 12oz format, McCarthy's 10oz/16oz variants do not become Bull's choices merely because they exist on the shared master item.
 
-### Organization-specific edits
+Choose an available format to create/reuse the shared master variant and attach the selected organization to it.
 
-Managers and Admins can edit organization-specific variant state such as:
+## 12. Bulk edit Catalog rows
 
-- displayed/Toast name override,
-- availability,
-- Export to Toast,
-- price override,
-- Happy Hour price.
+Use the **Bulk edit** control above the Catalog table.
 
-They can also manage organization-level **Happy Hour** settings from the Catalog page:
+When enabled, a checkbox column appears before the visible rows. The header checkbox selects/deselects the currently visible page.
 
-- enable/disable Happy Hour,
-- select the Time Range 1 days,
-- set the Time Range 1 start/end time,
-- optionally enable Time Range 2,
-- select separate Time Range 2 days,
-- set the Time Range 2 start/end time.
+Selection clears when page/filter context changes so actions remain scoped to what is visible.
 
-Changes use explicit **Update** / **Cancel** controls and persist through the Inventory organization-config API.
+Current icon actions:
 
-The shared master item name remains separate from an organization's name override.
+- Available here
+- Not carried here
+- Export to Toast
+- Do not export
+- Set price
 
-## 8. Merge duplicate master items
+The info icon opens a key explaining the icons. The key closes on outside click or Escape and is positioned near the info button while remaining inside the viewport.
 
-Inventory Admins can merge duplicate master Catalog items from the Catalog drawer.
+### Bulk price workflow
 
-Choose the incorrect/source master item, select the intended target master item, and run the merge.
+Bulk price is intentionally not immediate.
 
-The merge workflow moves or combines variants under the target master identity instead of leaving two duplicate master products.
+1. Select rows.
+2. Press the **$** action.
+3. Enter the new price.
+4. Press **Review changes**.
+5. Review every affected carried format with:
+   - item,
+   - format,
+   - current price,
+   - new price.
+6. Choose:
+   - **Cancel**,
+   - **Back**,
+   - **Save changes**.
 
-Because this changes shared master Inventory identity, merge controls are Admin-only.
+Nothing is changed until **Save changes**.
 
-## 9. Manage Inventory access
+Only carried formats in selected rows are affected.
 
-Inventory Admins can open:
+## 13. Merge duplicate master items
+
+Inventory Admins can merge duplicate shared master items from the Catalog drawer.
+
+Choose the duplicate/source item, select the master item to keep, then confirm the merge.
+
+The merge moves/composes variants and source mappings into the kept master item.
+
+Because this changes shared identity across organizations, merge is Admin-only.
+
+## 14. Manage Inventory assignments
+
+Open:
 
 ```text
 /assignments
 ```
 
-The Assignments page lists organization members and lets authorized admins:
+Admins can:
 
-- enable or disable Inventory access,
-- assign Viewer, Staff, Manager, or Admin role.
+- enable/disable Inventory access,
+- assign Viewer, Staff, Manager, or Admin.
 
-The selected organization in the header determines which assignments are being managed.
+The organization selector determines which organization's assignments are being managed.
 
-## 10. Export the current organization to Toast
+## 15. Export to Toast
 
 Open:
 
@@ -229,138 +353,102 @@ Open:
 /toast-workbook
 ```
 
-This route requires Staff, Manager, or Admin access.
+Normal export source: the selected organization's persistent Catalog.
 
-The normal source is now the selected organization's **persistent Inventory catalog**. You do not need to upload the earlier review CSV for a normal export.
-
-Inventory automatically loads:
+The pristine workbook is loaded from:
 
 ```text
 toast/menu/Toast-Menu-Template-Your-Restaurant-Name.xlsx
 ```
 
-from the repository's read-only Toast template mount.
+Every download starts from a fresh in-memory copy.
 
-Each export begins from a fresh in-memory copy of that pristine workbook.
+Available downloads:
 
-### Advanced source override
+- populated XLSX,
+- ZIP containing the same populated workbook.
 
-The Export to Toast page still contains an **Advanced source override** section.
+Generated filenames use the organization/store name and timestamp.
 
-Use it only when testing or recovering older data. It can temporarily source the export from:
+### Workbook content currently handled
 
-- `toast-export-review.csv`, or
-- a raw Aloha CSV.
+The exporter populates/validates:
 
-These overrides are session-level alternatives to the normal persistent Catalog source.
+- Beer
+- Liquor
+- Cocktails
+- NA Bev
+- Retail
+- Open Items
+- Notes / Happy Hour schedule
 
-## 11. Download the Toast package
+Retail and Open Items are created only when needed by cloning the pristine NA Bev worksheet and renaming the clone.
 
-The export page provides:
+Open Items rows may have blank prices.
 
-- **Download populated XLSX**
-- **Download ZIP for Toast**
+The Notes tab is always moved to the final workbook-tab position after dynamic worksheet creation.
 
-The ZIP contains the same populated workbook packaged for delivery to the Toast representative.
+## 16. Toast routing rules
 
-Generated filenames use the store/organization name when available and include a Pacific-time timestamp.
-
-For browser compatibility, the generated XLSX/ZIP is staged briefly on the Inventory server and then downloaded through a same-origin attachment response. This preserves the intended filename on iOS browsers, including Firefox on iOS, and tolerates the extra preview request some iOS download flows make before the final save.
-
-The current writer populates Beer and Liquor tabs.
-
-## 12. Happy Hour schedule in the Toast Notes tab
-
-When Happy Hour is enabled for the selected organization, the exporter writes the organization schedule into the Toast workbook's **Notes** tab.
-
-Current behavior:
-
-- Monday through Sunday can be selected independently for each configured range.
-- Time Range 1 uses its own organization start/end time and selected days.
-- Time Range 2 is optional and, when enabled, uses its own start/end time and selected days.
-- Unselected days are left blank within each range.
-- If Happy Hour is disabled, both ranges are left blank.
-- Workbook validation checks that the Notes schedule matches the organization settings before download.
-
-The Export to Toast page also displays the selected days and time window so the schedule can be reviewed before generating the workbook.
-
-## 13. Understand Beer variants and Toast's workbook structure
-
-Inventory stores the actual product/serving format as variant data.
+Canonical Inventory category is authoritative for workbook routing.
 
 Examples:
 
-- 10oz Draft
-- 16oz Draft
-- standard Can
-- 24oz Can / Tall Boy
-- Bottle
+- NA Bev stays in NA Bev even if stale old Toast metadata says Retail.
+- Retail stays in Retail.
+- Open Items stays in Open Items.
+- canonical Scotch routes to the Scotch section rather than an old organization Whiskey destination.
 
-Toast's supplied workbook structure remains the source template. Inventory does not add custom Beer columns; it maps organization formats into existing Toast slots.
+This prevents organization/source metadata from bleeding one category into another.
 
-Current mapping:
+## 17. Beer workbook visibility
 
-| Inventory variant | Toast workbook slot |
-| --- | --- |
-| organization-configured draft size | configured existing Toast draft slot |
-| standard Can | existing Can slot |
-| organization-specific optional Beer grouping | configured Optional Beer Category slot |
-| Bottle | existing Bottle slot |
+Inventory preserves Toast's worksheet structure.
 
-The organization settings control whether Optional Beer Category 1 is enabled and what label it uses. When enabled, export:
+It does not delete/move the fixed Beer columns.
 
-1. unhides the first Optional Beer Category,
-2. renames its package header cell (P14) to the configured organization label, and
-3. writes the assigned optional-category names and prices into that existing section.
+Instead, export toggles column visibility:
 
-The slot itself is generic. McCarthy's currently labels Optional Beer Category 1 **Tall Boy Can**, but another organization can name the slot differently. Reusing Toast's existing Optional Beer Category preserves the workbook structure without adding custom columns.
+- disabled built-in draft slots are hidden,
+- Can/Bottle are hidden when disabled,
+- the shared Draft Beer name column is hidden if no built-in draft format is enabled,
+- enabled Optional Beer Category groups are unhidden and relabeled,
+- disabled Optional Beer Category groups remain hidden.
 
-## 14. Canonical categories
+Example: an organization with only **Can** and custom **12oz** enabled can produce a Beer sheet whose visible product sections are effectively Can + 12oz while the underlying Toast template structure remains intact.
 
-The persistent Catalog carries canonical category information shared with Toast export.
+## 18. Advanced source override
 
-Toast export and the Toast workbook summary use the canonical Inventory category rather than relying only on old source text.
+The Export to Toast page retains **Advanced source override** for diagnostics/recovery.
 
-This matters especially after repeated imports, source reconciliation, and organization-specific overrides, because the persistent catalog—not the original CSV label—is the source of truth.
+It can temporarily source an export from older review data/raw source data instead of the persistent Catalog.
+
+Use persistent Inventory for normal ongoing operations.
 
 ## Development workflow
 
 ### Start/rebuild
-
-From the repository root:
 
 ```bash
 cd ~/docker/inventory-app
 docker compose up -d --build
 ```
 
-The Compose service currently starts the TanStack/Vite app automatically.
+The Compose service starts the TanStack/Vite development server automatically.
 
-The old interactive-only command is intentionally retained as a commented block in `docker-compose.yml`:
-
-```yaml
-# command:
-#   - sleep
-#   - infinity
-```
-
-You can temporarily switch back to that mode when needed, but normal development should use the active `npm run dev` command.
-
-### App address
-
-The dev server runs on container port 3000 and is exposed on:
+### Address
 
 ```text
 http://localhost:3350
 ```
 
-### Follow logs
+### Logs
 
 ```bash
 docker compose logs -f inventory-app
 ```
 
-### Install/update dependencies
+### Dependencies
 
 ```bash
 docker compose exec inventory-app npm install
@@ -372,19 +460,17 @@ docker compose exec inventory-app npm install
 docker compose exec inventory-app npm run generate-routes
 ```
 
-`app/src/routeTree.gen.ts` is generated and ignored by Git.
-
 ### Build check
 
 ```bash
 docker compose exec inventory-app npm run build
 ```
 
-Run a build after changes to routes, auth integration, shared packages, import logic, catalog behavior, or workbook generation.
+Run a build after route, auth, shared-package, import/reconciliation, Catalog, or workbook-generation changes.
 
 ## Shared repository mounts
 
-The Compose setup expects:
+Expected layout:
 
 ```text
 ~/docker/
@@ -393,99 +479,84 @@ The Compose setup expects:
 └── niteowl-app-config/
 ```
 
-These are mounted into the app so Inventory uses the shared NiteOwl UI and navigation/app configuration packages.
-
-The Toast source directory is mounted read-only:
+Toast source mount:
 
 ```text
 ./toast → /app/public/toast:ro
 ```
 
+The pristine Toast workbook must not be modified in place.
+
 ## Auth / Inventory API dependency
 
-Persistent Inventory storage is exposed through the Auth service rather than implemented as a database connection in this frontend.
+Persistent storage belongs to the Auth service Inventory plugin.
 
-The Inventory client currently uses authenticated endpoints for operations including:
+The frontend uses authenticated API operations for:
 
-- access checks,
-- assignments,
-- catalog reads,
+- access/assignments,
+- catalog,
+- organization config,
+- organization-variant updates,
+- bulk variant updates,
+- Beer format creation/reuse,
 - imports,
+- explicit reconciliation,
 - import history,
 - source mappings,
-- organization-variant updates,
-- master-item merges.
+- mapping confirmation,
+- canonical category updates,
+- master-item merge.
 
-All requests use the current Better Auth session and organization context.
+Database/schema work is done in the Auth repository, not directly in this frontend.
 
 ## CLI pipeline
 
-The repository still contains the earlier Node/bash Aloha normalization pipeline.
-
-Run its tests:
+The older Aloha CLI remains under `bash-scripts/`.
 
 ```bash
 bash ./bash-scripts/test-all.sh
 ```
 
-Normalize an Aloha file for review:
-
-```bash
-bash ./bash-scripts/normalize-aloha-for-review.sh \
-  "McCarthy's Pub Menu Items.csv" \
-  ./output
-```
-
-See `bash-scripts/README.md` for the CLI-specific outputs and normalization details.
+See `bash-scripts/README.md` for CLI-specific behavior.
 
 ## Troubleshooting
 
-### I cannot see an organization
+### An item exports to the wrong worksheet/section
 
-Inventory only displays organizations for which your signed-in account passes the Inventory access check.
+Check its canonical Menu Category first. Canonical category is authoritative for workbook routing.
 
-Confirm the organization membership and Inventory assignment in the Auth service / Inventory Assignments page.
+### An item is carried but does not export
 
-### I can see Inventory but cannot import/export
+Check both:
 
-A Viewer can browse but cannot import/export. Staff or higher is required.
+1. **Available here**
+2. **Export to Toast**
 
-### I can import but cannot edit Catalog mappings
+For most priced categories, also verify a valid price. Open Items is the exception: blank prices are allowed.
 
-Catalog/mapping edits require Manager or Admin.
+### An organization sees another organization's Beer formats
 
-### I cannot see Assignments or merge items
+Check Organization Settings. Catalog Beer choices are supposed to be filtered to formats enabled for the selected organization; shared variants from another location should not automatically appear as valid local choices.
 
-Those operations require Inventory Admin.
+### A custom Beer format does not export
 
-### A Catalog item does not export to Toast
+Verify the custom Optional Beer Category is enabled and the variant is assigned to its stable slot.
 
-Check both organization controls:
+### A built-in Beer section is visible but disabled
 
-1. **Available here** must be enabled.
-2. **Export to Toast** must be enabled.
+Regenerate the workbook after saving Organization Settings. Export validation checks built-in Beer column visibility.
 
-Also verify the variant is active, has the correct Menu Category for workbook routing, and has a valid price. Toast Destination does not select a workbook worksheet.
+### Mapping Review still says Review after I picked the correct master
 
-### An Optional Beer Category item does not appear where expected
+The mapping must be explicitly saved/confirmed. Confirmed mappings are tracked with `mappingConfirmed`.
 
-Verify Optional Beer Category 1 is enabled for the organization and that its configured label is correct.
+### The generated workbook tab order looks wrong
 
-When enabled, the writer uses the first existing Optional Beer Category, unhides it, and applies the organization-specific label to P14. McCarthy's currently uses **Tall Boy Can** as that label; the slot itself is not hardcoded to Tall Boys.
-
-### An import creates or maps to the wrong product
-
-Review the **Mapping review** workspace. Persistent source mappings determine which master item/variant repeated source rows reconcile to.
-
-### I need to recover an older browser review file
-
-Use the **Advanced source override** section on `/toast-workbook` and upload `toast-export-review.csv`.
-
-For normal ongoing use, save imports to persistent Inventory and export from the Catalog instead.
+Notes should be the final tab. Retail/Open Items are inserted before Notes when dynamically created.
 
 ### The app cannot resolve @niteowl packages
 
-Confirm these sibling directories exist:
+Confirm sibling directories:
 
 ```text
 ../niteowl-ui
@@ -494,13 +565,13 @@ Confirm these sibling directories exist:
 
 ### Docker says niteowl-dev does not exist
 
-Create the external network once:
+Create it once:
 
 ```bash
 docker network create niteowl-dev
 ```
 
-Then rerun:
+Then:
 
 ```bash
 docker compose up -d
