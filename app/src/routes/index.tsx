@@ -57,7 +57,15 @@ function CatalogPage() {
   const [bulkEditEnabled, setBulkEditEnabled] = useState(false)
   const [bulkUpdating, setBulkUpdating] = useState(false)
   const [bulkHelpOpen, setBulkHelpOpen] = useState(false)
+  const [bulkHelpPosition, setBulkHelpPosition] = useState<{
+    top: number
+    left: number
+    width: number
+    maxHeight: number
+  } | null>(null)
   const bulkHelpRef = useRef<HTMLDivElement>(null)
+  const bulkHelpButtonRef = useRef<HTMLButtonElement>(null)
+  const bulkHelpPopoverRef = useRef<HTMLDivElement>(null)
   const [selectedBulkGroupIds, setSelectedBulkGroupIds] = useState<Set<string>>(
     () => new Set(),
   )
@@ -177,7 +185,51 @@ function CatalogPage() {
   }, [bulkEditEnabled])
 
   useEffect(() => {
-    if (!bulkHelpOpen) return
+    if (!bulkHelpOpen) {
+      setBulkHelpPosition(null)
+      return
+    }
+
+    function positionBulkHelp() {
+      const trigger = bulkHelpButtonRef.current
+      const popover = bulkHelpPopoverRef.current
+      if (!trigger || !popover) return
+
+      const viewportPadding = 16
+      const gap = 10
+      const triggerRect = trigger.getBoundingClientRect()
+      const width = Math.min(384, window.innerWidth - viewportPadding * 2)
+      const naturalHeight = Math.min(popover.scrollHeight, 480)
+      const spaceBelow =
+        window.innerHeight - triggerRect.bottom - gap - viewportPadding
+      const spaceAbove = triggerRect.top - gap - viewportPadding
+      const placeBelow =
+        spaceBelow >= naturalHeight || spaceBelow >= spaceAbove
+      const availableSpace = placeBelow ? spaceBelow : spaceAbove
+      const maxHeight = Math.max(96, availableSpace)
+      const renderedHeight = Math.min(naturalHeight, maxHeight)
+
+      const idealLeft =
+        triggerRect.left + triggerRect.width / 2 - width / 2
+      const left = Math.min(
+        Math.max(viewportPadding, idealLeft),
+        Math.max(viewportPadding, window.innerWidth - width - viewportPadding),
+      )
+      const idealTop = placeBelow
+        ? triggerRect.bottom + gap
+        : triggerRect.top - gap - renderedHeight
+      const top = Math.min(
+        Math.max(viewportPadding, idealTop),
+        Math.max(viewportPadding, window.innerHeight - renderedHeight - viewportPadding),
+      )
+
+      setBulkHelpPosition({
+        top,
+        left,
+        width,
+        maxHeight,
+      })
+    }
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target
@@ -196,12 +248,18 @@ function CatalogPage() {
       }
     }
 
+    const frame = window.requestAnimationFrame(positionBulkHelp)
     document.addEventListener('pointerdown', handlePointerDown)
     document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', positionBulkHelp)
+    window.addEventListener('scroll', positionBulkHelp, true)
 
     return () => {
+      window.cancelAnimationFrame(frame)
       document.removeEventListener('pointerdown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', positionBulkHelp)
+      window.removeEventListener('scroll', positionBulkHelp, true)
     }
   }, [bulkHelpOpen])
 
@@ -538,6 +596,7 @@ function CatalogPage() {
               <div ref={bulkHelpRef} className="inventory-catalog-bulk-help">
                 <button
                   type="button"
+                  ref={bulkHelpButtonRef}
                   className="inventory-catalog-bulk-help-button"
                   aria-label="Bulk edit button key"
                   aria-expanded={bulkHelpOpen}
@@ -549,9 +608,22 @@ function CatalogPage() {
 
                 {bulkHelpOpen ? (
                   <div
+                    ref={bulkHelpPopoverRef}
                     className="inventory-catalog-bulk-help-popover"
                     role="dialog"
                     aria-label="Bulk edit button key"
+                    style={{
+                      position: 'fixed',
+                      top: bulkHelpPosition?.top ?? 0,
+                      left: bulkHelpPosition?.left ?? 0,
+                      right: 'auto',
+                      bottom: 'auto',
+                      width: bulkHelpPosition?.width ?? 320,
+                      maxWidth: 'none',
+                      maxHeight: bulkHelpPosition?.maxHeight ?? 320,
+                      overflowY: 'auto',
+                      visibility: bulkHelpPosition ? 'visible' : 'hidden',
+                    }}
                   >
                     <strong>Bulk edit key</strong>
                     <div>
