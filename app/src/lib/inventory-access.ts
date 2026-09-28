@@ -132,6 +132,8 @@ export type InventoryOrganizationConfig = {
   draft24ActualSizeOz: number | null
   pitcherEnabled: boolean
   pitcherActualSizeOz: number | null
+  canEnabled: boolean
+  bottleEnabled: boolean
   optionalBeerCategory1Enabled: boolean
   optionalBeerCategory1Label: string
   optionalBeerCategory2Enabled: boolean
@@ -333,6 +335,8 @@ export async function updateInventoryOrganizationConfig(input: {
   draft24ActualSizeOz: number | null
   pitcherEnabled: boolean
   pitcherActualSizeOz: number | null
+  canEnabled: boolean
+  bottleEnabled: boolean
   optionalBeerCategory1Enabled: boolean
   optionalBeerCategory1Label: string
   optionalBeerCategory2Enabled: boolean
@@ -395,6 +399,8 @@ function normalizeInventoryOrganizationConfig(
     draft24ActualSizeOz: config?.draft24ActualSizeOz ?? null,
     pitcherEnabled: config?.pitcherEnabled ?? false,
     pitcherActualSizeOz: config?.pitcherActualSizeOz ?? null,
+    canEnabled: config?.canEnabled ?? true,
+    bottleEnabled: config?.bottleEnabled ?? true,
     optionalBeerCategory1Enabled:
       config?.optionalBeerCategory1Enabled ?? false,
     optionalBeerCategory1Label:
