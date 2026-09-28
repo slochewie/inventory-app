@@ -388,7 +388,10 @@ function matchesSimpleWorkbookDestination(
   item: NormalizedMenuItem,
   workbookCategory: 'NA Bev' | 'Retail',
 ) {
-  if (getToastWorkbookCategory(item) === workbookCategory) return true
+  const routedCategory = getToastWorkbookCategory(item)
+  if (routedCategory !== null) {
+    return routedCategory === workbookCategory
+  }
 
   const destination = clean(item.toastDestination)
 
