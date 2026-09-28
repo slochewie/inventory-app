@@ -19,6 +19,10 @@ jobs:
           node <<'NODE'
           const fs = require('fs')
 
+          function lines(parts) {
+            return parts.join('\n') + '\n'
+          }
+
           function replaceOnce(text, from, to) {
             if (!text.includes(from)) {
               throw new Error('Missing expected block:\n' + from)
@@ -31,35 +35,44 @@ jobs:
 
           workbook = replaceOnce(
             workbook,
-            "import { buildBeerTabPreviewRows, getDraftBeerPrice, type BeerTabPreviewRow } from './beer-preview'\nimport type { NormalizedMenuItem } from './types'\n",
-            "import { buildBeerTabPreviewRows, getDraftBeerPrice, type BeerTabPreviewRow } from './beer-preview'\nimport type { NormalizedMenuItem } from './types'\nimport { getToastWorkbookCategory } from './workbook-routing'\n",
+            lines([
+              "import { buildBeerTabPreviewRows, getDraftBeerPrice, type BeerTabPreviewRow } from './beer-preview'",
+              "import type { NormalizedMenuItem } from './types'",
+            ]),
+            lines([
+              "import { buildBeerTabPreviewRows, getDraftBeerPrice, type BeerTabPreviewRow } from './beer-preview'",
+              "import type { NormalizedMenuItem } from './types'",
+              "import { getToastWorkbookCategory } from './workbook-routing'",
+            ]),
           )
 
           workbook = replaceOnce(
             workbook,
-`function buildWorkbookBeerRows(
-  items: NormalizedMenuItem[],
-  happyHourEnabled: boolean,
-  draftSlotMappings: readonly ToastDraftSlotMapping[],
-  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
-) {
-  const merged = new Map<string, BeerTabPreviewRow>()
-
-  buildBeerTabPreviewRows(items, happyHourEnabled)
-`,
-`function buildWorkbookBeerRows(
-  items: NormalizedMenuItem[],
-  happyHourEnabled: boolean,
-  draftSlotMappings: readonly ToastDraftSlotMapping[],
-  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
-) {
-  const merged = new Map<string, BeerTabPreviewRow>()
-  const beerItems = items.filter(
-    (item) => getToastWorkbookCategory(item) === 'Beer',
-  )
-
-  buildBeerTabPreviewRows(beerItems, happyHourEnabled)
-`,
+            lines([
+              'function buildWorkbookBeerRows(',
+              '  items: NormalizedMenuItem[],',
+              '  happyHourEnabled: boolean,',
+              '  draftSlotMappings: readonly ToastDraftSlotMapping[],',
+              '  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],',
+              ') {',
+              '  const merged = new Map<string, BeerTabPreviewRow>()',
+              '',
+              '  buildBeerTabPreviewRows(items, happyHourEnabled)',
+            ]),
+            lines([
+              'function buildWorkbookBeerRows(',
+              '  items: NormalizedMenuItem[],',
+              '  happyHourEnabled: boolean,',
+              '  draftSlotMappings: readonly ToastDraftSlotMapping[],',
+              '  optionalBeerCategories: readonly OptionalBeerCategoryOptions[],',
+              ') {',
+              '  const merged = new Map<string, BeerTabPreviewRow>()',
+              '  const beerItems = items.filter(',
+              "    (item) => getToastWorkbookCategory(item) === 'Beer',",
+              '  )',
+              '',
+              '  buildBeerTabPreviewRows(beerItems, happyHourEnabled)',
+            ]),
           )
 
           fs.writeFileSync(workbookPath, workbook)
@@ -75,40 +88,42 @@ jobs:
 
           liquor = replaceOnce(
             liquor,
-`function matchesSimpleWorkbookDestination(
-  item: NormalizedMenuItem,
-  workbookCategory: 'NA Bev' | 'Retail',
-) {
-  const destination = clean(item.toastDestination)
-
-  if (workbookCategory === 'NA Bev') {
-    return /^(?:toast\\s+)?na\\s*bev(?:\\s+tab)?(?:\\b|:)/i.test(destination)
-      || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
-  }
-
-  return /^(?:toast\\s+)?retail(?:\\s+tab)?(?:\\b|:)/i.test(destination)
-    || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
-}
-`,
-`function matchesSimpleWorkbookDestination(
-  item: NormalizedMenuItem,
-  workbookCategory: 'NA Bev' | 'Retail',
-) {
-  if (getToastWorkbookCategory(item) === workbookCategory) return true
-
-  const destination = clean(item.toastDestination)
-
-  if (workbookCategory === 'NA Bev') {
-    return /^(?:toast\\s+)?na\\s*bev(?:\\s+tab)?(?:\\b|:)/i.test(destination)
-      || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)
-      || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
-  }
-
-  return /^(?:toast\\s+)?retail(?:\\s+tab)?(?:\\b|:)/i.test(destination)
-    || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)
-    || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
-}
-`,
+            lines([
+              'function matchesSimpleWorkbookDestination(',
+              '  item: NormalizedMenuItem,',
+              "  workbookCategory: 'NA Bev' | 'Retail',",
+              ') {',
+              '  const destination = clean(item.toastDestination)',
+              '',
+              "  if (workbookCategory === 'NA Bev') {",
+              "    return /^(?:toast\\s+)?na\\s*bev(?:\\s+tab)?(?:\\b|:)/i.test(destination)",
+              '      || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)',
+              '  }',
+              '',
+              "  return /^(?:toast\\s+)?retail(?:\\s+tab)?(?:\\b|:)/i.test(destination)",
+              '    || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)',
+              '}',
+            ]),
+            lines([
+              'function matchesSimpleWorkbookDestination(',
+              '  item: NormalizedMenuItem,',
+              "  workbookCategory: 'NA Bev' | 'Retail',",
+              ') {',
+              '  if (getToastWorkbookCategory(item) === workbookCategory) return true',
+              '',
+              '  const destination = clean(item.toastDestination)',
+              '',
+              "  if (workbookCategory === 'NA Bev') {",
+              "    return /^(?:toast\\s+)?na\\s*bev(?:\\s+tab)?(?:\\b|:)/i.test(destination)",
+              '      || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)',
+              '      || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)',
+              '  }',
+              '',
+              "  return /^(?:toast\\s+)?retail(?:\\s+tab)?(?:\\b|:)/i.test(destination)",
+              '    || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)',
+              '    || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)',
+              '}',
+            ]),
           )
 
           fs.writeFileSync(liquorPath, liquor)
@@ -123,4 +138,4 @@ jobs:
           git commit -m "Route workbook tabs from canonical category"
           git push
 
-# trigger: 2
+# trigger: 3
