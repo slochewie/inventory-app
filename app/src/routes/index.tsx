@@ -14,6 +14,7 @@ import {
   mergeInventoryItems,
   updateInventoryItemCategory,
   updateInventoryOrganizationVariant,
+  type InventoryOrganizationConfig,
   type OptionalBeerCategoryConfig,
 } from '#/lib/inventory-access'
 
@@ -51,11 +52,14 @@ function CatalogPage() {
   const [mergingItemId, setMergingItemId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryConfig[]>([])
+  const [organizationConfig, setOrganizationConfig] =
+    useState<InventoryOrganizationConfig | null>(null)
 
 
   useEffect(() => {
     if (!activeOrganization?.id) {
       setItems([])
+      setOrganizationConfig(null)
       return
     }
 
@@ -69,6 +73,7 @@ function CatalogPage() {
     ])
       .then(([catalog, organizationConfig]) => {
         const catalogItems = catalog.items.map(catalogRowToNormalizedItem)
+        setOrganizationConfig(organizationConfig)
         setItems(catalogItems)
         setSelectedGroupId(null)
         setPage(1)
@@ -438,6 +443,7 @@ function CatalogPage() {
             allGroups={groups}
             categoryOptions={categoryOptions}
             optionalBeerCategories={optionalBeerCategories}
+            organizationConfig={organizationConfig}
             savingVariantId={savingVariantId}
             merging={mergingItemId === selectedGroup.id}
             onClose={() => setSelectedGroupId(null)}
@@ -458,6 +464,7 @@ function CatalogDrawer({
   allGroups,
   categoryOptions,
   optionalBeerCategories,
+  organizationConfig,
   savingVariantId,
   merging,
   onClose,
@@ -471,6 +478,7 @@ function CatalogDrawer({
   allGroups: CatalogGroup[]
   categoryOptions: CatalogCategoryOption[]
   optionalBeerCategories: OptionalBeerCategoryConfig[]
+  organizationConfig: InventoryOrganizationConfig | null
   savingVariantId: string | null
   merging: boolean
   onClose: () => void
@@ -513,6 +521,16 @@ function CatalogDrawer({
     categoryOptions.find((option) => option.id === draftCategoryId)?.name ??
     group.category
   const selectedCategoryIsBeer = isBeerCategoryName(selectedCategoryName)
+  const visibleDraftItems =
+    selectedCategoryIsBeer && organizationConfig
+      ? draftItems.filter((item) =>
+          isBeerVariantEnabledForOrganization(
+            item,
+            organizationConfig,
+            optionalBeerCategories,
+          ),
+        )
+      : draftItems
 
   const hasChanges = categoryChanged || draftItems.some((draftItem) => {
     const original = group.items.find((item) => item.id === draftItem.id)
@@ -617,7 +635,7 @@ function CatalogDrawer({
           <p className="inventory-kicker">{selectedCategoryName}</p>
           <h2 id="inventory-catalog-drawer-title">{group.name}</h2>
           <p>
-            {group.items.length} format{group.items.length === 1 ? '' : 's'} · {carriedCount} available here
+            {visibleDraftItems.length} format{visibleDraftItems.length === 1 ? '' : 's'} · {carriedCount} available here
           </p>
         </div>
         <button type="button" onClick={onClose}>Close</button>
@@ -661,7 +679,7 @@ function CatalogDrawer({
         </div>
 
         <div className="inventory-catalog-variants">
-          {draftItems.map((item) => {
+          {visibleDraftItems.map((item) => {
             const saving = savingVariantId === item.id
 
             return (
@@ -904,6 +922,75 @@ function NameField({
       ) : null}
     </label>
   )
+}
+
+function isBeerVariantEnabledForOrganization(
+  item: NormalizedMenuItem,
+  config: InventoryOrganizationConfig,
+  optionalBeerCategories: readonly OptionalBeerCategoryConfig[],
+) {
+  if (item.organizationEnabled === true) return true
+
+  const normalizedVariantLabel = normalizeBeerFormatLabel(item.variantLabel ?? '')
+  const matchingCustomCategory = optionalBeerCategories.some(
+    (category) =>
+      category.enabled &&
+      normalizeBeerFormatLabel(category.label) === normalizedVariantLabel,
+  )
+  if (matchingCustomCategory) return true
+
+  if (item.variantKind === 'draft') {
+    if (item.variantSizeOz === 8) return config.draft8Enabled
+    if (item.variantSizeOz === 16) return config.draft16Enabled
+    if (item.variantSizeOz === 24) return config.draft24Enabled
+
+    if (
+      item.variantSizeOz === null &&
+      /\bpitcher\b/i.test(item.variantLabel ?? '')
+    ) {
+      return config.pitcherEnabled
+    }
+
+    if (item.variantSizeOz !== null) {
+      return optionalBeerCategories.some((category) => {
+        if (!category.enabled) return false
+        return parseOptionalBeerCategoryDraftSize(category.label) ===
+          item.variantSizeOz
+      })
+    }
+
+    return false
+  }
+
+  const packageText = [
+    item.variantPackageType ?? '',
+    item.variantLabel ?? '',
+    item.toastDestination ?? '',
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  if (packageText.includes('bottle') || /\bbtl\b/.test(packageText)) {
+    return config.bottleEnabled
+  }
+
+  if (packageText.includes('can')) {
+    const customPackageMatch = optionalBeerCategories.some(
+      (category) =>
+        category.enabled &&
+        normalizeBeerFormatLabel(category.label) === normalizedVariantLabel,
+    )
+    return customPackageMatch || config.canEnabled
+  }
+
+  return false
+}
+
+function normalizeBeerFormatLabel(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
 }
 
 function getVariantDestinationLabel(item: NormalizedMenuItem, categoryName: string) {
