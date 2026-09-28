@@ -1129,8 +1129,6 @@ function isBeerVariantEnabledForOrganization(
   config: InventoryOrganizationConfig,
   optionalBeerCategories: readonly OptionalBeerCategoryConfig[],
 ) {
-  if (item.organizationEnabled === true) return true
-
   const normalizedVariantLabel = normalizeBeerFormatLabel(item.variantLabel ?? '')
   const matchingCustomCategory = optionalBeerCategories.some(
     (category) =>
