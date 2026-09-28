@@ -10,8 +10,11 @@ import {
   getInventoryOrganizationConfig,
   getOptionalBeerCategories,
   listInventoryCatalog,
+  listInventorySourceMappings,
   persistInventoryImport,
+  type InventoryCatalogRow,
   type InventoryOrganizationConfig,
+  type InventorySourceMapping,
 } from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
 import {
@@ -56,6 +59,10 @@ type WorkbookState = {
 }
 
 type StagedReviewStatus = 'review' | 'ready' | 'all'
+
+type ReconciliationDecision =
+  | { kind: 'existing'; variantId: string }
+  | { kind: 'new' }
 
 const STAGED_REVIEW_PAGE_SIZE = 25
 
@@ -162,6 +169,15 @@ function ToastWorkbook() {
     useState<string | null>(null)
   const [importingReviewedItems, setImportingReviewedItems] = useState(false)
   const [importReviewedError, setImportReviewedError] = useState<string | null>(null)
+  const [masterCatalog, setMasterCatalog] = useState<InventoryCatalogRow[]>([])
+  const [sourceMappings, setSourceMappings] = useState<InventorySourceMapping[]>([])
+  const [reconciliationActive, setReconciliationActive] = useState(false)
+  const [reconciliationDecisions, setReconciliationDecisions] = useState<
+    Record<string, ReconciliationDecision>
+  >({})
+  const [selectedReconciliationItemId, setSelectedReconciliationItemId] =
+    useState<string | null>(null)
+  const [reconciliationQuery, setReconciliationQuery] = useState('')
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const beerExportItemCount = items.filter(
