@@ -17,6 +17,7 @@ import {
   listInventoryCatalog,
   persistInventoryImport,
   updateInventoryOrganizationVariant,
+  type InventoryOrganizationConfig,
   type OptionalBeerCategoryConfig,
 } from '#/lib/inventory-access'
 import {
@@ -54,6 +55,24 @@ const EMPTY_DRAFT: ManualItemDraft = {
   exportToToast: true,
 }
 
+function isEnabledBuiltInBeerDestination(
+  destination: string,
+  config: InventoryOrganizationConfig | null,
+) {
+  if (!config) return true
+
+  const normalized = destination.trim().toLowerCase()
+
+  if (normalized === 'beer tab · draft beer 8oz') return config.draft8Enabled
+  if (normalized === 'beer tab · draft beer 16oz') return config.draft16Enabled
+  if (normalized === 'beer tab · draft beer 24oz') return config.draft24Enabled
+  if (normalized === 'beer tab · pitcher') return config.pitcherEnabled
+  if (normalized === 'beer tab · can') return config.canEnabled
+  if (normalized === 'beer tab · bottle') return config.bottleEnabled
+
+  return true
+}
+
 function ManualItemPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [draft, setDraft] = useState<ManualItemDraft>(EMPTY_DRAFT)
@@ -61,6 +80,8 @@ function ManualItemPage() {
   const [destinationOptions, setDestinationOptions] = useState<string[]>([])
   const [menuCategories, setMenuCategories] = useState<InventoryMenuCategory[]>([])
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryConfig[]>([])
+  const [organizationConfig, setOrganizationConfig] =
+    useState<InventoryOrganizationConfig | null>(null)
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +93,7 @@ function ManualItemPage() {
       setDestinationOptions([])
       setMenuCategories([])
       setOptionalBeerCategories([])
+      setOrganizationConfig(null)
       return
     }
 
@@ -135,6 +157,7 @@ function ManualItemPage() {
         setCatalogCategoryOptions([...categories].sort((left, right) => left.localeCompare(right)))
         setDestinationOptions([...destinations].sort((left, right) => left.localeCompare(right)))
         setOptionalBeerCategories(getOptionalBeerCategories(organizationConfig))
+        setOrganizationConfig(organizationConfig)
       })
       .catch((caught) => {
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -162,14 +185,20 @@ function ManualItemPage() {
   }, [catalogCategoryOptions, menuCategories])
 
   const allDestinationOptions = useMemo(() => {
+    const builtInDestinations = getBuiltInToastDestinations().filter((destination) =>
+      isEnabledBuiltInBeerDestination(destination, organizationConfig),
+    )
+
     return mergeCategoryOptions(
-      getBuiltInToastDestinations(),
+      builtInDestinations,
       mergeCategoryOptions(
-        destinationOptions,
+        destinationOptions.filter((destination) =>
+          isEnabledBuiltInBeerDestination(destination, organizationConfig),
+        ),
         menuCategories.map((category) => category.toastDestination),
       ),
     )
-  }, [destinationOptions, menuCategories])
+  }, [destinationOptions, menuCategories, organizationConfig])
 
   const enabledOptionalBeerCategories = useMemo(
     () => optionalBeerCategories.filter((category) => category.enabled),
