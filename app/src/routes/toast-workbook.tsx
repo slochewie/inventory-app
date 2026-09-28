@@ -713,6 +713,16 @@ function ToastWorkbook() {
           label,
         }))
       : []
+    const builtInFormatVisibility = organizationConfig
+      ? {
+          draft8Enabled: organizationConfig.draft8Enabled,
+          draft16Enabled: organizationConfig.draft16Enabled,
+          draft24Enabled: organizationConfig.draft24Enabled,
+          pitcherEnabled: organizationConfig.pitcherEnabled,
+          canEnabled: organizationConfig.canEnabled,
+          bottleEnabled: organizationConfig.bottleEnabled,
+        }
+      : undefined
     const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
       templateArrayBuffer: workbook.arrayBuffer.slice(0),
       items,
@@ -726,6 +736,7 @@ function ToastWorkbook() {
       happyHourRange2Days: organizationConfig?.happyHourRange2Days,
       draftSlotMappings,
       optionalBeerCategories,
+      builtInFormatVisibility,
     })
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
