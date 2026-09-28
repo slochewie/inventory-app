@@ -1189,6 +1189,38 @@ function ToastWorkbook() {
                   ) : null}
                 </section>
 
+                {selectedReconciliationItemId ? (
+                  <StagedReconciliationDrawer
+                    item={
+                      items.find(
+                        (item) => item.id === selectedReconciliationItemId,
+                      )!
+                    }
+                    catalog={masterCatalog}
+                    decision={
+                      reconciliationDecisions[selectedReconciliationItemId]
+                    }
+                    onClose={() => setSelectedReconciliationItemId(null)}
+                    onChooseExisting={(variantId) => {
+                      setReconciliationDecisions((current) => ({
+                        ...current,
+                        [selectedReconciliationItemId]: {
+                          kind: 'existing',
+                          variantId,
+                        },
+                      }))
+                      setSelectedReconciliationItemId(null)
+                    }}
+                    onChooseNew={() => {
+                      setReconciliationDecisions((current) => ({
+                        ...current,
+                        [selectedReconciliationItemId]: { kind: 'new' },
+                      }))
+                      setSelectedReconciliationItemId(null)
+                    }}
+                  />
+                ) : null}
+
                 {selectedStagedItem ? (
                   <StagedItemDrawer
                     item={selectedStagedItem}
