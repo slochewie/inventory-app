@@ -521,6 +521,40 @@ export async function listInventoryImports(
 }
 
 
+export async function addInventoryOrganizationVariant(input: {
+  organizationId: string
+  itemId: string
+  toastCategory: string
+  toastDestination: string
+  toastSlot?: string | null
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/organization-variant"),
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  )
+  const result = (await response.json()) as {
+    variantId?: string
+    error?: string
+  }
+
+  if (!response.ok || typeof result.variantId !== "string") {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to add Inventory format.",
+    )
+  }
+
+  return result.variantId
+}
+
 export async function updateInventoryOrganizationVariant(input: {
   organizationId: string
   variantId: string
