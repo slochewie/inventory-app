@@ -5,6 +5,7 @@ export type ToastWorkbookCategory =
   | 'Cocktails'
   | 'NA Bev'
   | 'Retail'
+  | 'Open Items'
 
 export function getToastWorkbookCategory(
   item: Pick<NormalizedMenuItem, 'category' | 'toastCategory'>,
@@ -33,6 +34,7 @@ export function normalizeToastWorkbookCategory(
     return 'NA Bev'
   }
   if (key === 'retail') return 'Retail'
+  if (key === 'open items' || key === 'open item') return 'Open Items'
 
   return null
 }
