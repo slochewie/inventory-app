@@ -264,6 +264,7 @@ When an existing Toast workbook is staged for review, Inventory preserves the st
 ## Toast Destination workbook routing
 
 **Toast Destination** is the workbook placement target used during Toast export. It identifies where an item belongs in the XLSX, including Beer slots, Liquor groups, Cocktails, NA Bev, and Retail.
+- Open Items is an optional organization category like Retail. When Open Items rows are exported, Inventory clones the pristine NA Bev worksheet, renames the clone Open Items, populates only Open Items rows there, and keeps Notes as the final workbook tab.
 
 Menu Category is the user-facing grouping used when adding and organizing items. Beer, Cocktails, and NA Bev are built in. Retail is the currently supported optional category.
 
