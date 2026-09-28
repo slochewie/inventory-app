@@ -26,6 +26,11 @@ const MENU_CATEGORY_DEFAULTS: readonly MenuCategoryDefault[] = [
     toastCategory: 'Retail',
     toastDestination: 'Retail',
   },
+  {
+    name: 'Open Items',
+    toastCategory: 'Open Items',
+    toastDestination: 'Open Items',
+  },
 ]
 
 type StoredMenuCategories = {
@@ -263,6 +268,7 @@ export function getMenuCategoryDestination(value: string) {
     return 'NA Bev'
   }
   if (key === 'retail') return 'Retail'
+  if (key === 'open items' || key === 'open item') return 'Open Items'
 
   return ''
 }
