@@ -740,6 +740,8 @@ select {
 
 
 .inventory-organization-settings {
+  container-name: inventory-organization-settings;
+  container-type: inline-size;
   width: min(100%, 96rem);
   border: 1px solid #e5e7eb;
   border-radius: 1rem;
@@ -967,7 +969,7 @@ select {
   grid-column: auto;
 }
 
-@media (max-width: 1000px) {
+@container inventory-organization-settings (max-width: 80rem) {
   .inventory-organization-settings-content {
     grid-template-columns: 1fr;
   }
