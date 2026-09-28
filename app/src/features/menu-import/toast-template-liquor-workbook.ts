@@ -142,9 +142,10 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
 
   populateLiquorSheet(workbookPackage, items, happyHourEnabled)
   populateCocktailsSheet(workbookPackage, items, happyHourEnabled)
-  // Retail duplicates the pristine NA Bev sheet when needed, so create it
-  // before writing NA Bev rows into the source worksheet.
+  // Retail and Open Items duplicate the pristine NA Bev sheet when needed,
+  // so create them before writing NA Bev rows into the source worksheet.
   populateRetailSheet(workbookPackage, items)
+  populateOpenItemsSheet(workbookPackage, items)
   populateNaBevSheet(workbookPackage, items)
   populateHappyHourNotesSheet(
     workbookPackage,
@@ -224,6 +225,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     issues,
   )
   const retail = validateRetailSheet(workbookPackage, items, issues)
+  const openItems = validateOpenItemsSheet(workbookPackage, items, issues)
   const naBev = validateNaBevSheet(workbookPackage, items, issues)
 
   const happyHourNotes = validateHappyHourNotesSheet(
@@ -253,6 +255,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     cocktailRows: cocktails,
     naBevRows: naBev,
     retailRows: retail,
+    openItemsRows: openItems,
     happyHourNotes: happyHourNotes.valid,
   }
 }
@@ -287,8 +290,20 @@ function populateRetailSheet(
   const rows = getRetailRows(items)
   if (rows.length === 0) return
 
-  ensureRetailSheet(workbookPackage)
+  ensureSimpleClonedSheet(workbookPackage, 'Retail')
   const mapping = getSimpleSheetMapping(workbookPackage, 'Retail')
+  writeSimpleMenuRows(workbookPackage, mapping, rows)
+}
+
+function populateOpenItemsSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+) {
+  const rows = getOpenItemsRows(items)
+  if (rows.length === 0) return
+
+  ensureSimpleClonedSheet(workbookPackage, 'Open Items')
+  const mapping = getSimpleSheetMapping(workbookPackage, 'Open Items')
   writeSimpleMenuRows(workbookPackage, mapping, rows)
 }
 
@@ -328,9 +343,13 @@ function getRetailRows(items: NormalizedMenuItem[]): SimpleMenuRow[] {
   return getSimpleCategoryRows(items, 'Retail')
 }
 
+function getOpenItemsRows(items: NormalizedMenuItem[]): SimpleMenuRow[] {
+  return getSimpleCategoryRows(items, 'Open Items')
+}
+
 function getSimpleCategoryRows(
   items: NormalizedMenuItem[],
-  workbookCategory: 'NA Bev' | 'Retail',
+  workbookCategory: 'NA Bev' | 'Retail' | 'Open Items',
 ): SimpleMenuRow[] {
   return items
     .filter(
@@ -355,7 +374,7 @@ function getSimpleCategoryRows(
 
 function getSimpleMenuGroup(
   item: NormalizedMenuItem,
-  workbookCategory: 'Cocktails' | 'NA Bev' | 'Retail',
+  workbookCategory: 'Cocktails' | 'NA Bev' | 'Retail' | 'Open Items',
 ) {
   const rawGroup = clean(
     item.rawRows[0]?.Group ??
@@ -387,7 +406,7 @@ function getSimpleMenuGroup(
 
 function matchesSimpleWorkbookDestination(
   item: NormalizedMenuItem,
-  workbookCategory: 'NA Bev' | 'Retail',
+  workbookCategory: 'NA Bev' | 'Retail' | 'Open Items',
 ) {
   const routedCategory = getToastWorkbookCategory(item)
   if (routedCategory !== null) {
@@ -402,14 +421,20 @@ function matchesSimpleWorkbookDestination(
       || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
   }
 
-  return /^(?:toast\s+)?retail(?:\s+tab)?(?:\b|:)/i.test(destination)
+  if (workbookCategory === 'Retail') {
+    return /^(?:toast\s+)?retail(?:\s+tab)?(?:\b|:)/i.test(destination)
+      || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)
+      || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
+  }
+
+  return /^(?:toast\s+)?open\s*items?(?:\s+tab)?(?:\b|:)/i.test(destination)
     || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)
     || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
 }
 
 function matchesWorkbookCategoryLabel(
   value: string,
-  workbookCategory: 'Cocktails' | 'NA Bev' | 'Retail',
+  workbookCategory: 'Cocktails' | 'NA Bev' | 'Retail' | 'Open Items',
 ) {
   const normalized = value.toLowerCase().replace(/\s+/g, ' ').trim()
 
@@ -423,8 +448,9 @@ function matchesWorkbookCategoryLabel(
       normalized === 'na beverages'
     )
   }
+  if (workbookCategory === 'Retail') return normalized === 'retail'
 
-  return normalized === 'retail'
+  return normalized === 'open items' || normalized === 'open item'
 }
 
 function getSimpleSheetMapping(
@@ -624,6 +650,19 @@ function validateRetailSheet(
   return rows.length
 }
 
+function validateOpenItemsSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  issues: string[],
+) {
+  const rows = getOpenItemsRows(items)
+  if (rows.length === 0) return 0
+
+  const mapping = getSimpleSheetMapping(workbookPackage, 'Open Items')
+  validateSimpleMenuRows(workbookPackage, mapping, rows, issues)
+  return rows.length
+}
+
 function validateSimpleMenuRows(
   workbookPackage: WorkbookPackage,
   mapping: SimpleSheetMapping,
@@ -679,10 +718,13 @@ function validateSimpleMenuRows(
   })
 }
 
-function ensureRetailSheet(workbookPackage: WorkbookPackage) {
+function ensureSimpleClonedSheet(
+  workbookPackage: WorkbookPackage,
+  targetSheetName: 'Retail' | 'Open Items',
+) {
   if (
     getWorkbookSheets(workbookPackage).some(
-      (sheet) => sheet.name.toLowerCase() === 'retail',
+      (sheet) => sheet.name.toLowerCase() === targetSheetName.toLowerCase(),
     )
   ) {
     return
@@ -806,7 +848,7 @@ function ensureRetailSheet(workbookPackage: WorkbookPackage) {
     SPREADSHEET_NS,
     'sheet',
   )
-  newSheet.setAttribute('name', 'Retail')
+  newSheet.setAttribute('name', targetSheetName)
   newSheet.setAttribute(
     'sheetId',
     String(Math.max(0, ...sheetIds) + 1),
