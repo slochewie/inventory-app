@@ -589,6 +589,138 @@ function CatalogPage() {
 
   return (
     <AuthenticatedInventoryShell currentPath="/">
+      <style>{`
+        .inventory-catalog-page .inventory-catalog-bulk-toolbar {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: .65rem;
+          min-height: 3.35rem;
+          border-bottom: 1px solid #e5e7eb;
+          background: #fff;
+          padding: .65rem 1rem;
+        }
+
+        .inventory-catalog-page .inventory-catalog-bulk-toggle,
+        .inventory-catalog-page .inventory-catalog-bulk-actions > button {
+          display: inline-flex;
+          min-width: 2.5rem;
+          min-height: 2.5rem;
+          align-items: center;
+          justify-content: center;
+          gap: .45rem;
+          border: 1px solid #d1d5db;
+          border-radius: .65rem;
+          background: #fff;
+          color: #111827;
+          padding: .45rem .65rem;
+          font-weight: 800;
+        }
+
+        .inventory-catalog-page .inventory-catalog-bulk-toggle[aria-pressed='true'] {
+          border-color: #111827;
+          background: #111827;
+          color: #fff;
+        }
+
+        .inventory-catalog-page .inventory-catalog-bulk-help-button {
+          display: inline-flex;
+          width: 2.5rem;
+          height: 2.5rem;
+          align-items: center;
+          justify-content: center;
+          border: 0;
+          border-radius: 999px;
+          background: #f3f4f6;
+          color: #374151;
+          padding: 0;
+        }
+
+        .inventory-catalog-page .inventory-catalog-bulk-actions {
+          display: flex;
+          align-items: center;
+          gap: .45rem;
+          margin-left: auto;
+        }
+
+        .inventory-bulk-price-dialog {
+          position: fixed;
+          inset: 0;
+          width: min(42rem, calc(100vw - 2rem));
+          max-width: 42rem;
+          max-height: min(80dvh, 42rem);
+          margin: auto;
+          border: 0;
+          background: transparent;
+          padding: 0;
+        }
+
+        .inventory-bulk-price-dialog::backdrop {
+          background: rgb(15 23 42 / 45%);
+        }
+
+        .inventory-bulk-price-dialog-card {
+          display: grid;
+          width: 100%;
+          max-height: min(80dvh, 42rem);
+          overflow: hidden;
+          gap: 1rem;
+          border: 1px solid #d1d5db;
+          border-radius: 1rem;
+          background: #fff;
+          padding: 1.1rem;
+          box-shadow: 0 24px 60px rgb(15 23 42 / 22%);
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+          .inventory-catalog-page .inventory-catalog-bulk-toolbar {
+            display: grid;
+            grid-template-columns: auto auto minmax(0, 1fr);
+            gap: .55rem;
+            padding: .65rem .75rem;
+          }
+
+          .inventory-catalog-page .inventory-catalog-bulk-count {
+            justify-self: end;
+            white-space: nowrap;
+          }
+
+          .inventory-catalog-page .inventory-catalog-bulk-actions {
+            grid-column: 1 / -1;
+            display: grid;
+            width: 100%;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: .5rem;
+            margin-left: 0;
+          }
+
+          .inventory-catalog-page .inventory-catalog-bulk-actions > button {
+            width: 100%;
+            min-width: 0;
+          }
+
+          .inventory-bulk-price-dialog {
+            width: min(40rem, calc(100vw - 2rem));
+            max-height: min(78dvh, 40rem);
+          }
+
+          .inventory-bulk-price-dialog-card {
+            max-height: min(78dvh, 40rem);
+          }
+        }
+
+        @media (max-width: 700px) {
+          .inventory-bulk-price-dialog {
+            width: calc(100vw - 1rem);
+            max-height: calc(100dvh - 1rem);
+          }
+
+          .inventory-bulk-price-dialog-card {
+            max-height: calc(100dvh - 1rem);
+            padding: .9rem;
+          }
+        }
+      `}</style>
       <section className="inventory-content inventory-catalog-page">
         <header className="inventory-page-heading">
           <div>
