@@ -1,5 +1,6 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { buildToastExportFiles } from './toast-export'
+import { getToastWorkbookCategory } from './workbook-routing'
 import {
   buildPopulatedToastTemplateWorkbook,
   validatePopulatedBeerWorkbook,
@@ -387,14 +388,18 @@ function matchesSimpleWorkbookDestination(
   item: NormalizedMenuItem,
   workbookCategory: 'NA Bev' | 'Retail',
 ) {
+  if (getToastWorkbookCategory(item) === workbookCategory) return true
+
   const destination = clean(item.toastDestination)
 
   if (workbookCategory === 'NA Bev') {
     return /^(?:toast\s+)?na\s*bev(?:\s+tab)?(?:\b|:)/i.test(destination)
+      || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)
       || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
   }
 
   return /^(?:toast\s+)?retail(?:\s+tab)?(?:\b|:)/i.test(destination)
+    || matchesWorkbookCategoryLabel(clean(item.category), workbookCategory)
     || matchesWorkbookCategoryLabel(clean(item.toastCategory), workbookCategory)
 }
 

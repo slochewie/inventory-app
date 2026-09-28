@@ -1,6 +1,7 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { buildBeerTabPreviewRows, getDraftBeerPrice, type BeerTabPreviewRow } from './beer-preview'
 import type { NormalizedMenuItem } from './types'
+import { getToastWorkbookCategory } from './workbook-routing'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const WORKBOOK_PATH = 'xl/workbook.xml'
@@ -505,8 +506,11 @@ function buildWorkbookBeerRows(
   optionalBeerCategories: readonly OptionalBeerCategoryOptions[],
 ) {
   const merged = new Map<string, BeerTabPreviewRow>()
+  const beerItems = items.filter(
+    (item) => getToastWorkbookCategory(item) === 'Beer',
+  )
 
-  buildBeerTabPreviewRows(items, happyHourEnabled)
+  buildBeerTabPreviewRows(beerItems, happyHourEnabled)
     .filter(
       (row) =>
         hasAnyBeerPrice(row, draftSlotMappings, optionalBeerCategories) &&
