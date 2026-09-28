@@ -3,6 +3,13 @@ import type { NormalizedMenuItem, ParsedMenuImport } from './types'
 const STORAGE_KEY = 'niteowl.inventory.review-session.v1'
 const STORAGE_VERSION = 1
 
+function getStorageKey(organizationId?: string | null) {
+  const normalizedOrganizationId = organizationId?.trim()
+  return normalizedOrganizationId
+    ? `${STORAGE_KEY}.organization.${encodeURIComponent(normalizedOrganizationId)}`
+    : STORAGE_KEY
+}
+
 export type SavedReviewSession = {
   version: number
   savedAt: string
@@ -10,19 +17,29 @@ export type SavedReviewSession = {
   items: NormalizedMenuItem[]
 }
 
-export function saveReviewSession(importFile: ParsedMenuImport | null, items: NormalizedMenuItem[]) {
-  saveReviewedItems(items, importFile)
+export function saveReviewSession(
+  importFile: ParsedMenuImport | null,
+  items: NormalizedMenuItem[],
+  organizationId?: string | null,
+) {
+  saveReviewedItems(items, importFile, organizationId)
 }
 
-export function saveReviewedItems(items: NormalizedMenuItem[], importFile: ParsedMenuImport | null = null) {
+export function saveReviewedItems(
+  items: NormalizedMenuItem[],
+  importFile: ParsedMenuImport | null = null,
+  organizationId?: string | null,
+) {
   if (typeof window === 'undefined') return
 
+  const storageKey = getStorageKey(organizationId)
+
   if (items.length === 0) {
-    window.localStorage.removeItem(STORAGE_KEY)
+    window.localStorage.removeItem(storageKey)
     return
   }
 
-  const existing = loadReviewSession()
+  const existing = loadReviewSession(organizationId)
   const payload: SavedReviewSession = {
     version: STORAGE_VERSION,
     savedAt: new Date().toISOString(),
@@ -30,13 +47,15 @@ export function saveReviewedItems(items: NormalizedMenuItem[], importFile: Parse
     items,
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+  window.localStorage.setItem(storageKey, JSON.stringify(payload))
 }
 
-export function loadReviewSession(): SavedReviewSession | null {
+export function loadReviewSession(
+  organizationId?: string | null,
+): SavedReviewSession | null {
   if (typeof window === 'undefined') return null
 
-  const raw = window.localStorage.getItem(STORAGE_KEY)
+  const raw = window.localStorage.getItem(getStorageKey(organizationId))
   if (!raw) return null
 
   try {
@@ -56,7 +75,7 @@ export function loadReviewSession(): SavedReviewSession | null {
   }
 }
 
-export function clearReviewSession() {
+export function clearReviewSession(organizationId?: string | null) {
   if (typeof window === 'undefined') return
-  window.localStorage.removeItem(STORAGE_KEY)
+  window.localStorage.removeItem(getStorageKey(organizationId))
 }
