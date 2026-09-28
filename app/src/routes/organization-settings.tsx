@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import {
   AuthenticatedInventoryShell,
   useInventoryAccessRole,
@@ -702,16 +703,16 @@ function OrganizationSettingsPage() {
                           </button>
                         </div>
 
-                        {index === visibleOptionalBeerCategoryCount - 1 ? (
-                          <button
-                            type="button"
-                            className="inventory-secondary-button"
-                            disabled={savingOptionalBeerCategories}
-                            onClick={() => removeOptionalBeerCategory(category)}
-                          >
-                            Remove format
-                          </button>
-                        ) : null}
+                        <button
+                          type="button"
+                          className="inventory-secondary-button inventory-format-remove-button"
+                          aria-label={`Remove ${category.label || 'format'}`}
+                          title={`Remove ${category.label || 'format'}`}
+                          disabled={savingOptionalBeerCategories}
+                          onClick={() => removeOptionalBeerCategory(category)}
+                        >
+                          <Trash2 aria-hidden="true" size={18} />
+                        </button>
                       </div>
                     ))}
                 </div>
