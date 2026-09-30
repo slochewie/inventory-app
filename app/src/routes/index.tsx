@@ -1300,9 +1300,18 @@ function CatalogDrawer({
     }
   }, [])
 
-  const carriedCount = draftItems.filter(
-    (item) => item.organizationEnabled === true,
-  ).length
+  const carriedCount =
+    selectedCategoryIsBeer && organizationConfig
+      ? draftItems.filter(
+          (item) =>
+            item.organizationEnabled === true &&
+            isBeerVariantEnabledForOrganization(
+              item,
+              organizationConfig,
+              optionalBeerCategories,
+            ),
+        ).length
+      : draftItems.filter((item) => item.organizationEnabled === true).length
   const [mergeTargetId, setMergeTargetId] = useState('')
   const mergeCandidates = allGroups.filter((candidate) => candidate.id !== group.id)
   const categoryChanged =
@@ -1313,12 +1322,14 @@ function CatalogDrawer({
   const selectedCategoryIsBeer = isBeerCategoryName(selectedCategoryName)
   const visibleDraftItems =
     selectedCategoryIsBeer && organizationConfig
-      ? draftItems.filter((item) =>
-          isBeerVariantEnabledForOrganization(
-            item,
-            organizationConfig,
-            optionalBeerCategories,
-          ),
+      ? draftItems.filter(
+          (item) =>
+            item.organizationEnabled === true &&
+            isBeerVariantEnabledForOrganization(
+              item,
+              organizationConfig,
+              optionalBeerCategories,
+            ),
         )
       : draftItems
   const availableBeerFormats =
