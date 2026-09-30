@@ -751,6 +751,33 @@ function ToastWorkbook() {
     }
   }
 
+  function applyMasterItemToReconciliation(
+    masterItemId: string,
+    scopedItems: NormalizedMenuItem[],
+  ) {
+    setReconciliationDecisions((current) => {
+      const next = { ...current }
+
+      for (const item of scopedItems) {
+        const compatibleVariant = findMasterCandidates(item, masterCatalog).find(
+          (candidate) => candidate.id === masterItemId,
+        )
+
+        next[item.id] = compatibleVariant
+          ? {
+              kind: 'existing',
+              variantId: compatibleVariant.variant.id,
+            }
+          : {
+              kind: 'new-variant',
+              itemId: masterItemId,
+            }
+      }
+
+      return next
+    })
+  }
+
   function beginReconciliation() {
     const readyExportableIds = new Set(
       items
@@ -1484,21 +1511,21 @@ function ToastWorkbook() {
                 </section>
 
                 {isStagedReviewSource ? (
-                  <section className="inventory-card inventory-import-card">
-                    <div className="inventory-table-heading">
+                  <section className="inventory-card inventory-post-staging-card">
+                    <div className="inventory-post-staging-heading">
                       <div>
                         <p className="inventory-kicker">Post staging</p>
-                      <h2>
-                        {reconciliationActive
-                          ? 'Reconcile with master catalog'
-                          : 'Review master mappings'}
-                      </h2>
-                      <p>
-                        {reconciliationActive
-                          ? 'Choose whether each staged item maps to an existing master variant or creates a new master item.'
-                          : 'Staging is complete. Review master mappings before anything is written to Inventory.'}
-                      </p>
-                    </div>
+                        <h2>
+                          {reconciliationActive
+                            ? 'Reconcile with master catalog'
+                            : 'Master mapping review'}
+                        </h2>
+                        <p>
+                          {reconciliationActive
+                            ? 'Choose the shared master item once, then verify each staged format before importing.'
+                            : 'Only reviewed mappings are written to Inventory. Selected ready rows can be handled independently.'}
+                        </p>
+                      </div>
                     {!reconciliationActive ? (
                       <button
                         type="button"
@@ -1534,13 +1561,20 @@ function ToastWorkbook() {
                     ) : null}
                   </div>
 
-                  {summary.reviewItems > 0 ? (
-                    <p className="inventory-import-message">
+                  <div className="inventory-post-staging-status">
+                    <span>
                       {selectedStagedBulkIds.size > 0
-                        ? `${summary.reviewItems.toLocaleString()} other staged item${summary.reviewItems === 1 ? '' : 's'} still need review. Selected ready items can be reconciled independently.`
-                        : `${summary.reviewItems.toLocaleString()} staged item${summary.reviewItems === 1 ? '' : 's'} still need review or must be ignored before full reconciliation.`}
-                    </p>
-                  ) : null}
+                        ? `${selectedStagedBulkIds.size.toLocaleString()} selected`
+                        : `${items.filter((item) => item.status === 'ready' && item.exportIncluded).length.toLocaleString()} ready`}
+                    </span>
+                    {summary.reviewItems > 0 ? (
+                      <span className="is-warning">
+                        {summary.reviewItems.toLocaleString()} still need review
+                      </span>
+                    ) : (
+                      <span className="is-ready">Staging review complete</span>
+                    )}
+                  </div>
 
                   {reconciliationActive ? (
                     <StagedReconciliationPanel
@@ -1556,6 +1590,12 @@ function ToastWorkbook() {
                       query={reconciliationQuery}
                       onQueryChange={setReconciliationQuery}
                       onReview={setSelectedReconciliationItemId}
+                      onApplyMaster={(masterItemId, scopedItems) =>
+                        applyMasterItemToReconciliation(
+                          masterItemId,
+                          scopedItems,
+                        )
+                      }
                       onCancel={() => {
                         setReconciliationActive(false)
                         setReconciliationScopeIds(null)
@@ -1735,6 +1775,7 @@ function StagedReconciliationPanel({
   query,
   onQueryChange,
   onReview,
+  onApplyMaster,
   onCancel,
   onImport,
   importing,
@@ -1745,6 +1786,10 @@ function StagedReconciliationPanel({
   query: string
   onQueryChange: (value: string) => void
   onReview: (itemId: string) => void
+  onApplyMaster: (
+    masterItemId: string,
+    scopedItems: NormalizedMenuItem[],
+  ) => void
   onCancel: () => void
   onImport: () => void
   importing: boolean
@@ -1764,29 +1809,78 @@ function StagedReconciliationPanel({
     (item) => decisions[item.id]?.kind === 'new-variant',
   ).length
   const mappedCount = decidedCount - newCount - newVariantCount
+  const masterItems = getUniqueMasterItems(catalog)
+  const normalizedNames = [...new Set(items.map((item) => normalizeMasterName(item.name)))]
+  const exactMaster =
+    normalizedNames.length === 1
+      ? masterItems.find(
+          (candidate) =>
+            normalizeMasterName(candidate.name) === normalizedNames[0],
+        ) ?? null
+      : null
+  const [groupMasterItemId, setGroupMasterItemId] = useState(
+    exactMaster?.id ?? '',
+  )
+
+  useEffect(() => {
+    setGroupMasterItemId(exactMaster?.id ?? '')
+  }, [exactMaster?.id, items])
 
   return (
     <div className="inventory-import-workspace">
-      <section
-        className="inventory-summary-grid"
-        aria-label="Master reconciliation summary"
-      >
-        <SummaryCard label="Unresolved" value={unresolvedCount} />
-        <SummaryCard label="Map existing" value={mappedCount} />
-        <SummaryCard label="New variant" value={newVariantCount} />
-        <SummaryCard label="Create new" value={newCount} />
-        <SummaryCard label="Total" value={items.length} />
-      </section>
+      <div className="inventory-reconciliation-overview">
+        <div className="inventory-reconciliation-counts">
+          <span><strong>{items.length}</strong> selected</span>
+          <span><strong>{unresolvedCount}</strong> unresolved</span>
+          <span><strong>{mappedCount}</strong> existing variants</span>
+          <span><strong>{newVariantCount}</strong> new variants</span>
+          {newCount > 0 ? (
+            <span><strong>{newCount}</strong> new masters</span>
+          ) : null}
+        </div>
 
-      <label className="inventory-search-control">
-        <span>Search staged items</span>
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Item name, category, format…"
-        />
-      </label>
+        <div className="inventory-reconciliation-master-picker">
+          <div>
+            <strong>Master item for selected rows</strong>
+            <span>
+              Apply one master item to the group. Compatible formats map to an
+              existing variant; missing formats become new variants.
+            </span>
+          </div>
+          <div className="inventory-reconciliation-master-controls">
+            <select
+              value={groupMasterItemId}
+              onChange={(event) => setGroupMasterItemId(event.target.value)}
+              aria-label="Master item for selected staged rows"
+            >
+              <option value="">Choose master item…</option>
+              {masterItems.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="inventory-primary-button"
+              disabled={!groupMasterItemId || importing}
+              onClick={() => onApplyMaster(groupMasterItemId, items)}
+            >
+              Apply to all {items.length}
+            </button>
+          </div>
+        </div>
+
+        <label className="inventory-search-control inventory-reconciliation-search">
+          <span>Filter selected rows</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="Item name, category, format…"
+          />
+        </label>
+      </div>
 
       <div className="inventory-table-wrap">
         <table className="inventory-table inventory-reconcile-table">
@@ -1851,13 +1945,14 @@ function StagedReconciliationPanel({
       </div>
 
       {unresolvedCount > 0 ? (
-        <p className="inventory-import-message">
-          {unresolvedCount.toLocaleString()} item
-          {unresolvedCount === 1 ? '' : 's'} will remain staged for later review.
+        <p className="inventory-reconciliation-note">
+          {unresolvedCount.toLocaleString()} unresolved item
+          {unresolvedCount === 1 ? '' : 's'} will remain staged. Only rows with a
+          mapping decision are imported.
         </p>
       ) : null}
 
-      <div className="inventory-draft-slots-actions">
+      <div className="inventory-reconciliation-actions">
         <button
           type="button"
           className="inventory-secondary-button"
@@ -2047,6 +2142,20 @@ function StagedReconciliationDrawer({
         </div>
       </section>
     </dialog>
+  )
+}
+
+function getUniqueMasterItems(catalog: InventoryCatalogRow[]) {
+  const unique = new Map<string, InventoryCatalogRow>()
+
+  catalog
+    .filter((candidate) => candidate.active)
+    .forEach((candidate) => {
+      if (!unique.has(candidate.id)) unique.set(candidate.id, candidate)
+    })
+
+  return [...unique.values()].sort((left, right) =>
+    left.name.localeCompare(right.name),
   )
 }
 
