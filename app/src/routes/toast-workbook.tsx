@@ -1646,11 +1646,47 @@ function ToastWorkbook() {
                       }))
                       setSelectedReconciliationItemId(null)
                     }}
+                    newMasterGroupCount={items.filter(
+                      (candidate) =>
+                        candidate.status === 'ready' &&
+                        candidate.exportIncluded &&
+                        (!reconciliationScopeIds ||
+                          reconciliationScopeIds.has(candidate.id)) &&
+                        normalizeMasterName(candidate.name) ===
+                          normalizeMasterName(
+                            items.find(
+                              (item) =>
+                                item.id === selectedReconciliationItemId,
+                            )?.name ?? '',
+                          ),
+                    ).length}
                     onChooseNew={() => {
-                      setReconciliationDecisions((current) => ({
-                        ...current,
-                        [selectedReconciliationItemId]: { kind: 'new' },
-                      }))
+                      const selectedItem = items.find(
+                        (item) => item.id === selectedReconciliationItemId,
+                      )
+                      const normalizedSelectedName = normalizeMasterName(
+                        selectedItem?.name ?? '',
+                      )
+
+                      setReconciliationDecisions((current) => {
+                        const next = { ...current }
+
+                        items
+                          .filter(
+                            (candidate) =>
+                              candidate.status === 'ready' &&
+                              candidate.exportIncluded &&
+                              (!reconciliationScopeIds ||
+                                reconciliationScopeIds.has(candidate.id)) &&
+                              normalizeMasterName(candidate.name) ===
+                                normalizedSelectedName,
+                          )
+                          .forEach((candidate) => {
+                            next[candidate.id] = { kind: 'new' }
+                          })
+
+                        return next
+                      })
                       setSelectedReconciliationItemId(null)
                     }}
                   />
@@ -1983,6 +2019,7 @@ function StagedReconciliationDrawer({
   onClose,
   onChooseExisting,
   onChooseNewVariant,
+  newMasterGroupCount,
   onChooseNew,
 }: {
   item: NormalizedMenuItem
@@ -1991,6 +2028,7 @@ function StagedReconciliationDrawer({
   onClose: () => void
   onChooseExisting: (variantId: string) => void
   onChooseNewVariant: (itemId: string) => void
+  newMasterGroupCount: number
   onChooseNew: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -2051,7 +2089,9 @@ function StagedReconciliationDrawer({
           }
           onClick={onChooseNew}
         >
-          Create new master item
+          {newMasterGroupCount > 1
+            ? `Create one new master item with ${newMasterGroupCount} formats`
+            : 'Create new master item'}
         </button>
       </section>
 
