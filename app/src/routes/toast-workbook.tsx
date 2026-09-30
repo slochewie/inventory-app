@@ -218,17 +218,19 @@ function ToastWorkbook() {
   ).length
   const liquorExportItemCount = items.filter((item) => item.exportIncluded && isLiquorItem(item)).length
   const organizationName = importFile?.meta?.store?.trim() || 'Organization'
-  const stagedReviewCategories = useMemo(
-    () =>
-      [
-        ...new Set(
-          items
-            .map(getStagedReviewCategory)
-            .filter(Boolean),
-        ),
-      ].sort((left, right) => left.localeCompare(right)),
-    [items],
-  )
+  const stagedReviewCategories = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    items.forEach((item) => {
+      const category = getStagedReviewCategory(item)
+      if (!category) return
+      counts.set(category, (counts.get(category) ?? 0) + 1)
+    })
+
+    return [...counts.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((left, right) => left.value.localeCompare(right.value))
+  }, [items])
   const filteredStagedItems = useMemo(() => {
     const query = stagedReviewQuery.trim().toLowerCase()
 
@@ -1266,17 +1268,17 @@ function ToastWorkbook() {
                   </label>
 
                   <label className="inventory-search-control">
-                    <span>Category</span>
+                    <span>Item type</span>
                     <select
                       value={stagedReviewCategory}
                       onChange={(event) =>
                         setStagedReviewCategory(event.target.value)
                       }
                     >
-                      <option value="all">All categories</option>
-                      {stagedReviewCategories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
+                      <option value="all">All item types ({items.length})</option>
+                      {stagedReviewCategories.map(({ value, count }) => (
+                        <option key={value} value={value}>
+                          {value} ({count})
                         </option>
                       ))}
                     </select>
@@ -1485,7 +1487,7 @@ function ToastWorkbook() {
                               <td>
                                 <div className="inventory-catalog-item-cell">
                                   <strong>{item.name}</strong>
-                                  <span>{item.category || item.toastCategory}</span>
+                                  <span>{getStagedReviewDisplayCategory(item)}</span>
                                   <div className="inventory-format-list">
                                     <span>
                                       {item.variantLabel || 'Standard'}
@@ -2831,6 +2833,14 @@ function getStagedReviewCategory(item: NormalizedMenuItem) {
   }
 
   return normalizeStagedMenuCategory(category)
+}
+
+function getStagedReviewDisplayCategory(item: NormalizedMenuItem) {
+  const category = getStagedReviewCategory(item)
+  const sourceCategory = clean(item.category || item.toastCategory)
+
+  if (category === 'Beer') return sourceCategory || 'Beer'
+  return category
 }
 
 function normalizeStagedMenuCategory(value: string) {
