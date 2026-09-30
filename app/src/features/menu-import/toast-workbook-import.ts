@@ -10,7 +10,7 @@ const WORKBOOK_RELS_PATH = 'xl/_rels/workbook.xml.rels'
 const RELATIONSHIP_NS =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 
-export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '6'
+export const TOAST_WORKBOOK_STAGING_PARSER_VERSION = '7'
 
 const TRUSTED_SOURCE_TABS = new Set([
   'beer',
@@ -476,69 +476,29 @@ function parseCocktailsSheet(
   for (let rowNumber = headerRow + 1; rowNumber <= 200; rowNumber += 1) {
     const name = getCellValue(sheetDoc, 1, rowNumber, workbook.sharedStrings)
     const price = getCellValue(sheetDoc, 2, rowNumber, workbook.sharedStrings)
-    const description = getCellValue(
-      sheetDoc,
-      3,
-      rowNumber,
-      workbook.sharedStrings,
-    )
-    const menuGroup = getCellValue(
-      sheetDoc,
-      4,
-      rowNumber,
-      workbook.sharedStrings,
-    )
-    const happyHourPrice = getCellValue(
-      sheetDoc,
-      5,
-      rowNumber,
-      workbook.sharedStrings,
-    )
+    const description = getCellValue(sheetDoc, 3, rowNumber, workbook.sharedStrings)
+    const menuGroup = getCellValue(sheetDoc, 4, rowNumber, workbook.sharedStrings)
+    const happyHourPrice = getCellValue(sheetDoc, 5, rowNumber, workbook.sharedStrings)
 
     if (!hasMeaningfulInput(name, price, happyHourPrice)) continue
     if (isToastTemplateInstruction(name)) continue
     if (isNumericOnly(name) && !isPositiveMoney(price)) continue
 
-    rows.push({
-      sheet: sheet.name,
-      row: String(rowNumber),
-      name,
-      price,
-      description,
-      menuGroup,
-      happyHourPrice,
-    })
+    rows.push({ sheet: sheet.name, row: String(rowNumber), name, price, description, menuGroup, happyHourPrice })
 
     const notes: string[] = []
     if (clean(name) && !isPositiveMoney(price)) {
-      notes.push(
-        `${sheet.name} row ${rowNumber}: ${clean(name)} has no positive base price.`,
-      )
-    }
-    if (!clean(menuGroup)) {
-      notes.push(
-        `${sheet.name} row ${rowNumber}: ${clean(name) || 'Cocktail'} has no Menu Group Name.`,
-      )
-    }
-    if (
-      !clean(menuGroup) &&
-      clean(description) &&
-      /cocktail/i.test(description)
-    ) {
-      notes.push(
-        `${sheet.name} row ${rowNumber}: "${clean(description)}" appears in Description where a Menu Group may have been intended.`,
-      )
+      notes.push(sheet.name + ' row ' + rowNumber + ': ' + clean(name) + ' has no positive base price.')
     }
 
     items.push(
       createItem({
-        id: `toast-workbook:cocktail:${rowNumber}`,
-        name:
-          normalizeItemName(name) ||
-          `[Review ${sheet.name} row ${rowNumber}]`,
+        id: 'toast-workbook:cocktail:house:' + rowNumber,
+        name: normalizeItemName(name) || '[Review ' + sheet.name + ' row ' + rowNumber + ']',
         category: 'Cocktails',
-        toastCategory: clean(menuGroup) || 'Cocktails',
+        toastCategory: clean(menuGroup) || 'House Cocktails',
         toastDestination: 'Cocktails',
+        variantLabel: 'House Cocktails',
         price,
         happyHourPrice,
         variantKind: 'standard',
@@ -546,17 +506,64 @@ function parseCocktailsSheet(
         sheet: sheet.name,
         rowNumber,
         notes,
-        forceReview:
-          isNumericOnly(name) ||
-          !clean(menuGroup) ||
-          !isPositiveMoney(price),
+        forceReview: isNumericOnly(name) || !isPositiveMoney(price),
       }),
     )
   }
 
+  const offMenuSlots = [
+    { label: 'Vodka Cocktails', nameCol: 7, priceCol: 8 },
+    { label: 'Gin Cocktails', nameCol: 10, priceCol: 11 },
+    { label: 'Rum Cocktails', nameCol: 13, priceCol: 14 },
+    { label: 'Tequila Cocktails', nameCol: 16, priceCol: 17 },
+    { label: 'Whiskey/Bourbon Cocktails', nameCol: 19, priceCol: 20 },
+  ] as const
+
+  offMenuSlots.forEach((slot) => {
+    for (let rowNumber = headerRow + 1; rowNumber <= 200; rowNumber += 1) {
+      const name = getCellValue(sheetDoc, slot.nameCol, rowNumber, workbook.sharedStrings)
+      const price = getCellValue(sheetDoc, slot.priceCol, rowNumber, workbook.sharedStrings)
+
+      if (!hasMeaningfulInput(name, price)) continue
+      if (isToastTemplateInstruction(name)) continue
+      if (isNumericOnly(name) && !isPositiveMoney(price)) continue
+
+      rows.push({
+        sheet: sheet.name,
+        row: String(rowNumber),
+        name,
+        price,
+        menuGroup: slot.label,
+        pricingMode: 'upcharge',
+      })
+
+      const notes: string[] = []
+      if (clean(name) && !isPositiveMoney(price)) {
+        notes.push(sheet.name + ' row ' + rowNumber + ': ' + clean(name) + ' has no positive upcharge price.')
+      }
+
+      items.push(
+        createItem({
+          id: 'toast-workbook:cocktail:' + slot.nameCol + ':' + rowNumber,
+          name: normalizeItemName(name) || '[Review ' + sheet.name + ' ' + slot.label + ' row ' + rowNumber + ']',
+          category: 'Cocktails',
+          toastCategory: slot.label,
+          toastDestination: 'Cocktails',
+          variantLabel: slot.label,
+          price,
+          variantKind: 'standard',
+          variantPackageType: null,
+          sheet: sheet.name,
+          rowNumber,
+          notes,
+          forceReview: isNumericOnly(name) || !isPositiveMoney(price),
+        }),
+      )
+    }
+  })
+
   return { rows, items, warnings }
 }
-
 function parseSimpleMenuSheet(
   workbook: ParsedWorkbook,
   sheet: WorkbookSheet,
