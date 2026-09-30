@@ -204,6 +204,7 @@ function ToastWorkbook() {
   const [importReviewedError, setImportReviewedError] = useState<string | null>(null)
   const [masterCatalog, setMasterCatalog] = useState<InventoryCatalogRow[]>([])
   const [reconciliationActive, setReconciliationActive] = useState(false)
+  const [reconciliationScopeIds, setReconciliationScopeIds] = useState<Set<string> | null>(null)
   const [reconciliationDecisions, setReconciliationDecisions] = useState<
     Record<string, ReconciliationDecision>
   >({})
@@ -340,6 +341,7 @@ function ToastWorkbook() {
     setDownloadError(null)
     setAlohaError(null)
     setReconciliationActive(false)
+    setReconciliationScopeIds(null)
     setReconciliationDecisions({})
     setSelectedReconciliationItemId(null)
     setReconciliationQuery('')
@@ -750,6 +752,22 @@ function ToastWorkbook() {
   }
 
   function beginReconciliation() {
+    const readyExportableIds = new Set(
+      items
+        .filter(
+          (item) => item.status === 'ready' && item.exportIncluded,
+        )
+        .map((item) => item.id),
+    )
+    const selectedReadyIds = new Set(
+      [...selectedStagedBulkIds].filter((itemId) =>
+        readyExportableIds.has(itemId),
+      ),
+    )
+
+    setReconciliationScopeIds(
+      selectedReadyIds.size > 0 ? selectedReadyIds : null,
+    )
     setReconciliationDecisions({})
     setReconciliationActive(true)
     setSelectedReconciliationItemId(null)
@@ -853,10 +871,16 @@ function ToastWorkbook() {
       }
 
       setItems(remainingItems)
+      setSelectedStagedBulkIds((current) => {
+        const next = new Set(current)
+        importedItemIds.forEach((itemId) => next.delete(itemId))
+        return next
+      })
       setSelectedStagedItemId(null)
       setSelectedReconciliationItemId(null)
       setReconciliationDecisions({})
       setReconciliationActive(false)
+      setReconciliationScopeIds(null)
       setReconciliationQuery('')
 
       const refreshedCatalog = await listInventoryCatalog(
@@ -1480,25 +1504,41 @@ function ToastWorkbook() {
                         type="button"
                         className="inventory-primary-button"
                         disabled={
-                          summary.reviewItems > 0 ||
-                          items.filter(
-                            (item) =>
-                              item.status === 'ready' &&
-                              item.exportIncluded,
-                          ).length === 0
+                          selectedStagedBulkIds.size > 0
+                            ? !items.some(
+                                (item) =>
+                                  selectedStagedBulkIds.has(item.id) &&
+                                  item.status === 'ready' &&
+                                  item.exportIncluded,
+                              )
+                            : summary.reviewItems > 0 ||
+                              items.filter(
+                                (item) =>
+                                  item.status === 'ready' &&
+                                  item.exportIncluded,
+                              ).length === 0
                         }
                         onClick={beginReconciliation}
                       >
-                        Review master mappings
+                        {selectedStagedBulkIds.size > 0
+                          ? `Review selected mappings (${[...selectedStagedBulkIds].filter((itemId) =>
+                              items.some(
+                                (item) =>
+                                  item.id === itemId &&
+                                  item.status === 'ready' &&
+                                  item.exportIncluded,
+                              ),
+                            ).length})`
+                          : 'Review master mappings'}
                       </button>
                     ) : null}
                   </div>
 
                   {summary.reviewItems > 0 ? (
                     <p className="inventory-import-message">
-                      {summary.reviewItems.toLocaleString()} staged item
-                      {summary.reviewItems === 1 ? '' : 's'} still need review or
-                      must be ignored before reconciliation.
+                      {selectedStagedBulkIds.size > 0
+                        ? `${summary.reviewItems.toLocaleString()} other staged item${summary.reviewItems === 1 ? '' : 's'} still need review. Selected ready items can be reconciled independently.`
+                        : `${summary.reviewItems.toLocaleString()} staged item${summary.reviewItems === 1 ? '' : 's'} still need review or must be ignored before full reconciliation.`}
                     </p>
                   ) : null}
 
@@ -1506,7 +1546,10 @@ function ToastWorkbook() {
                     <StagedReconciliationPanel
                       items={items.filter(
                         (item) =>
-                          item.status === 'ready' && item.exportIncluded,
+                          item.status === 'ready' &&
+                          item.exportIncluded &&
+                          (!reconciliationScopeIds ||
+                            reconciliationScopeIds.has(item.id)),
                       )}
                       catalog={masterCatalog}
                       decisions={reconciliationDecisions}
@@ -1515,6 +1558,7 @@ function ToastWorkbook() {
                       onReview={setSelectedReconciliationItemId}
                       onCancel={() => {
                         setReconciliationActive(false)
+                        setReconciliationScopeIds(null)
                         setReconciliationDecisions({})
                         setSelectedReconciliationItemId(null)
                         setReconciliationQuery('')
