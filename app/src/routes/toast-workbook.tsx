@@ -828,10 +828,30 @@ function ToastWorkbook() {
       ),
     )
 
+    const scopeIds =
+      selectedReadyIds.size > 0 ? selectedReadyIds : readyExportableIds
+
+    const automaticExactDecisions: Record<string, ReconciliationDecision> = {}
+
+    items
+      .filter((item) => scopeIds.has(item.id))
+      .forEach((item) => {
+        const suggested = findMasterCandidates(item, masterCatalog)[0] ?? null
+        if (
+          suggested &&
+          normalizeMasterName(suggested.name) === normalizeMasterName(item.name)
+        ) {
+          automaticExactDecisions[item.id] = {
+            kind: 'existing',
+            variantId: suggested.variant.id,
+          }
+        }
+      })
+
     setReconciliationScopeIds(
       selectedReadyIds.size > 0 ? selectedReadyIds : null,
     )
-    setReconciliationDecisions({})
+    setReconciliationDecisions(automaticExactDecisions)
     setReconciliationActive(true)
     setSelectedReconciliationItemId(null)
     setReconciliationQuery('')
