@@ -598,11 +598,18 @@ function getWineTemplateMapping(
     ).map((cell) => normalizeHeader(cell.value))
 
     const nameHeaders = values.filter((value) => value === 'name').length
-    const glassHeaders = values.filter((value) => value === 'glass 
+    const glassHeaders = values.filter((value) => value === 'glass $').length
+    const bottleHeaders = values.filter((value) => value === 'bottle $').length
+
+    if (nameHeaders >= 1 && glassHeaders >= 1 && bottleHeaders >= 1) {
+      headerRow = rowNumber
+      break
+    }
+  }
 
   if (headerRow === null) {
     throw new Error(
-      'Wine tab is missing the expected Glass / Bottle header row',
+      'Wine tab is missing the expected Name / Glass / Bottle header row',
     )
   }
 
@@ -611,10 +618,9 @@ function getWineTemplateMapping(
     headerRow,
     workbookPackage.sharedStrings,
   )
-  const glassHeaders = headerValues.filter((headerCell) => {
-    const header = normalizeHeader(headerCell.value)
-    return header.includes('glass') && !header.includes('happy')
-  })
+  const glassHeaders = headerValues.filter(
+    (headerCell) => normalizeHeader(headerCell.value) === 'glass $',
+  )
 
   const ignoredLabels = new Set([
     '',
@@ -673,13 +679,13 @@ function getWineTemplateMapping(
         headerCell.col <= nameCol + 4,
     )
     const bottlePriceCol =
-      groupHeaders.find((headerCell) => {
-        const header = normalizeHeader(headerCell.value)
-        return header.includes('bottle') && !header.includes('happy')
-      })?.col ?? null
+      groupHeaders.find(
+        (headerCell) => normalizeHeader(headerCell.value) === 'bottle $',
+      )?.col ?? null
     const happyHourColumns = groupHeaders
-      .filter((headerCell) =>
-        normalizeHeader(headerCell.value).includes('happy hour'),
+      .filter(
+        (headerCell) =>
+          normalizeHeader(headerCell.value) === 'happy hour $',
       )
       .map((headerCell) => headerCell.col)
 
