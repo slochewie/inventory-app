@@ -118,6 +118,7 @@ export function parseToastExportReviewCsv(text: string, sourceName: string): {
       rows: rawRows,
       warnings: [],
       meta: {
+        source: 'toast-review-csv-staging',
         restoredFrom: 'toast-export-review.csv',
       },
     },
