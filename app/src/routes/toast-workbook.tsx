@@ -215,8 +215,16 @@ function ToastWorkbook() {
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
   const catalogExportItems = useMemo(
-    () => masterCatalog.map(catalogRowToNormalizedItem),
-    [masterCatalog],
+    () =>
+      masterCatalog
+        .map(catalogRowToNormalizedItem)
+        .filter((item) =>
+          isOrganizationCatalogExportItemEnabled(
+            item,
+            organizationConfig,
+          ),
+        ),
+    [masterCatalog, organizationConfig],
   )
   const beerExportItemCount = items.filter(
     (item) => item.exportIncluded && getToastWorkbookCategory(item) === 'Beer',
@@ -3174,6 +3182,44 @@ function getStagedDraftSlotMappings(
   } catch {
     return []
   }
+}
+
+function isOrganizationCatalogExportItemEnabled(
+  item: NormalizedMenuItem,
+  config: InventoryOrganizationConfig | null,
+) {
+  if (!item.exportIncluded) return false
+  if (!config || getToastWorkbookCategory(item) !== 'Beer') return true
+
+  const optionalSlotMatch = item.toastSlot?.match(/^optional-beer-([1-5])$/)
+  if (optionalSlotMatch) {
+    const slot = Number(optionalSlotMatch[1])
+    return (
+      getOptionalBeerCategories(config).find(
+        (category) => category.slot === slot,
+      )?.enabled === true
+    )
+  }
+
+  if (item.variantKind === 'draft') {
+    if (item.variantSizeOz === 8) return config.draft8Enabled
+    if (item.variantSizeOz === 16) return config.draft16Enabled
+    if (item.variantSizeOz === 24) return config.draft24Enabled
+
+    if (
+      item.variantSizeOz === null &&
+      /^pitcher$/i.test(item.variantLabel ?? '')
+    ) {
+      return config.pitcherEnabled
+    }
+
+    return true
+  }
+
+  if (item.variantKind === 'can') return config.canEnabled
+  if (item.variantKind === 'bottle') return config.bottleEnabled
+
+  return true
 }
 
 function getOrganizationDraftSlotMappings(
