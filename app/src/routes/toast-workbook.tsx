@@ -1,6 +1,14 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  CircleCheckBig,
+  CircleOff,
+  CircleX,
+  Info,
+  ListChecks,
+  Upload,
+} from 'lucide-react'
+import {
   AuthenticatedInventoryShell,
   useInventoryAccessRole,
 } from '#/components/authenticated-inventory-shell'
@@ -184,6 +192,12 @@ function ToastWorkbook() {
     useState<StagedReviewStatus>('review')
   const [stagedReviewCategory, setStagedReviewCategory] = useState('all')
   const [stagedReviewPage, setStagedReviewPage] = useState(1)
+  const [stagedBulkEditEnabled, setStagedBulkEditEnabled] = useState(false)
+  const [selectedStagedBulkIds, setSelectedStagedBulkIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const [stagedBulkHelpOpen, setStagedBulkHelpOpen] = useState(false)
+  const stagedBulkHelpRef = useRef<HTMLDivElement>(null)
   const [selectedStagedItemId, setSelectedStagedItemId] =
     useState<string | null>(null)
   const [importingReviewedItems, setImportingReviewedItems] = useState(false)
@@ -263,6 +277,10 @@ function ToastWorkbook() {
     stagedReviewPageStart,
     stagedReviewPageStart + STAGED_REVIEW_PAGE_SIZE,
   )
+  const stagedVisibleIds = stagedReviewPageItems.map((item) => item.id)
+  const allVisibleStagedSelected =
+    stagedVisibleIds.length > 0 &&
+    stagedVisibleIds.every((itemId) => selectedStagedBulkIds.has(itemId))
   const selectedStagedItem =
     items.find((item) => item.id === selectedStagedItemId) ?? null
   const isStagedReviewSource =
@@ -270,7 +288,32 @@ function ToastWorkbook() {
 
   useEffect(() => {
     setStagedReviewPage(1)
+    setSelectedStagedBulkIds(new Set())
   }, [stagedReviewCategory, stagedReviewQuery, stagedReviewStatus])
+
+  useEffect(() => {
+    if (!stagedBulkHelpOpen) return
+
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        stagedBulkHelpRef.current &&
+        !stagedBulkHelpRef.current.contains(event.target as Node)
+      ) {
+        setStagedBulkHelpOpen(false)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setStagedBulkHelpOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [stagedBulkHelpOpen])
 
   useEffect(() => {
     if (!activeOrganization?.id) {
@@ -286,6 +329,9 @@ function ToastWorkbook() {
     const savedReviewSession = loadOrganizationReviewSession(organizationId)
 
     setSelectedStagedItemId(null)
+    setStagedBulkEditEnabled(false)
+    setSelectedStagedBulkIds(new Set())
+    setStagedBulkHelpOpen(false)
     setStagedReviewQuery('')
     setStagedReviewStatus('review')
     setStagedReviewCategory('all')
@@ -537,6 +583,81 @@ function ToastWorkbook() {
     } finally {
       event.target.value = ''
     }
+  }
+
+  function toggleAllVisibleStagedItems() {
+    setSelectedStagedBulkIds((current) => {
+      const next = new Set(current)
+      const shouldSelect = !stagedVisibleIds.every((itemId) => next.has(itemId))
+
+      stagedVisibleIds.forEach((itemId) => {
+        if (shouldSelect) next.add(itemId)
+        else next.delete(itemId)
+      })
+
+      return next
+    })
+  }
+
+  function toggleStagedBulkItem(itemId: string) {
+    setSelectedStagedBulkIds((current) => {
+      const next = new Set(current)
+      if (next.has(itemId)) next.delete(itemId)
+      else next.add(itemId)
+      return next
+    })
+  }
+
+  function applyStagedBulkAction(
+    action: 'ready' | 'ignore' | 'include' | 'exclude',
+  ) {
+    if (selectedStagedBulkIds.size === 0) return
+
+    setItems((current) => {
+      const next = current.map((item) => {
+        if (!selectedStagedBulkIds.has(item.id)) return item
+
+        const structurallyReady =
+          item.name.trim() !== '' &&
+          !/^\[Review /i.test(item.name) &&
+          item.basePriceCents !== null
+
+        if (action === 'ignore') {
+          return {
+            ...item,
+            status: 'ignored' as const,
+            exportToToast: false,
+            exportIncluded: false,
+            stagingExplicitlyExcluded: true,
+          }
+        }
+
+        if (action === 'exclude') {
+          return {
+            ...item,
+            status: structurallyReady ? ('ready' as const) : ('review' as const),
+            exportToToast: false,
+            exportIncluded: false,
+            stagingExplicitlyExcluded: structurallyReady,
+          }
+        }
+
+        if (!structurallyReady) return item
+
+        return {
+          ...item,
+          status: 'ready' as const,
+          exportToToast: true,
+          exportIncluded: true,
+          stagingExplicitlyExcluded: false,
+        }
+      })
+
+      saveReviewSession(importFile, next, activeOrganization?.id)
+      return next
+    })
+
+    setSelectedStagedBulkIds(new Set())
   }
 
   function updateStagedItem(
@@ -1074,6 +1195,113 @@ function ToastWorkbook() {
                     </div>
                   </div>
 
+                  <div
+                    className={`inventory-catalog-bulk-toolbar${stagedBulkEditEnabled ? ' is-active' : ''}`}
+                    aria-label="Bulk staged review controls"
+                  >
+                    <button
+                      type="button"
+                      className="inventory-catalog-bulk-toggle"
+                      aria-pressed={stagedBulkEditEnabled}
+                      title={stagedBulkEditEnabled ? 'Exit bulk edit' : 'Bulk edit'}
+                      onClick={() => {
+                        setStagedBulkEditEnabled((current) => !current)
+                        setSelectedStagedBulkIds(new Set())
+                      }}
+                    >
+                      <ListChecks aria-hidden="true" />
+                      <span>Bulk edit</span>
+                    </button>
+
+                    <div
+                      ref={stagedBulkHelpRef}
+                      className="inventory-catalog-bulk-help"
+                    >
+                      <button
+                        type="button"
+                        className="inventory-catalog-bulk-help-button"
+                        aria-label="Staged bulk edit button key"
+                        aria-expanded={stagedBulkHelpOpen}
+                        title="Bulk edit button key"
+                        onClick={() => setStagedBulkHelpOpen((current) => !current)}
+                      >
+                        <Info aria-hidden="true" />
+                      </button>
+
+                      {stagedBulkHelpOpen ? (
+                        <div
+                          className="inventory-catalog-bulk-help-popover"
+                          role="dialog"
+                          aria-label="Staged bulk edit button key"
+                        >
+                          <strong>Bulk edit key</strong>
+                          <div>
+                            <span><CircleCheckBig aria-hidden="true" /></span>
+                            <p><b>Ready</b> — mark valid selected rows ready and included.</p>
+                          </div>
+                          <div>
+                            <span><CircleX aria-hidden="true" /></span>
+                            <p><b>Ignore</b> — remove selected rows from staging and reconciliation.</p>
+                          </div>
+                          <div>
+                            <span><Upload aria-hidden="true" /></span>
+                            <p><b>Include</b> — include valid selected rows in export and reconciliation.</p>
+                          </div>
+                          <div>
+                            <span><CircleOff aria-hidden="true" /></span>
+                            <p><b>Exclude</b> — keep selected rows staged but exclude them from export and reconciliation.</p>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {stagedBulkEditEnabled ? (
+                      <>
+                        <span className="inventory-catalog-bulk-count">
+                          {selectedStagedBulkIds.size} selected
+                        </span>
+                        <div className="inventory-catalog-bulk-actions">
+                          <button
+                            type="button"
+                            title="Mark selected staged items ready"
+                            aria-label="Mark selected staged items ready"
+                            disabled={selectedStagedBulkIds.size === 0}
+                            onClick={() => applyStagedBulkAction('ready')}
+                          >
+                            <CircleCheckBig aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Ignore selected staged items"
+                            aria-label="Ignore selected staged items"
+                            disabled={selectedStagedBulkIds.size === 0}
+                            onClick={() => applyStagedBulkAction('ignore')}
+                          >
+                            <CircleX aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Include selected staged items"
+                            aria-label="Include selected staged items"
+                            disabled={selectedStagedBulkIds.size === 0}
+                            onClick={() => applyStagedBulkAction('include')}
+                          >
+                            <Upload aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Exclude selected staged items"
+                            aria-label="Exclude selected staged items"
+                            disabled={selectedStagedBulkIds.size === 0}
+                            onClick={() => applyStagedBulkAction('exclude')}
+                          >
+                            <CircleOff aria-hidden="true" />
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+
                   {importFile?.warnings.length ? (
                     <details className="inventory-export-preview">
                       <summary>
@@ -1099,6 +1327,16 @@ function ToastWorkbook() {
                       <table className="inventory-table inventory-catalog-table">
                         <thead>
                           <tr>
+                            {stagedBulkEditEnabled ? (
+                              <th className="inventory-catalog-select-column">
+                                <input
+                                  type="checkbox"
+                                  checked={allVisibleStagedSelected}
+                                  aria-label="Select all visible staged rows"
+                                  onChange={toggleAllVisibleStagedItems}
+                                />
+                              </th>
+                            ) : null}
                             <th>Item</th>
                             <th>Price</th>
                             <th>Status</th>
@@ -1110,18 +1348,33 @@ function ToastWorkbook() {
                             <tr
                               key={item.id}
                               className="inventory-catalog-row"
-                              tabIndex={0}
-                              onClick={() => setSelectedStagedItemId(item.id)}
+                              tabIndex={stagedBulkEditEnabled ? -1 : 0}
+                              onClick={() => {
+                                if (!stagedBulkEditEnabled) {
+                                  setSelectedStagedItemId(item.id)
+                                }
+                              }}
                               onKeyDown={(event) => {
                                 if (
-                                  event.key === 'Enter' ||
-                                  event.key === ' '
+                                  !stagedBulkEditEnabled &&
+                                  (event.key === 'Enter' || event.key === ' ')
                                 ) {
                                   event.preventDefault()
                                   setSelectedStagedItemId(item.id)
                                 }
                               }}
                             >
+                              {stagedBulkEditEnabled ? (
+                                <td className="inventory-catalog-select-column">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedStagedBulkIds.has(item.id)}
+                                    aria-label={`Select ${item.name}`}
+                                    onClick={(event) => event.stopPropagation()}
+                                    onChange={() => toggleStagedBulkItem(item.id)}
+                                  />
+                                </td>
+                              ) : null}
                               <td>
                                 <div className="inventory-catalog-item-cell">
                                   <strong>{item.name}</strong>
@@ -1144,7 +1397,11 @@ function ToastWorkbook() {
                                 >
                                   {item.status === 'review'
                                     ? 'Review'
-                                    : 'Ready'}
+                                    : item.status === 'ignored'
+                                      ? 'Ignored'
+                                      : item.exportIncluded
+                                        ? 'Ready'
+                                        : 'Excluded'}
                                 </span>
                               </td>
                               <td
