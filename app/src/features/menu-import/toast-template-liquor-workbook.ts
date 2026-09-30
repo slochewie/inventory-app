@@ -612,40 +612,72 @@ function getWineTemplateMapping(
     )
   }
 
-  const categoryRow = headerRow - 1
-  const categoryValues = getRowValues(
-    sheetDoc,
-    categoryRow,
-    workbookPackage.sharedStrings,
-  )
   const headerValues = getRowValues(
     sheetDoc,
     headerRow,
     workbookPackage.sharedStrings,
   )
-  const slots = categoryValues.flatMap((categoryCell): WineSlot[] => {
-    const label = clean(categoryCell.value)
+  const glassHeaders = headerValues.filter((headerCell) => {
+    const header = normalizeHeader(headerCell.value)
+    return header.includes('glass') && !header.includes('happy')
+  })
+
+  const ignoredLabels = new Set([
+    '',
+    'wine',
+    'glass $',
+    'glass',
+    'happy hour $',
+    'happy hour',
+    'bottle $',
+    'bottle',
+    'item name',
+    'name',
+  ])
+
+  function findCategoryLabel(nameCol: number) {
+    for (
+      let rowNumber = headerRow! - 1;
+      rowNumber >= Math.max(1, headerRow! - 8);
+      rowNumber -= 1
+    ) {
+      const candidates = getRowValues(
+        sheetDoc,
+        rowNumber,
+        workbookPackage.sharedStrings,
+      )
+        .filter(
+          (cell) =>
+            cell.col >= nameCol &&
+            cell.col <= nameCol + 4,
+        )
+        .map((cell) => clean(cell.value))
+        .filter((value) => {
+          const normalized = normalizeHeader(value)
+          return (
+            value !== '' &&
+            !ignoredLabels.has(normalized) &&
+            !/^\d+(?:\.\d+)?$/.test(value)
+          )
+        })
+
+      if (candidates.length > 0) return candidates[0]
+    }
+
+    return ''
+  }
+
+  const slots = glassHeaders.flatMap((glassHeader): WineSlot[] => {
+    const nameCol = Math.max(1, glassHeader.col - 1)
+    const label = findCategoryLabel(nameCol)
     const kind = normalizeWineKind(label)
     if (!label || !kind) return []
 
-    const nextCategoryColumn =
-      categoryValues.find((candidate) => candidate.col > categoryCell.col)?.col ??
-      categoryCell.col + 5
     const groupHeaders = headerValues.filter(
       (headerCell) =>
-        headerCell.col >= categoryCell.col &&
-        headerCell.col < nextCategoryColumn,
+        headerCell.col >= nameCol &&
+        headerCell.col <= nameCol + 4,
     )
-    const nameCol =
-      groupHeaders.find((headerCell) => {
-        const header = normalizeHeader(headerCell.value)
-        return header === 'wine' || header.includes('item name')
-      })?.col ?? categoryCell.col
-    const glassPriceCol =
-      groupHeaders.find((headerCell) => {
-        const header = normalizeHeader(headerCell.value)
-        return header.includes('glass') && !header.includes('happy')
-      })?.col ?? categoryCell.col + 1
     const bottlePriceCol =
       groupHeaders.find((headerCell) => {
         const header = normalizeHeader(headerCell.value)
@@ -660,9 +692,9 @@ function getWineTemplateMapping(
     return [{
       label,
       kind,
-      categoryCol: categoryCell.col,
+      categoryCol: nameCol,
       nameCol,
-      glassPriceCol,
+      glassPriceCol: glassHeader.col,
       glassHappyHourCol: happyHourColumns[0] ?? null,
       bottlePriceCol,
       bottleHappyHourCol: happyHourColumns[1] ?? null,
@@ -676,7 +708,7 @@ function getWineTemplateMapping(
   return {
     sheetPath: wineSheet.path,
     sheetName: wineSheet.name,
-    categoryRow,
+    categoryRow: Math.max(1, headerRow - 1),
     headerRow,
     dataStartRow: headerRow + 1,
     lastTemplateRow: getLastWorksheetRow(sheetDoc),
