@@ -37,6 +37,9 @@ function MasterNamesPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [page, setPage] = useState(1)
+
+  const PAGE_SIZE = 50
 
   async function reload() {
     if (!activeOrganization?.id) return
@@ -80,6 +83,16 @@ function MasterNamesPage() {
       ].some((value) => value.toLowerCase().includes(normalizedQuery)),
     )
   }, [items, query])
+
+  useEffect(() => {
+    setPage(1)
+  }, [query])
+
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const clampedPage = Math.min(page, pageCount)
+  const pageStart = (clampedPage - 1) * PAGE_SIZE
+  const pageItems = filteredItems.slice(pageStart, pageStart + PAGE_SIZE)
+  const pageEnd = pageStart + pageItems.length
 
   const selectedItem =
     items.find((item) => item.id === selectedItemId) ?? null
@@ -215,14 +228,42 @@ function MasterNamesPage() {
           color: #6b7280;
         }
 
+        .inventory-master-names-page .master-rename-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 70;
+          display: grid;
+          place-items: center;
+          background: rgb(15 23 42 / 45%);
+          padding: 1rem;
+        }
+
         .inventory-master-names-page .master-rename-panel {
           display: grid;
+          width: min(64rem, calc(100vw - 2rem));
+          max-height: min(88dvh, 52rem);
+          overflow: auto;
           gap: 1rem;
-          margin-top: 1rem;
           border: 1px solid #d1d5db;
           border-radius: 1rem;
           background: #fff;
           padding: 1rem;
+          box-shadow: 0 24px 60px rgb(15 23 42 / 22%);
+        }
+
+        .inventory-master-names-page .master-names-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: .75rem;
+          border-top: 1px solid #e5e7eb;
+          padding: .8rem 1rem;
+        }
+
+        .inventory-master-names-page .master-names-pagination-actions {
+          display: flex;
+          align-items: center;
+          gap: .5rem;
         }
 
         .inventory-master-names-page .master-rename-actions {
@@ -303,7 +344,7 @@ function MasterNamesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredItems.map((item) => {
+                {pageItems.map((item) => {
                   const exportImpact = item.organizations.reduce(
                     (sum, organization) =>
                       sum + organization.followsMasterNameCount,
@@ -336,14 +377,55 @@ function MasterNamesPage() {
             </table>
           </div>
         ) : null}
+
+        {!loading && filteredItems.length > 0 ? (
+          <div className="master-names-pagination">
+            <span>
+              Showing {(pageStart + 1).toLocaleString()}–{pageEnd.toLocaleString()} of{' '}
+              {filteredItems.length.toLocaleString()}
+            </span>
+            <div className="master-names-pagination-actions">
+              <button
+                className="inventory-template-download"
+                type="button"
+                disabled={clampedPage <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                Previous
+              </button>
+              <span>
+                Page {clampedPage} of {pageCount}
+              </span>
+              <button
+                className="inventory-template-download"
+                type="button"
+                disabled={clampedPage >= pageCount}
+                onClick={() =>
+                  setPage((current) => Math.min(pageCount, current + 1))
+                }
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {selectedItem ? (
-        <section className="inventory-card master-rename-panel">
+        <div
+          className="master-rename-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="master-rename-title"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) cancelRename()
+          }}
+        >
+        <section className="master-rename-panel">
           <div className="inventory-table-heading">
             <div className="master-name-current">
               <small>Current master name</small>
-              <h2>{selectedItem.name}</h2>
+              <h2 id="master-rename-title">{selectedItem.name}</h2>
             </div>
             <button
               className="inventory-template-download"
@@ -463,6 +545,7 @@ function MasterNamesPage() {
             </button>
           </div>
         </section>
+        </div>
       ) : null}
     </section>
   )
