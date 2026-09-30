@@ -104,6 +104,97 @@ export function getOptionalBeerCategories(
   }))
 }
 
+export type InventoryOrganizationBeerFormat = {
+  key: string
+  label: string
+  toastDestination: string
+  toastSlot: OptionalBeerCategoryConfig["key"] | null
+  kind: "draft" | "pitcher" | "can" | "bottle" | "custom"
+}
+
+export function getInventoryOrganizationBeerFormats(
+  config: InventoryOrganizationConfig,
+): InventoryOrganizationBeerFormat[] {
+  const formats: InventoryOrganizationBeerFormat[] = []
+
+  const addDraft = (
+    enabled: boolean,
+    actualSizeOz: number | null,
+    toastSlotSizeOz: number,
+  ) => {
+    if (!enabled) return
+    const sizeOz = actualSizeOz ?? toastSlotSizeOz
+    const label = `${sizeOz}oz Draft`
+    formats.push({
+      key: `draft-${sizeOz}oz`,
+      label,
+      toastDestination: `Beer tab · Draft Beer ${sizeOz}oz`,
+      toastSlot: null,
+      kind: "draft",
+    })
+  }
+
+  addDraft(config.draft8Enabled, config.draft8ActualSizeOz, 8)
+  addDraft(config.draft16Enabled, config.draft16ActualSizeOz, 16)
+  addDraft(config.draft24Enabled, config.draft24ActualSizeOz, 24)
+
+  if (config.pitcherEnabled) {
+    formats.push({
+      key: "pitcher",
+      label: "Pitcher",
+      toastDestination: "Beer tab · Pitcher",
+      toastSlot: null,
+      kind: "pitcher",
+    })
+  }
+
+  if (config.canEnabled) {
+    formats.push({
+      key: "can",
+      label: "Can",
+      toastDestination: "Beer tab · Can",
+      toastSlot: null,
+      kind: "can",
+    })
+  }
+
+  if (config.bottleEnabled) {
+    formats.push({
+      key: "bottle",
+      label: "Bottle",
+      toastDestination: "Beer tab · Bottle",
+      toastSlot: null,
+      kind: "bottle",
+    })
+  }
+
+  for (const category of getOptionalBeerCategories(config)) {
+    if (!category.enabled) continue
+
+    const label = category.label.trim()
+    if (!label) continue
+
+    const draftSizeMatch = label.match(/^(\d+(?:\.\d+)?)\s*oz$/i)
+    formats.push({
+      key: category.key,
+      label: draftSizeMatch ? `${draftSizeMatch[1]}oz Draft` : label,
+      toastDestination: draftSizeMatch
+        ? `Beer tab · Draft Beer ${draftSizeMatch[1]}oz`
+        : `Beer tab · ${label}`,
+      toastSlot: category.key,
+      kind: draftSizeMatch ? "draft" : "custom",
+    })
+  }
+
+  const byDestination = new Map<string, InventoryOrganizationBeerFormat>()
+  for (const format of formats) {
+    const key = format.toastDestination.trim().toLowerCase()
+    if (!byDestination.has(key)) byDestination.set(key, format)
+  }
+
+  return [...byDestination.values()]
+}
+
 export const ALL_HAPPY_HOUR_DAYS: HappyHourDay[] = [
   "mon",
   "tue",
