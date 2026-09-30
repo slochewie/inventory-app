@@ -9,7 +9,10 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
-import { getBuiltInToastDestinations } from '#/features/menu-import/toast-destination'
+import {
+  getBuiltInToastDestinations,
+  isBeerToastDestination,
+} from '#/features/menu-import/toast-destination'
 import { authClient } from '#/lib/auth-client'
 import {
   getInventoryOrganizationConfig,
@@ -228,19 +231,16 @@ function ManualItemPage() {
     () =>
       mergeCategoryOptions(
         getBuiltInToastDestinations().filter(
-          (destination) =>
-            !destination.trim().toLowerCase().startsWith('beer tab ·'),
+          (destination) => !isBeerToastDestination(destination),
         ),
         mergeCategoryOptions(
           destinationOptions.filter(
-            (destination) =>
-              !destination.trim().toLowerCase().startsWith('beer tab ·'),
+            (destination) => !isBeerToastDestination(destination),
           ),
           menuCategories
             .map((category) => category.toastDestination)
             .filter(
-              (destination) =>
-                !destination.trim().toLowerCase().startsWith('beer tab ·'),
+              (destination) => !isBeerToastDestination(destination),
             ),
         ),
       ),
