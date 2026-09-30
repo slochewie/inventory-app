@@ -130,6 +130,18 @@ function loadOrganizationReviewSession(organizationId: string) {
   return saved
 }
 
+function isReviewCsvSession(importFile: ParsedMenuImport | null | undefined) {
+  if (!importFile) return false
+
+  return (
+    importFile.meta?.source === 'toast-review-csv-staging' ||
+    importFile.meta?.restoredFrom === 'toast-export-review.csv' ||
+    /(?:^|[\\/])toast-export-review(?:[^\\/]*)\.csv$/i.test(
+      importFile.sourceName.trim(),
+    )
+  )
+}
+
 function ToastWorkbook() {
   const navigate = useNavigate()
   const { data: activeOrganization } = authClient.useActiveOrganization()
@@ -281,14 +293,17 @@ function ToastWorkbook() {
     if (savedReviewSession?.items.length) {
       setImportFile(savedReviewSession.importFile)
       setItems(savedReviewSession.items)
-      setReviewSource(
+      const savedSource =
         savedReviewSession.importFile?.meta?.source === 'toast-workbook-staging'
           ? 'toast-workbook'
-          : savedReviewSession.importFile?.meta?.source === 'toast-review-csv-staging' ||
-              savedReviewSession.importFile?.meta?.restoredFrom === 'toast-export-review.csv'
+          : isReviewCsvSession(savedReviewSession.importFile)
             ? 'review-csv'
-            : 'saved',
-      )
+            : 'saved'
+
+      setReviewSource(savedSource)
+      if (savedSource === 'review-csv') {
+        setStagedReviewStatus('all')
+      }
       setReviewSavedAt(savedReviewSession.savedAt)
     } else {
       setImportFile(null)
@@ -591,6 +606,10 @@ function ToastWorkbook() {
       setItems(parsed.items)
       setReviewSource('review-csv')
       setReviewSavedAt(null)
+      setStagedReviewQuery('')
+      setStagedReviewStatus('all')
+      setStagedReviewCategory('all')
+      setStagedReviewPage(1)
       saveReviewSession(stagedImportFile, parsed.items, activeOrganization?.id)
     } catch (error) {
       setImportFile(null)
@@ -981,8 +1000,8 @@ function ToastWorkbook() {
                       <option value="review">
                         Needs review ({summary.reviewItems})
                       </option>
-                      <option value="ready">Ready</option>
-                      <option value="all">All staged items</option>
+                      <option value="ready">Ready ({items.filter((item) => item.status === 'ready').length})</option>
+                      <option value="all">All staged items ({items.length})</option>
                     </select>
                   </label>
 
