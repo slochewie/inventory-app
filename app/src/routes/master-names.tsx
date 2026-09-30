@@ -32,6 +32,9 @@ function MasterNamesPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [items, setItems] = useState<InventoryMasterItem[]>([])
   const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('all')
+  const [organization, setOrganization] = useState('all')
+  const [impact, setImpact] = useState<'all' | 'affected' | 'override' | 'unused'>('all')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
@@ -67,26 +70,79 @@ function MasterNamesPage() {
     void reload()
   }, [activeOrganization?.id])
 
+  const categories = useMemo(
+    () =>
+      [...new Set(items.map((item) => item.categoryName ?? 'Uncategorized'))]
+        .sort((left, right) => left.localeCompare(right)),
+    [items],
+  )
+
+  const organizations = useMemo(
+    () =>
+      [...new Set(
+        items.flatMap((item) =>
+          item.organizations.map((entry) => entry.organizationName),
+        ),
+      )].sort((left, right) => left.localeCompare(right)),
+    [items],
+  )
+
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
-    if (!normalizedQuery) return items
 
-    return items.filter((item) =>
-      [
+    return items.filter((item) => {
+      if (
+        category !== 'all' &&
+        (item.categoryName ?? 'Uncategorized') !== category
+      ) {
+        return false
+      }
+
+      if (
+        organization !== 'all' &&
+        !item.organizations.some(
+          (entry) => entry.organizationName === organization,
+        )
+      ) {
+        return false
+      }
+
+      const affectedCount = item.organizations.reduce(
+        (sum, entry) => sum + entry.followsMasterNameCount,
+        0,
+      )
+      const overrideCount = item.organizations.reduce(
+        (sum, entry) =>
+          sum +
+          Math.max(
+            0,
+            entry.exportVariantCount - entry.followsMasterNameCount,
+          ),
+        0,
+      )
+
+      if (impact === 'affected' && affectedCount === 0) return false
+      if (impact === 'override' && overrideCount === 0) return false
+      if (impact === 'unused' && item.organizations.length > 0) return false
+
+      if (!normalizedQuery) return true
+
+      return [
         item.name,
+        item.normalizedName,
         item.categoryName ?? '',
         item.toastCategory ?? '',
-        ...item.organizations.flatMap((organization) => [
-          organization.organizationName,
-          ...organization.overrideNames,
+        ...item.organizations.flatMap((entry) => [
+          entry.organizationName,
+          ...entry.overrideNames,
         ]),
-      ].some((value) => value.toLowerCase().includes(normalizedQuery)),
-    )
-  }, [items, query])
+      ].some((value) => value.toLowerCase().includes(normalizedQuery))
+    })
+  }, [category, impact, items, organization, query])
 
   useEffect(() => {
     setPage(1)
-  }, [query])
+  }, [category, impact, organization, query])
 
   const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
   const clampedPage = Math.min(page, pageCount)
@@ -186,6 +242,27 @@ function MasterNamesPage() {
   return (
     <section className="inventory-content inventory-master-names-page">
       <style>{`
+        .inventory-master-names-page .master-names-toolbar {
+          display: grid;
+          grid-template-columns: minmax(20rem, 2fr) repeat(3, minmax(10rem, 1fr));
+          gap: .75rem;
+          margin-bottom: 1rem;
+        }
+
+        .inventory-master-names-page .master-names-toolbar .inventory-search-control {
+          min-width: 0;
+        }
+
+        .inventory-master-names-page .master-names-toolbar input,
+        .inventory-master-names-page .master-names-toolbar select {
+          width: 100%;
+        }
+
+        .inventory-master-names-page .master-names-result-count {
+          color: #64748b;
+          font-size: .9rem;
+        }
+
         .inventory-master-names-page .master-names-summary {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -351,6 +428,12 @@ function MasterNamesPage() {
           gap: .5rem;
         }
 
+        @media (max-width: 1100px) {
+          .inventory-master-names-page .master-names-toolbar {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
         @media (max-width: 900px) {
           .inventory-master-names-page .master-names-summary {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -362,6 +445,10 @@ function MasterNamesPage() {
         }
 
         @media (max-width: 600px) {
+          .inventory-master-names-page .master-names-toolbar {
+            grid-template-columns: 1fr;
+          }
+
           .inventory-master-names-page .master-names-summary,
           .inventory-master-names-page .master-impact-row {
             grid-template-columns: 1fr;
@@ -379,21 +466,70 @@ function MasterNamesPage() {
         </p>
       </header>
 
+      <section className="master-names-toolbar" aria-label="Master name filters">
+        <label className="inventory-search-control">
+          <span>Search</span>
+          <input
+            type="search"
+            value={query}
+            placeholder="Search master names, aliases, organizations…"
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+
+        <label className="inventory-search-control">
+          <span>Category</span>
+          <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            <option value="all">All categories</option>
+            {categories.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="inventory-search-control">
+          <span>Organization</span>
+          <select
+            value={organization}
+            onChange={(event) => setOrganization(event.target.value)}
+          >
+            <option value="all">All organizations</option>
+            {organizations.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="inventory-search-control">
+          <span>Rename impact</span>
+          <select
+            value={impact}
+            onChange={(event) =>
+              setImpact(
+                event.target.value as 'all' | 'affected' | 'override' | 'unused',
+              )
+            }
+          >
+            <option value="all">All master items</option>
+            <option value="affected">Affects Toast exports</option>
+            <option value="override">Has local Toast override</option>
+            <option value="unused">Unused by organizations</option>
+          </select>
+        </label>
+      </section>
+
       <section className="inventory-card inventory-table-card">
         <div className="inventory-table-heading">
           <div>
             <h2>Shared master catalog</h2>
-            <p>
-              {items.length.toLocaleString()} master items. Renames are global.
+            <p className="master-names-result-count">
+              {filteredItems.length.toLocaleString()} of {items.length.toLocaleString()} master items shown. Renames are global.
             </p>
           </div>
-          <input
-            className="inventory-input"
-            type="search"
-            value={query}
-            placeholder="Search master names or organizations"
-            onChange={(event) => setQuery(event.target.value)}
-          />
         </div>
 
         {error ? <p className="inventory-error">{error}</p> : null}
