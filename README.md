@@ -39,6 +39,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for operator/development instructions and [do
 | `/import-review` | New Import, History, Mapping Review | Role-gated by tab/action |
 | `/toast-template-import` | Direct populated Toast workbook import compatibility workflow | Staff+ |
 | `/toast-workbook` | Export to Toast plus organization-scoped Toast workbook staging/reconciliation | Staff+ |
+| `/master-names` | Shared master naming with organization impact review | Admin |
 | `/assignments` | Inventory access/roles | Admin |
 | `/imports` | Standalone history compatibility view | Viewer |
 | `/reconcile` | Standalone mapping-review compatibility view | Manager/Admin |
@@ -77,9 +78,11 @@ Each organization independently controls whether a variant is carried, whether i
 
 The Catalog groups variants by shared master item. Canonical category changes affect the shared master item across organizations. Organization-specific edits affect only the selected organization.
 
-### Current master-name limitation
+### Master naming
 
-The shared `inventoryItem.name` is not currently editable from the UI. The drawer can change canonical category, organization-specific variant names/settings, and merge duplicate master items, but renaming the shared master item itself still requires a future explicit master-name endpoint/UI.
+Inventory Admins use `/master-names` to rename the shared `inventoryItem.name`. The page shows the organization-level impact before saving, including linked/carried variants, Toast exports that follow the master name, and organization-specific Toast name overrides that will remain unchanged.
+
+A successful rename updates the shared canonical name and normalized name while retaining the previous master name as an alias for future reconciliation. Renaming is global; organization-specific Toast name overrides are not rewritten.
 
 ## Catalog bulk edit
 
@@ -287,6 +290,7 @@ Current API responsibilities include:
 - import history,
 - source mappings and mapping confirmation,
 - master-item category updates,
+- master-item naming/impact review,
 - master-item merge,
 - creation/reuse of an organization Beer variant from an enabled format.
 
