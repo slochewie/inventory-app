@@ -3418,3 +3418,177 @@ select {
     grid-column: 1 / -1;
   }
 }
+
+
+.inventory-post-staging-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+}
+
+.inventory-post-staging-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.inventory-post-staging-heading h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.15rem;
+}
+
+.inventory-post-staging-heading p:not(.inventory-kicker) {
+  max-width: 46rem;
+  margin: 0.35rem 0 0;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.inventory-post-staging-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.inventory-post-staging-status span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.inventory-post-staging-status span.is-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.inventory-post-staging-status span.is-ready {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.inventory-post-staging-card > .inventory-import-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.inventory-reconciliation-overview {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.inventory-reconciliation-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.inventory-reconciliation-counts span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #6b7280;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.inventory-reconciliation-counts strong {
+  color: #111827;
+  font-size: 0.9rem;
+}
+
+.inventory-reconciliation-master-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 28rem);
+  gap: 1rem;
+  align-items: end;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  padding: 0.9rem;
+}
+
+.inventory-reconciliation-master-picker > div:first-child {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.inventory-reconciliation-master-picker > div:first-child > span {
+  color: #6b7280;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.inventory-reconciliation-master-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+}
+
+.inventory-reconciliation-master-controls select {
+  min-width: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #111827;
+  padding: 0.65rem 0.7rem;
+  font: inherit;
+}
+
+.inventory-reconciliation-search {
+  width: min(28rem, 100%);
+}
+
+.inventory-reconciliation-note {
+  margin: 0;
+  border-radius: 0.7rem;
+  background: #f8fafc;
+  color: #4b5563;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.inventory-reconciliation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 0.9rem;
+}
+
+@media (max-width: 800px) {
+  .inventory-post-staging-heading {
+    display: grid;
+  }
+
+  .inventory-post-staging-heading > button {
+    width: 100%;
+  }
+
+  .inventory-reconciliation-master-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-reconciliation-master-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-reconciliation-master-controls > button,
+  .inventory-reconciliation-actions > button {
+    width: 100%;
+  }
+
+  .inventory-reconciliation-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
