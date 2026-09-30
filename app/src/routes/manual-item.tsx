@@ -13,6 +13,7 @@ import { getBuiltInToastDestinations } from '#/features/menu-import/toast-destin
 import { authClient } from '#/lib/auth-client'
 import {
   getInventoryOrganizationConfig,
+  getInventoryOrganizationBeerFormats,
   getOptionalBeerCategories,
   listInventoryCatalog,
   persistInventoryImport,
@@ -62,48 +63,6 @@ const EMPTY_DRAFT: ManualItemDraft = {
   toastSlot: '',
   availableHere: true,
   exportToToast: true,
-}
-
-function getOrganizationBeerDestinations(
-  config: InventoryOrganizationConfig | null,
-  optionalBeerCategories: OptionalBeerCategoryConfig[],
-) {
-  if (!config) return []
-
-  const destinations: string[] = []
-
-  const addDraft = (
-    enabled: boolean,
-    actualSizeOz: number | null,
-    toastSlotSizeOz: number,
-  ) => {
-    if (!enabled) return
-    const sizeOz = actualSizeOz ?? toastSlotSizeOz
-    destinations.push(`Beer tab · Draft Beer ${sizeOz}oz`)
-  }
-
-  addDraft(config.draft8Enabled, config.draft8ActualSizeOz, 8)
-  addDraft(config.draft16Enabled, config.draft16ActualSizeOz, 16)
-  addDraft(config.draft24Enabled, config.draft24ActualSizeOz, 24)
-
-  if (config.pitcherEnabled) destinations.push('Beer tab · Pitcher')
-  if (config.canEnabled) destinations.push('Beer tab · Can')
-  if (config.bottleEnabled) destinations.push('Beer tab · Bottle')
-
-  optionalBeerCategories
-    .filter((category) => category.enabled && category.label.trim())
-    .forEach((category) => {
-      const label = category.label.trim()
-      const draftSizeMatch = label.match(/^(\d+(?:\.\d+)?)\s*oz$/i)
-
-      destinations.push(
-        draftSizeMatch
-          ? `Beer tab · Draft Beer ${draftSizeMatch[1]}oz`
-          : `Beer tab · ${label}`,
-      )
-    })
-
-  return [...new Set(destinations)]
 }
 
 function ManualItemPage() {
@@ -252,13 +211,17 @@ function ManualItemPage() {
     [optionalBeerCategories],
   )
 
-  const organizationBeerDestinations = useMemo(
+  const organizationBeerFormats = useMemo(
     () =>
-      getOrganizationBeerDestinations(
-        organizationConfig,
-        optionalBeerCategories,
-      ),
-    [organizationConfig, optionalBeerCategories],
+      organizationConfig
+        ? getInventoryOrganizationBeerFormats(organizationConfig)
+        : [],
+    [organizationConfig],
+  )
+
+  const organizationBeerDestinations = useMemo(
+    () => organizationBeerFormats.map((format) => format.toastDestination),
+    [organizationBeerFormats],
   )
 
   const nonBeerDestinationOptions = useMemo(
@@ -549,7 +512,15 @@ function ManualItemPage() {
                 options={allDestinationOptions}
                 disabled={saving}
                 placeholder="Gin, Cocktails, NA Bev, Retail…"
-                onChange={(value) => updateDraft({ toastDestination: value })}
+                onChange={(value) => {
+                  const beerFormat = organizationBeerFormats.find(
+                    (format) => format.toastDestination === value,
+                  )
+                  updateDraft({
+                    toastDestination: value,
+                    toastSlot: beerFormat?.toastSlot ?? '',
+                  })
+                }}
               />
 
               <ManualMoneyField
