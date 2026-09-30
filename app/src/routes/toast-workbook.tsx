@@ -214,6 +214,10 @@ function ToastWorkbook() {
   const [reconciliationQuery, setReconciliationQuery] = useState('')
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
+  const catalogExportItems = useMemo(
+    () => masterCatalog.map(catalogRowToNormalizedItem),
+    [masterCatalog],
+  )
   const beerExportItemCount = items.filter(
     (item) => item.exportIncluded && getToastWorkbookCategory(item) === 'Beer',
   ).length
@@ -995,14 +999,12 @@ function ToastWorkbook() {
     if (!workbook) throw new Error('Toast source template is not loaded')
 
     const happyHourEnabled = organizationConfig?.happyHourEnabled === true
-    const stagedDraftSlotMappings =
-      reviewSource === 'toast-workbook'
-        ? getStagedDraftSlotMappings(importFile)
-        : []
+    const exportItems = catalogExportItems
+    if (exportItems.length === 0) {
+      throw new Error('The persistent Inventory catalog has no rows to export')
+    }
     const draftSlotMappings =
-      stagedDraftSlotMappings.length > 0
-        ? stagedDraftSlotMappings
-        : getOrganizationDraftSlotMappings(organizationConfig)
+      getOrganizationDraftSlotMappings(organizationConfig)
     const optionalBeerCategories = organizationConfig
       ? getOptionalBeerCategories(organizationConfig).map(({ enabled, label }) => ({
           enabled,
@@ -1021,7 +1023,7 @@ function ToastWorkbook() {
       : undefined
     const populatedWorkbook = await buildPopulatedToastTemplateWorkbookWithLiquorAsync({
       templateArrayBuffer: workbook.arrayBuffer.slice(0),
-      items,
+      items: exportItems,
       happyHourEnabled,
       happyHourStart: organizationConfig?.happyHourStart ?? null,
       happyHourEnd: organizationConfig?.happyHourEnd ?? null,
@@ -1037,7 +1039,7 @@ function ToastWorkbook() {
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
       workbookArrayBuffer: populatedWorkbookArrayBuffer,
-      items,
+      items: exportItems,
       happyHourEnabled,
       happyHourStart: organizationConfig?.happyHourStart ?? null,
       happyHourEnd: organizationConfig?.happyHourEnd ?? null,
@@ -1808,7 +1810,10 @@ function ToastWorkbook() {
               <h2>Download Toast workbook</h2>
             </div>
             <p className="inventory-export-context">
-              Uses each item's Toast Destination to place it in the workbook
+              Downloads use the persistent Inventory catalog from the database. Any staged import review remains saved and is not used as the workbook source.
+            </p>
+            <p className="inventory-export-context">
+              Uses each catalog item's Toast Destination to place it in the workbook
               {organizationConfig?.happyHourEnabled
                 ? ` with Happy Hour pricing for ${formatHappyHourSetting(organizationConfig)}.`
                 : ' without Happy Hour pricing.'}
@@ -1855,7 +1860,7 @@ function ToastWorkbook() {
             <button
               className="inventory-template-download"
               type="button"
-              disabled={!workbook || items.length === 0}
+              disabled={!workbook || catalogExportItems.length === 0}
               onClick={handleDownloadWorkbook}
             >
               Download populated XLSX
@@ -1864,7 +1869,7 @@ function ToastWorkbook() {
             <button
               className="inventory-template-download"
               type="button"
-              disabled={!workbook || items.length === 0}
+              disabled={!workbook || catalogExportItems.length === 0}
               onClick={handleDownloadWorkbookZip}
             >
               Download ZIP for Toast
