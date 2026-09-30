@@ -129,3 +129,153 @@
     align-items: flex-start;
   }
 }
+
+
+.cocktails-group-card.is-empty {
+  padding-bottom: 0;
+}
+
+.cocktails-group-card.is-empty .inventory-table-heading {
+  border-bottom: 0;
+}
+
+.cocktails-row {
+  width: 100%;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cocktails-row:hover,
+.cocktails-row:focus-visible {
+  background: #f8fafc;
+}
+
+.cocktails-edit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgb(15 23 42 / 45%);
+  padding: 1rem;
+}
+
+.cocktails-edit-panel {
+  display: grid;
+  gap: 1rem;
+  width: min(44rem, calc(100vw - 2rem));
+  max-height: min(90dvh, 48rem);
+  overflow: auto;
+  border: 1px solid #d0d5dd;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1.15rem;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 22%);
+}
+
+.cocktails-edit-header,
+.cocktails-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cocktails-edit-header h2 {
+  margin: 0.1rem 0 0;
+}
+
+.cocktails-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.cocktails-edit-grid label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.cocktails-edit-grid label > span {
+  color: #667085;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cocktails-edit-grid input,
+.cocktails-edit-grid select {
+  min-width: 0;
+  width: 100%;
+  min-height: 2.9rem;
+  border: 1px solid #d0d5dd;
+  border-radius: 0.7rem;
+  background: #fff;
+  padding: 0 0.85rem;
+  font: inherit;
+}
+
+.cocktails-edit-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid #eaecf0;
+  border-bottom: 1px solid #eaecf0;
+}
+
+.cocktails-edit-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.cocktails-edit-actions > div {
+  display: flex;
+  gap: 0.75rem;
+}
+
+@media (max-width: 720px) {
+  .cocktails-group-card.is-empty .cocktails-empty {
+    display: none;
+  }
+
+  .cocktails-edit-backdrop {
+    place-items: end center;
+    padding: 0.5rem;
+  }
+
+  .cocktails-edit-panel {
+    width: 100%;
+    max-height: calc(100dvh - 1rem);
+    border-radius: 1rem 1rem 0.6rem 0.6rem;
+  }
+
+  .cocktails-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cocktails-edit-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cocktails-edit-actions > div {
+    width: 100%;
+  }
+
+  .cocktails-edit-actions > div > * {
+    flex: 1;
+  }
+
+  .cocktails-edit-actions > .inventory-danger-button {
+    width: 100%;
+  }
+}
