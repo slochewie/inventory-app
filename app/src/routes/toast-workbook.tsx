@@ -181,6 +181,7 @@ function ToastWorkbook() {
     optionalBeerCategory1Rows: number
     optionalBeerCategoryRows: number[]
     liquorRows: number
+    wineRows: number
     cocktailRows: number
     naBevRows: number
     retailRows: number
@@ -1064,6 +1065,7 @@ function ToastWorkbook() {
       optionalBeerCategory1Rows: validation.beer.optionalBeerCategory1Rows,
       optionalBeerCategoryRows: validation.beer.optionalBeerCategoryRows,
       liquorRows: validation.liquorRows,
+      wineRows: validation.wineRows,
       cocktailRows: validation.cocktailRows,
       naBevRows: validation.naBevRows,
       retailRows: validation.retailRows,
@@ -1834,7 +1836,8 @@ function ToastWorkbook() {
                   : '0 optional Beer rows'}
                 {' · '}
                 {workbookValidation.bottleSlotRows} Bottle-slot rows · {workbookValidation.liquorRows} liquor rows ·{' '}
-                {workbookValidation.cocktailRows} cocktail rows · {workbookValidation.naBevRows} NA Bev rows ·{' '}
+                {workbookValidation.wineRows} wine rows · {workbookValidation.cocktailRows} cocktail rows ·{' '}
+                {workbookValidation.naBevRows} NA Bev rows ·{' '}
                 {workbookValidation.retailRows} retail rows · {workbookValidation.openItemsRows} Open Items rows · Notes schedule checked
               </span>
             </div>
@@ -1842,7 +1845,7 @@ function ToastWorkbook() {
             <div className="inventory-workbook-validation">
               <strong>Automatic validation</strong>
               <span>
-                Beer, Liquor, Cocktails, NA Bev, Retail, Open Items, Happy Hour cells, optional Beer categories, 24oz cans, and the Notes schedule are checked before download.
+                Beer, Wine, Liquor, Cocktails, NA Bev, Retail, Open Items, Happy Hour cells, optional Beer categories, 24oz cans, and the Notes schedule are checked before download.
               </span>
             </div>
           )}
@@ -2846,6 +2849,7 @@ function getStagedReviewDisplayCategory(item: NormalizedMenuItem) {
 function normalizeStagedMenuCategory(value: string) {
   const normalized = clean(value)
   if (/^beer(?:\s*\/|$)/i.test(normalized)) return 'Beer'
+  if (/^wine(?:\s*\/|\s*:|$)/i.test(normalized)) return 'Wine'
   if (/^cocktails?$/i.test(normalized)) return 'Cocktails'
   if (/^na\s+bev/i.test(normalized)) return 'NA Bev'
   return normalized || 'Beer'
