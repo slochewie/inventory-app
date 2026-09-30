@@ -245,6 +245,8 @@ function ToastWorkbook() {
   )
   const selectedStagedItem =
     items.find((item) => item.id === selectedStagedItemId) ?? null
+  const isStagedReviewSource =
+    reviewSource === 'toast-workbook' || reviewSource === 'review-csv'
 
   useEffect(() => {
     setStagedReviewPage(1)
@@ -282,7 +284,10 @@ function ToastWorkbook() {
       setReviewSource(
         savedReviewSession.importFile?.meta?.source === 'toast-workbook-staging'
           ? 'toast-workbook'
-          : 'saved',
+          : savedReviewSession.importFile?.meta?.source === 'toast-review-csv-staging' ||
+              savedReviewSession.importFile?.meta?.restoredFrom === 'toast-export-review.csv'
+            ? 'review-csv'
+            : 'saved',
       )
       setReviewSavedAt(savedReviewSession.savedAt)
     } else {
@@ -572,12 +577,21 @@ function ToastWorkbook() {
     try {
       const text = await file.text()
       const parsed = parseToastExportReviewCsv(text, file.name)
+      const stagedImportFile: ParsedMenuImport = {
+        ...parsed.importFile,
+        meta: {
+          ...parsed.importFile.meta,
+          source: 'toast-review-csv-staging',
+          store: activeOrganization?.name ?? 'Organization',
+          organizationId: activeOrganization?.id ?? '',
+        },
+      }
 
-      setImportFile(parsed.importFile)
+      setImportFile(stagedImportFile)
       setItems(parsed.items)
       setReviewSource('review-csv')
       setReviewSavedAt(null)
-      saveReviewSession(parsed.importFile, parsed.items, activeOrganization?.id)
+      saveReviewSession(stagedImportFile, parsed.items, activeOrganization?.id)
     } catch (error) {
       setImportFile(null)
       setItems([])
@@ -843,7 +857,19 @@ function ToastWorkbook() {
                 </button>
               </div>
             ) : reviewSource === 'review-csv' ? (
-              <p>Using an advanced review CSV override for this export session.</p>
+              <div>
+                <p>
+                  <strong>Staged export preview CSV — not saved to Inventory.</strong>{' '}
+                  Review and normalize this source before exporting.
+                </p>
+                <button
+                  type="button"
+                  className="inventory-secondary-button"
+                  onClick={() => void handleClearStagedImport()}
+                >
+                  Clear staged import
+                </button>
+              </div>
             ) : reviewSource === 'uploaded' ? (
               <p>Using an advanced source-file override for this export session.</p>
             ) : (
@@ -869,7 +895,7 @@ function ToastWorkbook() {
               />
             </label>
             <label className="inventory-upload-control">
-              <span>Choose review CSV</span>
+              <span>Stage export preview CSV for review</span>
               <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
             </label>
             <label className="inventory-upload-control">
@@ -924,11 +950,11 @@ function ToastWorkbook() {
               </dl>
             </section>
 
-            {reviewSource === 'toast-workbook' ? (
+            {isStagedReviewSource ? (
               <>
                 <section
                   className="inventory-catalog-toolbar"
-                  aria-label="Staged workbook review filters"
+                  aria-label="Staged source review filters"
                 >
                   <label className="inventory-search-control inventory-catalog-search">
                     <span>Search</span>
@@ -982,7 +1008,7 @@ function ToastWorkbook() {
                   <div className="inventory-table-heading">
                     <div>
                       <p className="inventory-kicker">Staging review</p>
-                      <h2>Normalized workbook rows</h2>
+                      <h2>Normalized staged rows</h2>
                       <p className="inventory-catalog-subtitle">
                         {filteredStagedItems.length === 0
                           ? '0 items'
@@ -1000,7 +1026,7 @@ function ToastWorkbook() {
                   {importFile?.warnings.length ? (
                     <details className="inventory-export-preview">
                       <summary>
-                        <span>Workbook warnings</span>
+                        <span>Source warnings</span>
                         <strong>
                           {importFile.warnings.length.toLocaleString()}
                         </strong>
@@ -1125,10 +1151,11 @@ function ToastWorkbook() {
                   ) : null}
                 </section>
 
-                <section className="inventory-card inventory-import-card">
-                  <div className="inventory-table-heading">
-                    <div>
-                      <p className="inventory-kicker">Post staging</p>
+                {reviewSource === 'toast-workbook' ? (
+                  <section className="inventory-card inventory-import-card">
+                    <div className="inventory-table-heading">
+                      <div>
+                        <p className="inventory-kicker">Post staging</p>
                       <h2>
                         {reconciliationActive
                           ? 'Reconcile with master catalog'
@@ -1189,12 +1216,13 @@ function ToastWorkbook() {
                     />
                   ) : null}
 
-                  {importReviewedError ? (
-                    <p className="inventory-error">{importReviewedError}</p>
-                  ) : null}
-                </section>
+                    {importReviewedError ? (
+                      <p className="inventory-error">{importReviewedError}</p>
+                    ) : null}
+                  </section>
+                ) : null}
 
-                {selectedReconciliationItemId ? (
+                {reviewSource === 'toast-workbook' && selectedReconciliationItemId ? (
                   <StagedReconciliationDrawer
                     item={
                       items.find(
