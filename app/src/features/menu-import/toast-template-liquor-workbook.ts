@@ -83,6 +83,36 @@ type LiquorTemplateMapping = {
   slots: LiquorSlot[]
 }
 
+type WineRow = {
+  itemName: string
+  wineType: string
+  glassPrice: number | null
+  glassHappyHourPrice: number | null
+  bottlePrice: number | null
+  bottleHappyHourPrice: number | null
+}
+
+type WineSlot = {
+  label: string
+  kind: string
+  categoryCol: number
+  nameCol: number
+  glassPriceCol: number
+  glassHappyHourCol: number | null
+  bottlePriceCol: number | null
+  bottleHappyHourCol: number | null
+}
+
+type WineTemplateMapping = {
+  sheetPath: string
+  sheetName: string
+  categoryRow: number
+  headerRow: number
+  dataStartRow: number
+  lastTemplateRow: number
+  slots: WineSlot[]
+}
+
 type SimpleMenuRow = {
   itemName: string
   basePrice: number | null
@@ -145,6 +175,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   const workbookPackage = readWorkbookPackage(beerWorkbookBuffer)
 
   populateLiquorSheet(workbookPackage, items, happyHourEnabled)
+  populateWineSheet(workbookPackage, items, happyHourEnabled)
   populateCocktailsSheet(workbookPackage, items, happyHourEnabled)
   // Retail and Open Items duplicate the pristine NA Bev sheet when needed,
   // so create them before writing NA Bev rows into the source worksheet.
@@ -225,6 +256,12 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     })
   })
 
+  const wine = validateWineSheet(
+    workbookPackage,
+    items,
+    happyHourEnabled,
+    issues,
+  )
   const cocktails = validateCocktailsSheet(
     workbookPackage,
     items,
@@ -259,12 +296,399 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
       optionalBeerCategoryRows: beer.optionalBeerCategoryRows,
     },
     liquorRows,
+    wineRows: wine,
     cocktailRows: cocktails,
     naBevRows: naBev,
     retailRows: retail,
     openItemsRows: openItems,
     happyHourNotes: happyHourNotes.valid,
   }
+}
+
+function populateWineSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+) {
+  const rows = getWineRows(items, happyHourEnabled)
+  if (rows.length === 0) return
+
+  const mapping = getWineTemplateMapping(workbookPackage)
+  const rowsByKind = groupWineRowsByKind(rows)
+  const supportedKinds = new Set(mapping.slots.map((slot) => slot.kind))
+  const unsupportedKinds = [...rowsByKind.keys()].filter(
+    (kind) => !supportedKinds.has(kind),
+  )
+
+  if (unsupportedKinds.length > 0) {
+    throw new Error(
+      `Toast Wine tab has no category slot for: ${unsupportedKinds.join(', ')}.`,
+    )
+  }
+
+  const sheetDoc = parseXml(
+    getTextFile(workbookPackage.files, mapping.sheetPath),
+  )
+  const targetColumns = new Set<number>()
+  mapping.slots.forEach((slot) => {
+    targetColumns.add(slot.nameCol)
+    targetColumns.add(slot.glassPriceCol)
+    if (slot.glassHappyHourCol) targetColumns.add(slot.glassHappyHourCol)
+    if (slot.bottlePriceCol) targetColumns.add(slot.bottlePriceCol)
+    if (slot.bottleHappyHourCol) targetColumns.add(slot.bottleHappyHourCol)
+  })
+  const longestGroup = Math.max(
+    0,
+    ...[...rowsByKind.values()].map((group) => group.length),
+  )
+  const clearToRow = Math.max(
+    mapping.lastTemplateRow,
+    mapping.dataStartRow + longestGroup + DATA_ROW_BUFFER,
+  )
+
+  clearCells(
+    sheetDoc,
+    [...targetColumns],
+    mapping.dataStartRow,
+    clearToRow,
+  )
+
+  mapping.slots.forEach((slot) => {
+    const slotRows = rowsByKind.get(slot.kind) ?? []
+
+    slotRows.forEach((row, index) => {
+      const rowNumber = mapping.dataStartRow + index
+      writeCellValue(
+        sheetDoc,
+        slot.nameCol,
+        rowNumber,
+        row.itemName,
+        mapping.dataStartRow,
+      )
+      writeCellValue(
+        sheetDoc,
+        slot.glassPriceCol,
+        rowNumber,
+        row.glassPrice,
+        mapping.dataStartRow,
+      )
+      if (slot.glassHappyHourCol) {
+        writeCellValue(
+          sheetDoc,
+          slot.glassHappyHourCol,
+          rowNumber,
+          row.glassHappyHourPrice,
+          mapping.dataStartRow,
+        )
+      }
+      if (slot.bottlePriceCol) {
+        writeCellValue(
+          sheetDoc,
+          slot.bottlePriceCol,
+          rowNumber,
+          row.bottlePrice,
+          mapping.dataStartRow,
+        )
+      }
+      if (slot.bottleHappyHourCol) {
+        writeCellValue(
+          sheetDoc,
+          slot.bottleHappyHourCol,
+          rowNumber,
+          row.bottleHappyHourPrice,
+          mapping.dataStartRow,
+        )
+      }
+    })
+  })
+
+  workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
+}
+
+function validateWineSheet(
+  workbookPackage: WorkbookPackage,
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+  issues: string[],
+) {
+  const rows = getWineRows(items, happyHourEnabled)
+  if (rows.length === 0) return 0
+
+  const mapping = getWineTemplateMapping(workbookPackage)
+  const rowsByKind = groupWineRowsByKind(rows)
+  const sheetDoc = parseXml(
+    getTextFile(workbookPackage.files, mapping.sheetPath),
+  )
+  let count = 0
+
+  mapping.slots.forEach((slot) => {
+    const slotRows = rowsByKind.get(slot.kind) ?? []
+    count += slotRows.length
+
+    slotRows.forEach((row, index) => {
+      const rowNumber = mapping.dataStartRow + index
+      validateLiquorCell(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        slot.nameCol,
+        rowNumber,
+        row.itemName,
+        `${row.itemName} Wine name`,
+      )
+      validateLiquorCell(
+        issues,
+        sheetDoc,
+        workbookPackage.sharedStrings,
+        slot.glassPriceCol,
+        rowNumber,
+        row.glassPrice,
+        `${row.itemName} Wine glass price`,
+      )
+      if (slot.glassHappyHourCol) {
+        validateLiquorCell(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          slot.glassHappyHourCol,
+          rowNumber,
+          row.glassHappyHourPrice,
+          `${row.itemName} Wine glass Happy Hour`,
+        )
+      }
+      if (slot.bottlePriceCol) {
+        validateLiquorCell(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          slot.bottlePriceCol,
+          rowNumber,
+          row.bottlePrice,
+          `${row.itemName} Wine bottle price`,
+        )
+      }
+      if (slot.bottleHappyHourCol) {
+        validateLiquorCell(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          slot.bottleHappyHourCol,
+          rowNumber,
+          row.bottleHappyHourPrice,
+          `${row.itemName} Wine bottle Happy Hour`,
+        )
+      }
+    })
+  })
+
+  return count
+}
+
+function getWineRows(
+  items: NormalizedMenuItem[],
+  happyHourEnabled: boolean,
+): WineRow[] {
+  const merged = new Map<string, WineRow>()
+
+  items.forEach((item) => {
+    if (
+      !item.exportIncluded ||
+      item.basePriceCents === null ||
+      getToastWorkbookCategory(item) !== 'Wine'
+    ) {
+      return
+    }
+
+    const itemName = clean(item.name)
+    const wineType = getWineType(item)
+    if (!itemName || !wineType) return
+
+    const isBottle =
+      /\bbottle\b/i.test(
+        [
+          item.variantLabel ?? '',
+          item.variantPackageType ?? '',
+          item.toastDestination,
+        ].join(' '),
+      )
+    const price = item.basePriceCents / 100
+    const happyHourPrice =
+      happyHourEnabled && item.happyHourPriceCents !== null
+        ? item.happyHourPriceCents / 100
+        : null
+    const key = `${normalizeWineKind(wineType)}\u0000${itemName.toLowerCase()}`
+    const existing = merged.get(key) ?? {
+      itemName,
+      wineType,
+      glassPrice: null,
+      glassHappyHourPrice: null,
+      bottlePrice: null,
+      bottleHappyHourPrice: null,
+    }
+
+    if (isBottle) {
+      existing.bottlePrice = price
+      existing.bottleHappyHourPrice = happyHourPrice
+    } else {
+      existing.glassPrice = price
+      existing.glassHappyHourPrice = happyHourPrice
+    }
+
+    merged.set(key, existing)
+  })
+
+  return [...merged.values()].sort(
+    (left, right) =>
+      normalizeWineKind(left.wineType).localeCompare(
+        normalizeWineKind(right.wineType),
+      ) || left.itemName.localeCompare(right.itemName),
+  )
+}
+
+function getWineType(item: NormalizedMenuItem) {
+  const candidates = [
+    item.toastDestination,
+    item.category ?? '',
+    item.toastCategory,
+  ]
+
+  for (const value of candidates) {
+    const match = clean(value).match(/^wine\s*(?:\/|:|·|-)?\s*(.+)$/i)
+    if (match?.[1]) return match[1].trim()
+  }
+
+  return ''
+}
+
+function groupWineRowsByKind(rows: WineRow[]) {
+  const groups = new Map<string, WineRow[]>()
+
+  rows.forEach((row) => {
+    const kind = normalizeWineKind(row.wineType)
+    const existing = groups.get(kind) ?? []
+    existing.push(row)
+    groups.set(kind, existing)
+  })
+
+  groups.forEach((groupRows) =>
+    groupRows.sort((left, right) => left.itemName.localeCompare(right.itemName)),
+  )
+
+  return groups
+}
+
+function getWineTemplateMapping(
+  workbookPackage: WorkbookPackage,
+): WineTemplateMapping {
+  const wineSheet = getWorkbookSheets(workbookPackage).find(
+    (sheet) => sheet.name.toLowerCase() === 'wine',
+  )
+  if (!wineSheet) throw new Error('Toast template is missing a Wine tab')
+
+  const sheetDoc = parseXml(
+    getTextFile(workbookPackage.files, wineSheet.path),
+  )
+  let headerRow: number | null = null
+
+  for (let rowNumber = 2; rowNumber <= 40; rowNumber += 1) {
+    const values = getRowValues(
+      sheetDoc,
+      rowNumber,
+      workbookPackage.sharedStrings,
+    ).map((cell) => normalizeHeader(cell.value))
+
+    if (
+      values.some((value) => value.includes('glass')) &&
+      values.some((value) => value.includes('bottle'))
+    ) {
+      headerRow = rowNumber
+      break
+    }
+  }
+
+  if (headerRow === null) {
+    throw new Error(
+      'Wine tab is missing the expected Glass / Bottle header row',
+    )
+  }
+
+  const categoryRow = headerRow - 1
+  const categoryValues = getRowValues(
+    sheetDoc,
+    categoryRow,
+    workbookPackage.sharedStrings,
+  )
+  const headerValues = getRowValues(
+    sheetDoc,
+    headerRow,
+    workbookPackage.sharedStrings,
+  )
+  const slots = categoryValues.flatMap((categoryCell): WineSlot[] => {
+    const label = clean(categoryCell.value)
+    const kind = normalizeWineKind(label)
+    if (!label || !kind) return []
+
+    const nextCategoryColumn =
+      categoryValues.find((candidate) => candidate.col > categoryCell.col)?.col ??
+      categoryCell.col + 5
+    const groupHeaders = headerValues.filter(
+      (headerCell) =>
+        headerCell.col >= categoryCell.col &&
+        headerCell.col < nextCategoryColumn,
+    )
+    const nameCol =
+      groupHeaders.find((headerCell) => {
+        const header = normalizeHeader(headerCell.value)
+        return header === 'wine' || header.includes('item name')
+      })?.col ?? categoryCell.col
+    const glassPriceCol =
+      groupHeaders.find((headerCell) => {
+        const header = normalizeHeader(headerCell.value)
+        return header.includes('glass') && !header.includes('happy')
+      })?.col ?? categoryCell.col + 1
+    const bottlePriceCol =
+      groupHeaders.find((headerCell) => {
+        const header = normalizeHeader(headerCell.value)
+        return header.includes('bottle') && !header.includes('happy')
+      })?.col ?? null
+    const happyHourColumns = groupHeaders
+      .filter((headerCell) =>
+        normalizeHeader(headerCell.value).includes('happy hour'),
+      )
+      .map((headerCell) => headerCell.col)
+
+    return [{
+      label,
+      kind,
+      categoryCol: categoryCell.col,
+      nameCol,
+      glassPriceCol,
+      glassHappyHourCol: happyHourColumns[0] ?? null,
+      bottlePriceCol,
+      bottleHappyHourCol: happyHourColumns[1] ?? null,
+    }]
+  })
+
+  if (slots.length === 0) {
+    throw new Error('Wine tab is missing Toast wine category blocks')
+  }
+
+  return {
+    sheetPath: wineSheet.path,
+    sheetName: wineSheet.name,
+    categoryRow,
+    headerRow,
+    dataStartRow: headerRow + 1,
+    lastTemplateRow: getLastWorksheetRow(sheetDoc),
+    slots,
+  }
+}
+
+function normalizeWineKind(value: string) {
+  return clean(value)
+    .toUpperCase()
+    .replace(/[ÉÈÊ]/g, 'E')
+    .replace(/\s+/g, ' ')
 }
 
 function populateCocktailsSheet(
