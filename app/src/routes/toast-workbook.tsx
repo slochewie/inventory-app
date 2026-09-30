@@ -223,7 +223,7 @@ function ToastWorkbook() {
       [
         ...new Set(
           items
-            .map((item) => item.category || item.toastCategory)
+            .map(getStagedReviewCategory)
             .filter(Boolean),
         ),
       ].sort((left, right) => left.localeCompare(right)),
@@ -242,7 +242,7 @@ function ToastWorkbook() {
 
       if (
         stagedReviewCategory !== 'all' &&
-        (item.category || item.toastCategory) !== stagedReviewCategory
+        getStagedReviewCategory(item) !== stagedReviewCategory
       ) {
         return false
       }
@@ -2815,6 +2815,22 @@ type StagedBeerDestinationOption = {
   value: string
   label: string
   toastSlot: string | null
+}
+
+function getStagedReviewCategory(item: NormalizedMenuItem) {
+  const category = clean(item.category || item.toastCategory)
+
+  if (/^beer(?:\s*\/|$)/i.test(category)) return 'Beer'
+
+  const liquorMatch = category.match(/^liquor\s*\/\s*(.+)$/i)
+  if (liquorMatch?.[1]) return formatLiquorCategoryLabel(liquorMatch[1].trim())
+
+  const normalizedLiquor = normalizeLiquorCategory(item.toastCategory)
+  if (LIQUOR_CATEGORIES.has(normalizedLiquor)) {
+    return formatLiquorCategoryLabel(normalizedLiquor)
+  }
+
+  return normalizeStagedMenuCategory(category)
 }
 
 function normalizeStagedMenuCategory(value: string) {
