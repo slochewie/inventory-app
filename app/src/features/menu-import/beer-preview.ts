@@ -61,6 +61,19 @@ function applyBeerSlot(
   const variantKind = item.variantKind?.toLowerCase()
 
   if (variantKind === 'draft' || destination.includes('draft')) {
+    const pitcher =
+      item.variantSizeOz === null &&
+      (/^pitcher$/i.test(item.variantLabel ?? '') ||
+        /\bpitcher\b/i.test(item.toastDestination))
+
+    if (pitcher) {
+      row.draftBySizeOz[draftSizeKey(null)] = {
+        price: item.basePriceCents,
+        happyHour: happyHourEnabled ? item.happyHourPriceCents : null,
+      }
+      return
+    }
+
     const sizeOz = getDraftSizeOz(item)
 
     if (sizeOz !== null) {
@@ -113,7 +126,7 @@ function applyBeerSlot(
 
 export function getDraftBeerPrice(
   row: BeerTabPreviewRow,
-  actualSizeOz: number,
+  actualSizeOz: number | null,
 ) {
   return row.draftBySizeOz[draftSizeKey(actualSizeOz)] ?? null
 }
@@ -149,8 +162,8 @@ function extractSizeOz(value: string) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
-function draftSizeKey(sizeOz: number) {
-  return String(Number(sizeOz))
+function draftSizeKey(sizeOz: number | null) {
+  return sizeOz === null ? 'pitcher' : String(Number(sizeOz))
 }
 
 function getBeerName(name: string, toastDestination: string) {
