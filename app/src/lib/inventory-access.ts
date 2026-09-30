@@ -65,6 +65,53 @@ type CatalogResponse = {
   error?: string
 }
 
+export type InventoryCocktailSection =
+  | "house"
+  | "vodka"
+  | "gin"
+  | "rum"
+  | "tequila"
+  | "whiskey-bourbon"
+
+export type InventoryCocktailMaster = {
+  id: string
+  name: string
+  normalizedName: string
+  active: boolean
+  organizationCocktailId: string | null
+  assigned: boolean
+}
+
+export type InventoryOrganizationCocktail = {
+  id: string
+  organizationId: string
+  inventoryCocktailId: string
+  masterName: string
+  normalizedName: string
+  enabled: boolean
+  exportToToast: boolean
+  section: InventoryCocktailSection
+  description: string | null
+  priceCents: number | null
+  happyHourPriceCents: number | null
+  toastNameOverride: string | null
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+type CocktailMastersResponse = {
+  cocktails?: InventoryCocktailMaster[]
+  error?: string
+}
+
+type CocktailsResponse = {
+  organizationId?: string
+  role?: InventoryRole | null
+  cocktails?: InventoryOrganizationCocktail[]
+  error?: string
+}
+
 export type HappyHourDay =
   | "mon"
   | "tue"
@@ -586,6 +633,176 @@ export async function listInventoryCatalog(
     role: result.role ?? null,
     items: Array.isArray(result.items) ? result.items : [],
   }
+}
+
+
+export async function listInventoryCocktailMasters(
+  organizationId: string,
+  signal?: AbortSignal,
+) {
+  const url = new URL(authEndpoint("/api/auth/inventory/cocktail-masters"))
+  url.searchParams.set("organizationId", organizationId)
+
+  const response = await fetch(url, {
+    credentials: "include",
+    signal,
+  })
+  const result = (await response.json()) as CocktailMastersResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to load cocktail masters.",
+    )
+  }
+
+  return Array.isArray(result.cocktails) ? result.cocktails : []
+}
+
+export async function listInventoryCocktails(
+  organizationId: string,
+  signal?: AbortSignal,
+) {
+  const url = new URL(authEndpoint("/api/auth/inventory/cocktails"))
+  url.searchParams.set("organizationId", organizationId)
+
+  const response = await fetch(url, {
+    credentials: "include",
+    signal,
+  })
+  const result = (await response.json()) as CocktailsResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to load cocktails.",
+    )
+  }
+
+  return {
+    organizationId:
+      typeof result.organizationId === "string"
+        ? result.organizationId
+        : organizationId,
+    role: result.role ?? null,
+    cocktails: Array.isArray(result.cocktails) ? result.cocktails : [],
+  }
+}
+
+export async function createInventoryCocktail(input: {
+  organizationId: string
+  inventoryCocktailId?: string
+  name: string
+  createNewMaster?: boolean
+  section: InventoryCocktailSection
+  description?: string | null
+  priceCents: number | null
+  happyHourPriceCents?: number | null
+  enabled?: boolean
+  exportToToast?: boolean
+  toastNameOverride?: string | null
+  sortOrder?: number
+}) {
+  const response = await fetch(authEndpoint("/api/auth/inventory/cocktail"), {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+  const result = (await response.json()) as {
+    created?: boolean
+    inventoryCocktailId?: string
+    organizationCocktailId?: string
+    error?: string
+  }
+
+  if (
+    !response.ok ||
+    result.created !== true ||
+    typeof result.organizationCocktailId !== "string"
+  ) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to add cocktail.",
+    )
+  }
+
+  return {
+    inventoryCocktailId: result.inventoryCocktailId ?? null,
+    organizationCocktailId: result.organizationCocktailId,
+  }
+}
+
+export async function updateInventoryCocktail(input: {
+  organizationId: string
+  organizationCocktailId: string
+  section?: InventoryCocktailSection
+  description?: string | null
+  priceCents?: number | null
+  happyHourPriceCents?: number | null
+  enabled?: boolean
+  exportToToast?: boolean
+  toastNameOverride?: string | null
+  sortOrder?: number
+}) {
+  const response = await fetch(authEndpoint("/api/auth/inventory/cocktail"), {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+  const result = (await response.json()) as {
+    updated?: boolean
+    error?: string
+  }
+
+  if (!response.ok || result.updated !== true) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to update cocktail.",
+    )
+  }
+
+  return true
+}
+
+export async function removeInventoryCocktail(input: {
+  organizationId: string
+  organizationCocktailId: string
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/cocktail/remove"),
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  )
+  const result = (await response.json()) as {
+    removed?: boolean
+    error?: string
+  }
+
+  if (!response.ok || result.removed !== true) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to remove cocktail.",
+    )
+  }
+
+  return true
 }
 
 
