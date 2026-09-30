@@ -1952,7 +1952,7 @@ function StagedReconciliationPanel({
                   </td>
                   <td>
                     {decision?.kind === 'new'
-                      ? 'Create new master'
+                      ? 'Will create new master'
                       : decision?.kind === 'new-variant'
                         ? `Add new variant to ${catalog.find((candidate) => candidate.id === decision.itemId)?.name ?? 'existing master'}`
                         : selected
@@ -2005,7 +2005,9 @@ function StagedReconciliationPanel({
         >
           {importing
             ? 'Importing…'
-            : `Import ${decidedCount.toLocaleString()} reviewed item${decidedCount === 1 ? '' : 's'}`}
+            : newCount > 0
+              ? `Create/import ${decidedCount.toLocaleString()} reviewed item${decidedCount === 1 ? '' : 's'}`
+              : `Import ${decidedCount.toLocaleString()} reviewed item${decidedCount === 1 ? '' : 's'}`}
         </button>
       </div>
     </div>
@@ -2077,6 +2079,10 @@ function StagedReconciliationDrawer({
           <div>
             <p className="inventory-kicker">Decision</p>
             <h3>Choose master destination</h3>
+            <p>
+              This only sets the reconciliation decision. Nothing is written to
+              Inventory until you click Import reviewed items.
+            </p>
           </div>
         </div>
 
@@ -2090,8 +2096,8 @@ function StagedReconciliationDrawer({
           onClick={onChooseNew}
         >
           {newMasterGroupCount > 1
-            ? `Create one new master item with ${newMasterGroupCount} formats`
-            : 'Create new master item'}
+            ? `Create one new master on import with ${newMasterGroupCount} formats`
+            : 'Create new master on import'}
         </button>
       </section>
 
