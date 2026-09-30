@@ -143,6 +143,17 @@ function MasterNamesPage() {
     setDraftName('')
   }
 
+  useEffect(() => {
+    if (!selectedItem) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') cancelRename()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [selectedItem, saving])
+
   async function saveRename() {
     if (!activeOrganization?.id || !selectedItem || saving) return
 
@@ -179,53 +190,29 @@ function MasterNamesPage() {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: .75rem;
-          margin-bottom: 1rem;
         }
 
         .inventory-master-names-page .master-names-summary article {
           border: 1px solid #e5e7eb;
-          border-radius: .8rem;
-          background: #fff;
-          padding: .8rem .9rem;
+          border-radius: .75rem;
+          background: #f8fafc;
+          padding: .9rem 1rem;
         }
 
         .inventory-master-names-page .master-names-summary span {
           display: block;
-          color: #6b7280;
-          font-size: .78rem;
+          color: #64748b;
+          font-size: .72rem;
           font-weight: 700;
-          letter-spacing: .02em;
+          letter-spacing: .04em;
           text-transform: uppercase;
         }
 
         .inventory-master-names-page .master-names-summary strong {
           display: block;
-          margin-top: .25rem;
+          margin-top: .2rem;
+          color: #0f172a;
           font-size: 1.25rem;
-        }
-
-        .inventory-master-names-page .master-impact-list {
-          display: grid;
-          gap: .55rem;
-          margin-top: .65rem;
-        }
-
-        .inventory-master-names-page .master-impact-row {
-          display: grid;
-          grid-template-columns: minmax(11rem, 1.3fr) repeat(3, minmax(6rem, .7fr)) minmax(12rem, 1.4fr);
-          gap: .75rem;
-          align-items: center;
-          border-top: 1px solid #e5e7eb;
-          padding: .7rem 0;
-        }
-
-        .inventory-master-names-page .master-impact-row:first-child {
-          border-top: 0;
-        }
-
-        .inventory-master-names-page .master-impact-row small {
-          display: block;
-          color: #6b7280;
         }
 
         .inventory-master-names-page .master-rename-backdrop {
@@ -240,15 +227,113 @@ function MasterNamesPage() {
 
         .inventory-master-names-page .master-rename-panel {
           display: grid;
-          width: min(64rem, calc(100vw - 2rem));
-          max-height: min(88dvh, 52rem);
+          width: min(58rem, calc(100vw - 2rem));
+          max-height: min(88dvh, 50rem);
           overflow: auto;
-          gap: 1rem;
+          gap: 1.15rem;
           border: 1px solid #d1d5db;
           border-radius: 1rem;
           background: #fff;
-          padding: 1rem;
+          padding: 1.25rem;
           box-shadow: 0 24px 60px rgb(15 23 42 / 22%);
+        }
+
+        .inventory-master-names-page .master-rename-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+
+        .inventory-master-names-page .master-rename-header h2 {
+          margin: .15rem 0 0;
+        }
+
+        .inventory-master-names-page .master-name-current {
+          display: grid;
+          gap: .15rem;
+        }
+
+        .inventory-master-names-page .master-name-current small,
+        .inventory-master-names-page .master-rename-help,
+        .inventory-master-names-page .master-impact-table small {
+          color: #64748b;
+        }
+
+        .inventory-master-names-page .master-impact-section {
+          display: grid;
+          gap: .65rem;
+        }
+
+        .inventory-master-names-page .master-impact-section h3 {
+          margin: 0;
+        }
+
+        .inventory-master-names-page .master-impact-table {
+          overflow: hidden;
+          border: 1px solid #e5e7eb;
+          border-radius: .75rem;
+        }
+
+        .inventory-master-names-page .master-impact-table table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .inventory-master-names-page .master-impact-table th,
+        .inventory-master-names-page .master-impact-table td {
+          padding: .75rem .85rem;
+          text-align: left;
+          vertical-align: top;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .inventory-master-names-page .master-impact-table th {
+          background: #f8fafc;
+          color: #475569;
+          font-size: .76rem;
+          font-weight: 700;
+          letter-spacing: .025em;
+          text-transform: uppercase;
+        }
+
+        .inventory-master-names-page .master-impact-table tr:last-child td {
+          border-bottom: 0;
+        }
+
+        .inventory-master-names-page .master-rename-field {
+          display: grid;
+          gap: .4rem;
+        }
+
+        .inventory-master-names-page .master-rename-field > span {
+          font-weight: 700;
+        }
+
+        .inventory-master-names-page .master-rename-field .inventory-input {
+          width: 100%;
+        }
+
+        .inventory-master-names-page .master-rename-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          border-top: 1px solid #e5e7eb;
+          padding-top: 1rem;
+        }
+
+        .inventory-master-names-page .master-rename-help {
+          margin: 0;
+          max-width: 42rem;
+          font-size: .92rem;
+          line-height: 1.45;
+        }
+
+        .inventory-master-names-page .master-rename-actions {
+          display: flex;
+          flex: 0 0 auto;
+          gap: .6rem;
         }
 
         .inventory-master-names-page .master-names-pagination {
@@ -264,22 +349,6 @@ function MasterNamesPage() {
           display: flex;
           align-items: center;
           gap: .5rem;
-        }
-
-        .inventory-master-names-page .master-rename-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: .6rem;
-        }
-
-        .inventory-master-names-page .master-name-current {
-          display: grid;
-          gap: .2rem;
-        }
-
-        .inventory-master-names-page .master-name-current small,
-        .inventory-master-names-page .master-rename-help {
-          color: #6b7280;
         }
 
         @media (max-width: 900px) {
@@ -355,7 +424,6 @@ function MasterNamesPage() {
                     <tr key={item.id}>
                       <td>
                         <strong>{item.name}</strong>
-                        <div>{item.normalizedName}</div>
                       </td>
                       <td>{item.categoryName ?? 'Uncategorized'}</td>
                       <td>{item.variantCount.toLocaleString()}</td>
@@ -421,130 +489,133 @@ function MasterNamesPage() {
             if (event.currentTarget === event.target) cancelRename()
           }}
         >
-        <section className="master-rename-panel">
-          <div className="inventory-table-heading">
-            <div className="master-name-current">
-              <small>Current master name</small>
-              <h2 id="master-rename-title">{selectedItem.name}</h2>
+          <section className="master-rename-panel">
+            <div className="master-rename-header">
+              <div className="master-name-current">
+                <small>Current master name</small>
+                <h2 id="master-rename-title">{selectedItem.name}</h2>
+              </div>
+              <button
+                className="inventory-template-download"
+                type="button"
+                disabled={saving}
+                onClick={cancelRename}
+              >
+                Close
+              </button>
             </div>
-            <button
-              className="inventory-template-download"
-              type="button"
-              disabled={saving}
-              onClick={cancelRename}
-            >
-              Close
-            </button>
-          </div>
 
-          <div className="master-names-summary">
-            <article>
-              <span>Organizations</span>
-              <strong>{selectedImpact.organizationCount}</strong>
-            </article>
-            <article>
-              <span>Carried variants</span>
-              <strong>{selectedImpact.enabledVariantCount}</strong>
-            </article>
-            <article>
-              <span>Exports follow master</span>
-              <strong>{selectedImpact.followsMasterNameCount}</strong>
-            </article>
-            <article>
-              <span>Exports with override</span>
-              <strong>{selectedImpact.overriddenExportCount}</strong>
-            </article>
-          </div>
+            <div className="master-names-summary">
+              <article>
+                <span>Organizations</span>
+                <strong>{selectedImpact.organizationCount}</strong>
+              </article>
+              <article>
+                <span>Carried variants</span>
+                <strong>{selectedImpact.enabledVariantCount}</strong>
+              </article>
+              <article>
+                <span>Affected exports</span>
+                <strong>{selectedImpact.followsMasterNameCount}</strong>
+              </article>
+              <article>
+                <span>Local overrides</span>
+                <strong>{selectedImpact.overriddenExportCount}</strong>
+              </article>
+            </div>
 
-          <div>
-            <h3>Organization impact</h3>
-            <div className="master-impact-list">
+            <div className="master-impact-section">
+              <h3>Organization impact</h3>
               {selectedItem.organizations.length > 0 ? (
-                selectedItem.organizations.map((organization) => (
-                  <div
-                    className="master-impact-row"
-                    key={organization.organizationId}
-                  >
-                    <div>
-                      <strong>{organization.organizationName}</strong>
-                      <small>
-                        {organization.variantCount} linked variant
-                        {organization.variantCount === 1 ? '' : 's'}
-                      </small>
-                    </div>
-                    <div>
-                      <strong>{organization.enabledVariantCount}</strong>
-                      <small>carried</small>
-                    </div>
-                    <div>
-                      <strong>{organization.exportVariantCount}</strong>
-                      <small>exporting</small>
-                    </div>
-                    <div>
-                      <strong>{organization.followsMasterNameCount}</strong>
-                      <small>will use new name</small>
-                    </div>
-                    <div>
-                      {organization.overrideNames.length > 0 ? (
-                        <>
-                          <strong>Local Toast override</strong>
-                          <small>{organization.overrideNames.join(', ')}</small>
-                        </>
-                      ) : (
-                        <>
-                          <strong>Master name</strong>
-                          <small>No local Toast-name override</small>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))
+                <div className="master-impact-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Organization</th>
+                        <th>Carried</th>
+                        <th>Exporting</th>
+                        <th>Affected</th>
+                        <th>Name used by Toast</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedItem.organizations.map((organization) => (
+                        <tr key={organization.organizationId}>
+                          <td>
+                            <strong>{organization.organizationName}</strong>
+                            <small>
+                              {organization.variantCount} linked variant
+                              {organization.variantCount === 1 ? '' : 's'}
+                            </small>
+                          </td>
+                          <td>{organization.enabledVariantCount}</td>
+                          <td>{organization.exportVariantCount}</td>
+                          <td>{organization.followsMasterNameCount}</td>
+                          <td>
+                            {organization.overrideNames.length > 0 ? (
+                              <>
+                                <strong>{organization.overrideNames.join(', ')}</strong>
+                                <small>Local Toast override; unchanged by rename</small>
+                              </>
+                            ) : (
+                              <>
+                                <strong>{selectedItem.name}</strong>
+                                <small>Follows the master name</small>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <p>No organization-specific variants currently reference this master item.</p>
               )}
             </div>
-          </div>
 
-          <label>
-            <span>New master name</span>
-            <input
-              className="inventory-input"
-              value={draftName}
-              maxLength={160}
-              disabled={saving}
-              onChange={(event) => setDraftName(event.target.value)}
-            />
-          </label>
+            <label className="master-rename-field">
+              <span>New master name</span>
+              <input
+                className="inventory-input"
+                value={draftName}
+                maxLength={160}
+                disabled={saving}
+                autoFocus
+                onChange={(event) => setDraftName(event.target.value)}
+              />
+            </label>
 
-          <p className="master-rename-help">
-            The previous master name is retained as an alias for future import
-            reconciliation. Organization-specific Toast name overrides are not
-            changed.
-          </p>
+            <div className="master-rename-footer">
+              <p className="master-rename-help">
+                The old master name is kept as an import alias. Organization-specific
+                Toast name overrides stay exactly as they are.
+              </p>
 
-          <div className="master-rename-actions">
-            <button
-              className="inventory-template-download"
-              type="button"
-              disabled={saving}
-              onClick={cancelRename}
-            >
-              Cancel
-            </button>
-            <button
-              className="inventory-template-download"
-              type="button"
-              disabled={
-                saving ||
-                !draftName.trim() ||
-                draftName.trim() === selectedItem.name
-              }
-              onClick={() => void saveRename()}
-            >
-              {saving ? 'Renaming…' : 'Rename master item'}
-            </button>
-          </div>
-        </section>
+              <div className="master-rename-actions">
+                <button
+                  className="inventory-template-download"
+                  type="button"
+                  disabled={saving}
+                  onClick={cancelRename}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="inventory-template-download"
+                  type="button"
+                  disabled={
+                    saving ||
+                    !draftName.trim() ||
+                    draftName.trim() === selectedItem.name
+                  }
+                  onClick={() => void saveRename()}
+                >
+                  {saving ? 'Renaming…' : 'Rename master'}
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
       ) : null}
     </section>
