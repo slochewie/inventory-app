@@ -295,9 +295,14 @@ function ManualItemPage() {
     'Uncategorized'
   const isBeerItem = workbookCategory.toLowerCase() === 'beer'
   const showToastBeerSlot = isBeerItem && enabledOptionalBeerCategories.length > 0
-  const allDestinationOptions = isBeerItem
-    ? organizationBeerDestinations
-    : nonBeerDestinationOptions
+  const allDestinationOptions = useMemo(
+    () =>
+      mergeCategoryOptions(
+        organizationBeerDestinations,
+        nonBeerDestinationOptions,
+      ),
+    [nonBeerDestinationOptions, organizationBeerDestinations],
+  )
   const exportToToast = draft.availableHere && draft.exportToToast
   const selectedMaster =
     masterOptions.find((option) => option.id === selectedMasterItemId) ?? null
