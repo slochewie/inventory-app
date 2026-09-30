@@ -1,4 +1,7 @@
-import type { InventoryCatalogRow } from '#/lib/inventory-access'
+import type {
+  InventoryCatalogRow,
+  InventoryOrganizationCocktail,
+} from '#/lib/inventory-access'
 import type { NormalizedMenuItem } from './types'
 
 export function catalogRowToNormalizedItem(
@@ -48,6 +51,59 @@ export function catalogRowToNormalizedItem(
   }
 }
 
+
+export function organizationCocktailToNormalizedItem(
+  cocktail: InventoryOrganizationCocktail,
+): NormalizedMenuItem {
+  const sectionLabel = getCocktailSectionLabel(cocktail.section)
+
+  return {
+    id: cocktail.id,
+    masterItemId: cocktail.inventoryCocktailId,
+    masterName: cocktail.masterName,
+    variantLabel: sectionLabel,
+    variantKind: 'cocktail',
+    variantSizeOz: null,
+    variantPackageType: null,
+    sourceKind: 'toast-template-sheet',
+    name: cocktail.toastNameOverride?.trim() || cocktail.masterName,
+    category: 'Cocktails',
+    toastCategory: sectionLabel,
+    toastDestination: 'Cocktails',
+    basePriceCents: cocktail.priceCents,
+    happyHourPriceCents:
+      cocktail.section === 'house' ? cocktail.happyHourPriceCents : null,
+    effectiveTimes: [],
+    sourceRowCount: 0,
+    status: cocktail.enabled ? 'ready' : 'ignored',
+    organizationEnabled: cocktail.enabled,
+    exportToToast: cocktail.exportToToast,
+    exportIncluded: cocktail.enabled && cocktail.exportToToast,
+    notes: [],
+    rawRows: cocktail.description
+      ? [{ description: cocktail.description }]
+      : [],
+  }
+}
+
+export function getCocktailSectionLabel(
+  section: InventoryOrganizationCocktail['section'],
+) {
+  switch (section) {
+    case 'house':
+      return 'House Cocktails'
+    case 'vodka':
+      return 'Vodka Cocktails'
+    case 'gin':
+      return 'Gin Cocktails'
+    case 'rum':
+      return 'Rum Cocktails'
+    case 'tequila':
+      return 'Tequila Cocktails'
+    case 'whiskey-bourbon':
+      return 'Whiskey/Bourbon Cocktails'
+  }
+}
 
 export function getInventoryVariantLabel(variant: {
   kind: string
