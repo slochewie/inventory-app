@@ -240,6 +240,41 @@ type SourceMappingsResponse = {
   error?: string
 }
 
+export type InventoryMasterOrganizationImpact = {
+  organizationId: string
+  organizationName: string
+  variantCount: number
+  enabledVariantCount: number
+  exportVariantCount: number
+  followsMasterNameCount: number
+  overrideNames: string[]
+}
+
+export type InventoryMasterItem = {
+  id: string
+  name: string
+  normalizedName: string
+  categoryName: string | null
+  toastCategory: string | null
+  variantCount: number
+  organizations: InventoryMasterOrganizationImpact[]
+}
+
+type MasterItemsResponse = {
+  items?: InventoryMasterItem[]
+  error?: string
+}
+
+type MasterItemRenameResponse = {
+  updated?: boolean
+  item?: {
+    id: string
+    name: string
+    normalizedName: string
+  }
+  error?: string
+}
+
 function authEndpoint(path: string) {
   return `${authBaseURL.replace(/\/$/, "")}${path}`
 }
@@ -684,6 +719,60 @@ export async function listInventorySourceMappings(
 
   return Array.isArray(result.mappings) ? result.mappings : []
 }
+
+export async function listInventoryMasterItems(
+  organizationId: string,
+  signal?: AbortSignal,
+) {
+  const url = new URL(authEndpoint("/api/auth/inventory/master-items"))
+  url.searchParams.set("organizationId", organizationId)
+
+  const response = await fetch(url, {
+    credentials: "include",
+    signal,
+  })
+  const result = (await response.json()) as MasterItemsResponse
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to load Inventory master items.",
+    )
+  }
+
+  return Array.isArray(result.items) ? result.items : []
+}
+
+export async function renameInventoryMasterItem(input: {
+  organizationId: string
+  itemId: string
+  name: string
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/master-item-name"),
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  )
+  const result = (await response.json()) as MasterItemRenameResponse
+
+  if (!response.ok || result.updated !== true || !result.item) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to rename the Inventory master item.",
+    )
+  }
+
+  return result.item
+}
+
 
 export async function updateInventoryItemCategory(input: {
   organizationId: string
