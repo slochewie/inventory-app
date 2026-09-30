@@ -321,7 +321,6 @@ export function AuthenticatedInventoryShell({
           canImportExport={canImportExport || inventoryRole === "viewer"}
           canEdit={canEdit}
           canManageAssignments={canManageAssignments}
-          canManageMasterCatalog={canManageMasterCatalog}
         />
 
         <SidebarInset className="inventory-authenticated-main">
