@@ -9,7 +9,6 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
-import { getBuiltInToastDestinations } from '#/features/menu-import/toast-destination'
 import { authClient } from '#/lib/auth-client'
 import {
   getInventoryOrganizationConfig,
@@ -64,22 +63,46 @@ const EMPTY_DRAFT: ManualItemDraft = {
   exportToToast: true,
 }
 
-function isEnabledBuiltInBeerDestination(
-  destination: string,
+function getOrganizationBeerDestinations(
   config: InventoryOrganizationConfig | null,
+  optionalBeerCategories: OptionalBeerCategoryConfig[],
 ) {
-  if (!config) return true
+  if (!config) return []
 
-  const normalized = destination.trim().toLowerCase()
+  const destinations: string[] = []
 
-  if (normalized === 'beer tab · draft beer 8oz') return config.draft8Enabled
-  if (normalized === 'beer tab · draft beer 16oz') return config.draft16Enabled
-  if (normalized === 'beer tab · draft beer 24oz') return config.draft24Enabled
-  if (normalized === 'beer tab · pitcher') return config.pitcherEnabled
-  if (normalized === 'beer tab · can') return config.canEnabled
-  if (normalized === 'beer tab · bottle') return config.bottleEnabled
+  const addDraft = (
+    enabled: boolean,
+    actualSizeOz: number | null,
+    toastSlotSizeOz: number,
+  ) => {
+    if (!enabled) return
+    const sizeOz = actualSizeOz ?? toastSlotSizeOz
+    destinations.push(`Beer tab · Draft Beer ${sizeOz}oz`)
+  }
 
-  return true
+  addDraft(config.draft8Enabled, config.draft8ActualSizeOz, 8)
+  addDraft(config.draft16Enabled, config.draft16ActualSizeOz, 16)
+  addDraft(config.draft24Enabled, config.draft24ActualSizeOz, 24)
+
+  if (config.pitcherEnabled) destinations.push('Beer tab · Pitcher')
+  if (config.canEnabled) destinations.push('Beer tab · Can')
+  if (config.bottleEnabled) destinations.push('Beer tab · Bottle')
+
+  optionalBeerCategories
+    .filter((category) => category.enabled && category.label.trim())
+    .forEach((category) => {
+      const label = category.label.trim()
+      const draftSizeMatch = label.match(/^(\d+(?:\.\d+)?)\s*oz$/i)
+
+      destinations.push(
+        draftSizeMatch
+          ? `Beer tab · Draft Beer ${draftSizeMatch[1]}oz`
+          : `Beer tab · ${label}`,
+      )
+    })
+
+  return [...new Set(destinations)]
 }
 
 function ManualItemPage() {
@@ -223,25 +246,35 @@ function ManualItemPage() {
     )
   }, [catalogCategoryOptions, menuCategories])
 
-  const allDestinationOptions = useMemo(() => {
-    const builtInDestinations = getBuiltInToastDestinations().filter((destination) =>
-      isEnabledBuiltInBeerDestination(destination, organizationConfig),
-    )
-
-    return mergeCategoryOptions(
-      builtInDestinations,
-      mergeCategoryOptions(
-        destinationOptions.filter((destination) =>
-          isEnabledBuiltInBeerDestination(destination, organizationConfig),
-        ),
-        menuCategories.map((category) => category.toastDestination),
-      ),
-    )
-  }, [destinationOptions, menuCategories, organizationConfig])
-
   const enabledOptionalBeerCategories = useMemo(
     () => optionalBeerCategories.filter((category) => category.enabled),
     [optionalBeerCategories],
+  )
+
+  const organizationBeerDestinations = useMemo(
+    () =>
+      getOrganizationBeerDestinations(
+        organizationConfig,
+        optionalBeerCategories,
+      ),
+    [organizationConfig, optionalBeerCategories],
+  )
+
+  const nonBeerDestinationOptions = useMemo(
+    () =>
+      mergeCategoryOptions(
+        destinationOptions.filter(
+          (destination) =>
+            !destination.trim().toLowerCase().startsWith('beer tab ·'),
+        ),
+        menuCategories
+          .map((category) => category.toastDestination)
+          .filter(
+            (destination) =>
+              !destination.trim().toLowerCase().startsWith('beer tab ·'),
+          ),
+      ),
+    [destinationOptions, menuCategories],
   )
 
   const normalizedCategory = draft.category.trim()
@@ -255,6 +288,9 @@ function ManualItemPage() {
     'Uncategorized'
   const isBeerItem = workbookCategory.toLowerCase() === 'beer'
   const showToastBeerSlot = isBeerItem && enabledOptionalBeerCategories.length > 0
+  const allDestinationOptions = isBeerItem
+    ? organizationBeerDestinations
+    : nonBeerDestinationOptions
   const exportToToast = draft.availableHere && draft.exportToToast
   const selectedMaster =
     masterOptions.find((option) => option.id === selectedMasterItemId) ?? null
@@ -269,14 +305,22 @@ function ManualItemPage() {
     const defaultDestination =
       menuCategory?.toastDestination || getMenuCategoryDestination(category)
 
-    setDraft((current) => ({
-      ...current,
-      category,
-      toastDestination:
-        !current.toastDestination.trim() && defaultDestination
-          ? defaultDestination
-          : current.toastDestination,
-    }))
+    setDraft((current) => {
+      const nextWorkbookCategory =
+        menuCategory?.toastCategory.trim() || category.trim()
+      const nextIsBeer = nextWorkbookCategory.toLowerCase() === 'beer'
+
+      return {
+        ...current,
+        category,
+        toastDestination: nextIsBeer
+          ? ''
+          : !current.toastDestination.trim() && defaultDestination
+            ? defaultDestination
+            : current.toastDestination,
+        toastSlot: nextIsBeer ? current.toastSlot : '',
+      }
+    })
     setSuccess(null)
   }
 
