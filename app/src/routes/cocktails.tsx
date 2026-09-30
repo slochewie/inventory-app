@@ -5,6 +5,7 @@ import { authClient } from '#/lib/auth-client'
 import {
   listInventoryCatalog,
   persistInventoryImport,
+  updateInventoryOrganizationVariant,
   type InventoryCatalogRow,
 } from '#/lib/inventory-access'
 import './cocktails.css'
@@ -41,6 +42,10 @@ function CocktailsPage() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<Draft | null>(null)
+  const [editAvailableHere, setEditAvailableHere] = useState(true)
+  const [editExportToToast, setEditExportToToast] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -85,22 +90,39 @@ function CocktailsPage() {
     [catalog],
   )
 
+  const selectedRow =
+    catalog.find((row) => row.variant.id === selectedVariantId) ?? null
+
+  useEffect(() => {
+    if (!selectedRow) {
+      setEditDraft(null)
+      return
+    }
+
+    const group = getCocktailGroup(selectedRow)
+    setEditDraft({
+      group,
+      name: displayName(selectedRow),
+      price:
+        selectedRow.effectivePriceCents === null
+          ? ''
+          : (selectedRow.effectivePriceCents / 100).toFixed(2),
+      happyHourPrice:
+        selectedRow.organization.happyHourPriceCents === null
+          ? ''
+          : (selectedRow.organization.happyHourPriceCents / 100).toFixed(2),
+    })
+    setEditAvailableHere(selectedRow.organization.enabled)
+    setEditExportToToast(selectedRow.organization.exportToToast)
+  }, [selectedRow?.variant.id])
+
   const grouped = useMemo(() => {
     const result = new Map<CocktailGroup, InventoryCatalogRow[]>()
     result.set('House Cocktails', [])
     OFF_MENU_GROUPS.forEach((group) => result.set(group, []))
 
     cocktailRows.forEach((row) => {
-      const rawGroup =
-        row.organization.toastCategoryOverride ??
-        row.category?.toastCategory ??
-        row.category?.name ??
-        ''
-      const group =
-        OFF_MENU_GROUPS.find(
-          (candidate) => candidate.toLowerCase() === rawGroup.trim().toLowerCase(),
-        ) ?? 'House Cocktails'
-      result.get(group)!.push(row)
+      result.get(getCocktailGroup(row))!.push(row)
     })
 
     result.forEach((rows) =>
@@ -182,6 +204,95 @@ function CocktailsPage() {
       await reload()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to add cocktail.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveSelectedCocktail() {
+    if (!activeOrganization?.id || !selectedRow || !editDraft || saving) return
+
+    const name = editDraft.name.trim()
+    const price = moneyToCents(editDraft.price)
+    const happyHourPrice =
+      editDraft.group === 'House Cocktails'
+        ? moneyToCents(editDraft.happyHourPrice, true)
+        : null
+
+    if (!name) {
+      setError('Enter a cocktail name.')
+      return
+    }
+
+    if (price === null) {
+      setError(
+        editDraft.group === 'House Cocktails'
+          ? 'Enter a valid base price.'
+          : 'Enter a valid upcharge price.',
+      )
+      return
+    }
+
+    if (
+      editDraft.group === 'House Cocktails' &&
+      editDraft.happyHourPrice.trim() &&
+      happyHourPrice === null
+    ) {
+      setError('Enter a valid Happy Hour price.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      await updateInventoryOrganizationVariant({
+        organizationId: activeOrganization.id,
+        variantId: selectedRow.variant.id,
+        enabled: editAvailableHere,
+        exportToToast: editAvailableHere && editExportToToast,
+        priceOverrideCents: price,
+        happyHourPriceCents: happyHourPrice,
+        toastNameOverride:
+          name === selectedRow.name ? null : name,
+        toastCategoryOverride: editDraft.group,
+        toastDestinationOverride: 'Cocktails',
+      })
+
+      setSuccess('Updated ' + name + '.')
+      setSelectedVariantId(null)
+      await reload()
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'Unable to update cocktail.',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function removeSelectedCocktail() {
+    if (!activeOrganization?.id || !selectedRow || saving) return
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      await updateInventoryOrganizationVariant({
+        organizationId: activeOrganization.id,
+        variantId: selectedRow.variant.id,
+        enabled: false,
+        exportToToast: false,
+      })
+      setSuccess('Removed ' + displayName(selectedRow) + ' from this organization.')
+      setSelectedVariantId(null)
+      await reload()
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'Unable to remove cocktail.',
+      )
     } finally {
       setSaving(false)
     }
@@ -315,8 +426,16 @@ function CocktailsPage() {
         <section className="cocktails-groups">
           {(['House Cocktails', ...OFF_MENU_GROUPS] as CocktailGroup[]).map((group) => {
             const rows = grouped.get(group) ?? []
+            const isEmpty = rows.length === 0
             return (
-              <section className="inventory-card cocktails-group-card" key={group}>
+              <section
+                className={
+                  isEmpty
+                    ? 'inventory-card cocktails-group-card is-empty'
+                    : 'inventory-card cocktails-group-card'
+                }
+                key={group}
+              >
                 <div className="inventory-table-heading">
                   <div>
                     <h2>{group}</h2>
@@ -336,15 +455,24 @@ function CocktailsPage() {
                 ) : (
                   <div className="cocktails-list">
                     {rows.map((row) => (
-                      <div className="cocktails-row" key={row.variant.id}>
+                      <button
+                        className="cocktails-row"
+                        key={row.variant.id}
+                        type="button"
+                        onClick={() => setSelectedVariantId(row.variant.id)}
+                      >
                         <div>
                           <strong>{displayName(row)}</strong>
                           <span>
                             {group === 'House Cocktails' ? 'Price' : 'Upcharge'}
+                            {!row.organization.enabled ? ' · Not carried here' : ''}
+                            {row.organization.enabled && !row.organization.exportToToast
+                              ? ' · Not exporting'
+                              : ''}
                           </span>
                         </div>
                         <strong>{formatMoney(row.effectivePriceCents)}</strong>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -352,8 +480,204 @@ function CocktailsPage() {
             )
           })}
         </section>
+
+        {selectedRow && editDraft ? (
+          <div
+            className="cocktails-edit-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cocktails-edit-title"
+            onMouseDown={(event) => {
+              if (event.currentTarget === event.target && !saving) {
+                setSelectedVariantId(null)
+              }
+            }}
+          >
+            <section className="cocktails-edit-panel">
+              <header className="cocktails-edit-header">
+                <div>
+                  <p className="inventory-kicker">Cocktail</p>
+                  <h2 id="cocktails-edit-title">{displayName(selectedRow)}</h2>
+                </div>
+                <button
+                  type="button"
+                  className="inventory-secondary-button"
+                  disabled={saving}
+                  onClick={() => setSelectedVariantId(null)}
+                >
+                  Close
+                </button>
+              </header>
+
+              <div className="cocktails-edit-grid">
+                <label>
+                  <span>Placement</span>
+                  <select
+                    value={editDraft.group}
+                    disabled={saving}
+                    onChange={(event) =>
+                      setEditDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              group: event.target.value as CocktailGroup,
+                              happyHourPrice:
+                                event.target.value === 'House Cocktails'
+                                  ? current.happyHourPrice
+                                  : '',
+                            }
+                          : current,
+                      )
+                    }
+                  >
+                    <option value="House Cocktails">House Cocktails</option>
+                    {OFF_MENU_GROUPS.map((group) => (
+                      <option key={group} value={group}>
+                        {group}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Cocktail name</span>
+                  <input
+                    value={editDraft.name}
+                    disabled={saving}
+                    onChange={(event) =>
+                      setEditDraft((current) =>
+                        current ? { ...current, name: event.target.value } : current,
+                      )
+                    }
+                  />
+                </label>
+
+                <label>
+                  <span>
+                    {editDraft.group === 'House Cocktails'
+                      ? 'Base price'
+                      : 'Upcharge price'}
+                  </span>
+                  <div className="cocktails-money-input">
+                    <span>$</span>
+                    <input
+                      inputMode="decimal"
+                      value={editDraft.price}
+                      disabled={saving}
+                      onChange={(event) =>
+                        setEditDraft((current) =>
+                          current ? { ...current, price: event.target.value } : current,
+                        )
+                      }
+                    />
+                  </div>
+                </label>
+
+                {editDraft.group === 'House Cocktails' ? (
+                  <label>
+                    <span>Happy Hour price</span>
+                    <div className="cocktails-money-input">
+                      <span>$</span>
+                      <input
+                        inputMode="decimal"
+                        value={editDraft.happyHourPrice}
+                        disabled={saving}
+                        placeholder="Optional"
+                        onChange={(event) =>
+                          setEditDraft((current) =>
+                            current
+                              ? { ...current, happyHourPrice: event.target.value }
+                              : current,
+                          )
+                        }
+                      />
+                    </div>
+                  </label>
+                ) : null}
+              </div>
+
+              <div className="cocktails-edit-toggles">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={editAvailableHere}
+                    disabled={saving}
+                    onChange={(event) => {
+                      setEditAvailableHere(event.target.checked)
+                      if (!event.target.checked) setEditExportToToast(false)
+                    }}
+                  />
+                  <span>Available here</span>
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={editExportToToast}
+                    disabled={saving || !editAvailableHere}
+                    onChange={(event) => setEditExportToToast(event.target.checked)}
+                  />
+                  <span>Export to Toast</span>
+                </label>
+              </div>
+
+              <footer className="cocktails-edit-actions">
+                <button
+                  type="button"
+                  className="inventory-danger-button"
+                  disabled={saving}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'Remove "' +
+                          displayName(selectedRow) +
+                          '" from this organization? The shared master item is kept.',
+                      )
+                    ) {
+                      void removeSelectedCocktail()
+                    }
+                  }}
+                >
+                  Remove from organization
+                </button>
+
+                <div>
+                  <button
+                    type="button"
+                    className="inventory-secondary-button"
+                    disabled={saving}
+                    onClick={() => setSelectedVariantId(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="inventory-primary-button"
+                    disabled={saving}
+                    onClick={() => void saveSelectedCocktail()}
+                  >
+                    {saving ? 'Saving…' : 'Update'}
+                  </button>
+                </div>
+              </footer>
+            </section>
+          </div>
+        ) : null}
       </section>
     </AuthenticatedInventoryShell>
+  )
+}
+
+function getCocktailGroup(row: InventoryCatalogRow): CocktailGroup {
+  const rawGroup =
+    row.organization.toastCategoryOverride ??
+    row.category?.toastCategory ??
+    row.category?.name ??
+    ''
+
+  return (
+    OFF_MENU_GROUPS.find(
+      (candidate) => candidate.toLowerCase() === rawGroup.trim().toLowerCase(),
+    ) ?? 'House Cocktails'
   )
 }
 
