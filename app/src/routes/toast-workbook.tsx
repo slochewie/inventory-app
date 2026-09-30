@@ -2986,14 +2986,48 @@ function applyOrganizationBeerDraftImportMappings(
   sourceItems: NormalizedMenuItem[],
   config: InventoryOrganizationConfig | null,
 ) {
-  if (!config || sourceItems.length === 0) return sourceItems
+  if (sourceItems.length === 0) return sourceItems
+
+  let changed = false
+  let stagedItems = sourceItems.map((item) => {
+    const wineMatch = [
+      item.toastDestination,
+      item.category ?? '',
+      item.toastCategory,
+    ]
+      .map((value) => clean(value).match(/^wine\s*(?:\/|:|·|-)\s*(.+)$/i))
+      .find((match) => Boolean(match?.[1]))
+
+    if (!wineMatch?.[1]) return item
+
+    const wineType = wineMatch[1].trim()
+    const destination = `Wine / ${wineType}`
+    const alreadyNormalized =
+      item.category === 'Wine' &&
+      item.toastCategory === 'Wine' &&
+      item.toastDestination === destination
+
+    if (alreadyNormalized) return item
+
+    changed = true
+    return {
+      ...item,
+      category: 'Wine',
+      toastCategory: 'Wine',
+      toastDestination: destination,
+    }
+  })
+
+  if (!config) return changed ? stagedItems : sourceItems
 
   const destinationOptions = getOrganizationDraftSizeOptions(config)
-  if (destinationOptions.length === 0) return sourceItems
+  if (destinationOptions.length === 0) {
+    return changed ? stagedItems : sourceItems
+  }
 
   const sourceSizes = [
     ...new Set(
-      sourceItems.flatMap((item) => {
+      stagedItems.flatMap((item) => {
         const category = normalizeStagedMenuCategory(
           item.category || item.toastCategory,
         )
@@ -3005,7 +3039,7 @@ function applyOrganizationBeerDraftImportMappings(
     ),
   ].sort((left, right) => left - right)
 
-  if (sourceSizes.length === 0) return sourceItems
+  if (sourceSizes.length === 0) return changed ? stagedItems : sourceItems
 
   const destinationBySize = new Map(
     destinationOptions.map(({ sizeOz, option }) => [sizeOz, option]),
@@ -3021,7 +3055,7 @@ function applyOrganizationBeerDraftImportMappings(
     .filter((sizeOz) => !exactSizes.has(sizeOz))
 
   if (unmatchedSourceSizes.length !== unmatchedDestinationSizes.length) {
-    return sourceItems
+    return changed ? stagedItems : sourceItems
   }
 
   const sizeMapping = new Map<number, number>()
@@ -3030,8 +3064,7 @@ function applyOrganizationBeerDraftImportMappings(
     sizeMapping.set(sourceSizeOz, unmatchedDestinationSizes[index])
   })
 
-  let changed = false
-  const mappedItems = sourceItems.map((item) => {
+  stagedItems = stagedItems.map((item) => {
     const category = normalizeStagedMenuCategory(
       item.category || item.toastCategory,
     )
@@ -3066,7 +3099,7 @@ function applyOrganizationBeerDraftImportMappings(
     }
   })
 
-  return changed ? mappedItems : sourceItems
+  return changed ? stagedItems : sourceItems
 }
 
 function getStagedDestinationSelectValue(
