@@ -7,6 +7,7 @@ import {
 import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
 import { authClient } from '#/lib/auth-client'
 import {
+  addInventoryOrganizationVariant,
   getInventoryOrganizationConfig,
   getOptionalBeerCategories,
   listInventoryCatalog,
@@ -66,6 +67,7 @@ type StagedReviewStatus = 'review' | 'ready' | 'all'
 
 type ReconciliationDecision =
   | { kind: 'existing'; variantId: string }
+  | { kind: 'new-variant'; itemId: string }
   | { kind: 'new' }
 
 const STAGED_REVIEW_PAGE_SIZE = 25
@@ -638,7 +640,7 @@ function ToastWorkbook() {
     if (
       !activeOrganization?.id ||
       !importFile ||
-      reviewSource !== 'toast-workbook' ||
+      !isStagedReviewSource ||
       importingReviewedItems
     ) {
       return
@@ -662,6 +664,26 @@ function ToastWorkbook() {
     setImportReviewedError(null)
 
     try {
+      const resolvedVariantIds = new Map<string, string>()
+
+      for (const item of reviewedItems) {
+        const decision = reconciliationDecisions[item.id]
+        if (decision?.kind !== 'new-variant') continue
+
+        const variantId = await addInventoryOrganizationVariant({
+          organizationId: activeOrganization.id,
+          itemId: decision.itemId,
+          toastCategory: item.toastCategory,
+          toastDestination: getVariantCreationDestination(
+            item,
+            organizationConfig,
+          ),
+          toastSlot: item.toastSlot ?? null,
+        })
+
+        resolvedVariantIds.set(item.id, variantId)
+      }
+
       await persistInventoryImport({
         organizationId: activeOrganization.id,
         sourceType: 'toast-template',
@@ -681,7 +703,11 @@ function ToastWorkbook() {
             status: item.status,
             exportIncluded: item.exportIncluded,
             targetVariantId:
-              decision?.kind === 'existing' ? decision.variantId : undefined,
+              decision?.kind === 'existing'
+                ? decision.variantId
+                : decision?.kind === 'new-variant'
+                  ? resolvedVariantIds.get(item.id)
+                  : undefined,
             createNewMaster:
               decision?.kind === 'new' ? true : undefined,
           }
@@ -1176,7 +1202,7 @@ function ToastWorkbook() {
                   ) : null}
                 </section>
 
-                {reviewSource === 'toast-workbook' ? (
+                {isStagedReviewSource ? (
                   <section className="inventory-card inventory-import-card">
                     <div className="inventory-table-heading">
                       <div>
@@ -1247,7 +1273,7 @@ function ToastWorkbook() {
                   </section>
                 ) : null}
 
-                {reviewSource === 'toast-workbook' && selectedReconciliationItemId ? (
+                {isStagedReviewSource && selectedReconciliationItemId ? (
                   <StagedReconciliationDrawer
                     item={
                       items.find(
@@ -1265,6 +1291,16 @@ function ToastWorkbook() {
                         [selectedReconciliationItemId]: {
                           kind: 'existing',
                           variantId,
+                        },
+                      }))
+                      setSelectedReconciliationItemId(null)
+                    }}
+                    onChooseNewVariant={(itemId) => {
+                      setReconciliationDecisions((current) => ({
+                        ...current,
+                        [selectedReconciliationItemId]: {
+                          kind: 'new-variant',
+                          itemId,
                         },
                       }))
                       setSelectedReconciliationItemId(null)
@@ -1423,7 +1459,10 @@ function StagedReconciliationPanel({
   const newCount = items.filter(
     (item) => decisions[item.id]?.kind === 'new',
   ).length
-  const mappedCount = decidedCount - newCount
+  const newVariantCount = items.filter(
+    (item) => decisions[item.id]?.kind === 'new-variant',
+  ).length
+  const mappedCount = decidedCount - newCount - newVariantCount
 
   return (
     <div className="inventory-import-workspace">
@@ -1433,6 +1472,7 @@ function StagedReconciliationPanel({
       >
         <SummaryCard label="Unresolved" value={unresolvedCount} />
         <SummaryCard label="Map existing" value={mappedCount} />
+        <SummaryCard label="New variant" value={newVariantCount} />
         <SummaryCard label="Create new" value={newCount} />
         <SummaryCard label="Total" value={items.length} />
       </section>
@@ -1482,9 +1522,11 @@ function StagedReconciliationPanel({
                   <td>
                     {decision?.kind === 'new'
                       ? 'Create new master'
-                      : selected
-                        ? `Map to ${formatMasterVariant(selected)}`
-                        : 'Needs decision'}
+                      : decision?.kind === 'new-variant'
+                        ? `Add new variant to ${catalog.find((candidate) => candidate.id === decision.itemId)?.name ?? 'existing master'}`
+                        : selected
+                          ? `Map to ${formatMasterVariant(selected)}`
+                          : 'Needs decision'}
                   </td>
                   <td>
                     {suggested
@@ -1544,6 +1586,7 @@ function StagedReconciliationDrawer({
   decision,
   onClose,
   onChooseExisting,
+  onChooseNewVariant,
   onChooseNew,
 }: {
   item: NormalizedMenuItem
@@ -1551,11 +1594,13 @@ function StagedReconciliationDrawer({
   decision?: ReconciliationDecision
   onClose: () => void
   onChooseExisting: (variantId: string) => void
+  onChooseNewVariant: (itemId: string) => void
   onChooseNew: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [query, setQuery] = useState('')
   const candidates = findMasterCandidates(item, catalog, query)
+  const masterItems = findMasterItems(item, catalog, query)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -1615,8 +1660,58 @@ function StagedReconciliationDrawer({
       </section>
 
       <section className="inventory-drawer-section">
+        <div className="inventory-drawer-section-heading">
+          <div>
+            <p className="inventory-kicker">Existing master item</p>
+            <h3>Add as a new variant</h3>
+            <p>
+              Use this when the product already exists in the master catalog but
+              this organization needs a new format or size.
+            </p>
+          </div>
+        </div>
+
         <label className="inventory-search-control">
-          <span>Find existing master item</span>
+          <span>Find master item</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search master catalog…"
+          />
+        </label>
+
+        <div className="inventory-reconcile-candidate-list">
+          {masterItems.length === 0 ? (
+            <p className="inventory-empty-state">
+              No master items match this search.
+            </p>
+          ) : (
+            masterItems.slice(0, 50).map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                className={
+                  decision?.kind === 'new-variant' &&
+                  decision.itemId === candidate.id
+                    ? 'inventory-reconcile-candidate is-selected'
+                    : 'inventory-reconcile-candidate'
+                }
+                onClick={() => onChooseNewVariant(candidate.id)}
+              >
+                <strong>{candidate.name}</strong>
+                <span>
+                  Add {formatStagedVariantForDecision(item)} to this master item
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="inventory-drawer-section">
+        <label className="inventory-search-control">
+          <span>Map to existing master variant</span>
           <input
             type="search"
             value={query}
@@ -1652,6 +1747,82 @@ function StagedReconciliationDrawer({
       </section>
     </dialog>
   )
+}
+
+function findMasterItems(
+  item: NormalizedMenuItem,
+  catalog: InventoryCatalogRow[],
+  query = '',
+) {
+  const normalizedQuery = normalizeMasterName(query)
+  const normalizedItemName = normalizeMasterName(item.name)
+  const unique = new Map<string, InventoryCatalogRow>()
+
+  catalog
+    .filter((candidate) => candidate.active)
+    .forEach((candidate) => {
+      if (!unique.has(candidate.id)) unique.set(candidate.id, candidate)
+    })
+
+  return [...unique.values()]
+    .filter((candidate) => {
+      if (!normalizedQuery) return true
+      return normalizeMasterName(
+        `${candidate.name} ${candidate.category?.name ?? ''}`,
+      ).includes(normalizedQuery)
+    })
+    .map((candidate) => ({
+      candidate,
+      exact:
+        normalizeMasterName(candidate.name) === normalizedItemName ? 0 : 1,
+      distance: masterNameDistance(
+        normalizedItemName,
+        normalizeMasterName(candidate.name),
+      ),
+    }))
+    .sort(
+      (left, right) =>
+        left.exact - right.exact ||
+        left.distance - right.distance ||
+        left.candidate.name.localeCompare(right.candidate.name),
+    )
+    .map(({ candidate }) => candidate)
+}
+
+function formatStagedVariantForDecision(item: NormalizedMenuItem) {
+  return (
+    item.toastDestination
+      .replace(/^Beer tab\s*[·:-]?\s*/i, '')
+      .trim() ||
+    item.variantLabel ||
+    item.category ||
+    item.toastCategory
+  )
+}
+
+function getVariantCreationDestination(
+  item: NormalizedMenuItem,
+  config: InventoryOrganizationConfig | null,
+) {
+  if (
+    item.toastCategory.toLowerCase() === 'beer' &&
+    item.toastSlot &&
+    config
+  ) {
+    const optional = getOptionalBeerCategories(config).find(
+      (category) => category.key === item.toastSlot,
+    )
+
+    if (optional) {
+      const label = optional.label.trim()
+      if (/^\d+(?:\.\d+)?\s*oz$/i.test(label)) {
+        return `Beer tab · ${label} Draft`
+      }
+      return `Beer tab · ${label}`
+    }
+  }
+
+  return item.toastDestination
 }
 
 function findMasterCandidates(
@@ -2136,8 +2307,14 @@ function getStagedBeerDestinationOptions(
   getOptionalBeerCategories(config)
     .filter((category) => category.enabled)
     .forEach((category) => {
+      const destinationLabel = /^\d+(?:\.\d+)?\s*oz$/i.test(
+        category.label.trim(),
+      )
+        ? `${category.label} Draft`
+        : category.label
+
       options.push({
-        value: `Beer tab · ${category.label}`,
+        value: `Beer tab · ${destinationLabel}`,
         label: category.label,
         toastSlot: category.key,
       })
