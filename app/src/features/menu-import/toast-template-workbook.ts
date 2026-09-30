@@ -65,7 +65,7 @@ type DraftSizeSlot = {
 
 export type ToastDraftSlotMapping = {
   toastSizeOz: number | null
-  actualSizeOz: number
+  actualSizeOz: number | null
 }
 
 export type OptionalBeerCategoryOptions = {
@@ -280,7 +280,7 @@ export function validatePopulatedBeerWorkbook({
         toastSlot.priceCol,
         rowNumber,
         centsToDollars(draftPrice?.price ?? null),
-        `${row.beerName} ${draftMapping.actualSizeOz}oz price in Toast ${toastSlot.label} slot`,
+        `${row.beerName} ${formatDraftMappingLabel(draftMapping.actualSizeOz)} price in Toast ${toastSlot.label} slot`,
       )
 
       if (toastSlot.happyHourCol) {
@@ -291,7 +291,7 @@ export function validatePopulatedBeerWorkbook({
           toastSlot.happyHourCol,
           rowNumber,
           centsToDollars(draftPrice?.happyHour ?? null),
-          `${row.beerName} ${draftMapping.actualSizeOz}oz Happy Hour in Toast ${toastSlot.label} slot`,
+          `${row.beerName} ${formatDraftMappingLabel(draftMapping.actualSizeOz)} Happy Hour in Toast ${toastSlot.label} slot`,
         )
       }
     })
@@ -1870,6 +1870,10 @@ function parseOptionalDraftSize(label: string) {
 
 function formatDraftSizeLabel(sizeOz: number) {
   return `${Number.isInteger(sizeOz) ? sizeOz.toString() : sizeOz.toFixed(1)}oz`
+}
+
+function formatDraftMappingLabel(sizeOz: number | null) {
+  return sizeOz === null ? 'Pitcher' : formatDraftSizeLabel(sizeOz)
 }
 
 function isPriceHeader(value: string) {
