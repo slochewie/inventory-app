@@ -379,7 +379,22 @@ function ToastWorkbook() {
         setOrganizationConfig(config)
         setMasterCatalog(catalog.items)
 
-        if (savedReviewSession?.items.length) return
+        if (savedReviewSession?.items.length) {
+          const mappedItems = applyOrganizationBeerDraftImportMappings(
+            savedReviewSession.items,
+            config,
+          )
+
+          if (mappedItems !== savedReviewSession.items) {
+            setItems(mappedItems)
+            saveReviewSession(
+              savedReviewSession.importFile,
+              mappedItems,
+              organizationId,
+            )
+          }
+          return
+        }
 
         if (catalog.items.length === 0) {
           setImportFile(null)
@@ -531,7 +546,10 @@ function ToastWorkbook() {
     try {
       const text = await file.text()
       const parsed = parseAlohaMenuCsv(text, file.name)
-      const normalizedItems = normalizeAlohaMenuItems(parsed)
+      const normalizedItems = applyOrganizationBeerDraftImportMappings(
+        normalizeAlohaMenuItems(parsed),
+        organizationConfig,
+      )
 
       setImportFile(parsed)
       setItems(normalizedItems)
@@ -571,11 +589,20 @@ function ToastWorkbook() {
         },
       }
 
+      const normalizedItems = applyOrganizationBeerDraftImportMappings(
+        parsed.items,
+        organizationConfig,
+      )
+
       setImportFile(stagedImportFile)
-      setItems(parsed.items)
+      setItems(normalizedItems)
       setReviewSource('toast-workbook')
       setReviewSavedAt(null)
-      saveReviewSession(stagedImportFile, parsed.items, activeOrganization?.id)
+      saveReviewSession(
+        stagedImportFile,
+        normalizedItems,
+        activeOrganization?.id,
+      )
     } catch (error) {
       setAlohaError(
         error instanceof Error
@@ -733,15 +760,24 @@ function ToastWorkbook() {
         },
       }
 
+      const normalizedItems = applyOrganizationBeerDraftImportMappings(
+        parsed.items,
+        organizationConfig,
+      )
+
       setImportFile(stagedImportFile)
-      setItems(parsed.items)
+      setItems(normalizedItems)
       setReviewSource('review-csv')
       setReviewSavedAt(null)
       setStagedReviewQuery('')
       setStagedReviewStatus('all')
       setStagedReviewCategory('all')
       setStagedReviewPage(1)
-      saveReviewSession(stagedImportFile, parsed.items, activeOrganization?.id)
+      saveReviewSession(
+        stagedImportFile,
+        normalizedItems,
+        activeOrganization?.id,
+      )
     } catch (error) {
       setImportFile(null)
       setItems([])
@@ -2777,6 +2813,137 @@ function getStagedBeerDestinationOptions(
     })
 
   return options
+}
+
+function getStagedDraftSizeOz(item: NormalizedMenuItem) {
+  if (
+    item.variantKind === 'draft' &&
+    item.variantSizeOz !== undefined &&
+    item.variantSizeOz !== null &&
+    Number.isFinite(item.variantSizeOz)
+  ) {
+    return item.variantSizeOz
+  }
+
+  const sourceText = [
+    item.variantLabel ?? '',
+    item.category ?? '',
+    item.toastDestination,
+  ].join(' ')
+
+  const match = sourceText.match(/\b(?:draft\s*)?(\d+(?:\.\d+)?)\s*oz\b/i)
+  if (!match) return null
+
+  const sizeOz = Number(match[1])
+  return Number.isFinite(sizeOz) && sizeOz > 0 ? sizeOz : null
+}
+
+function getOrganizationDraftSizeOptions(
+  config: InventoryOrganizationConfig | null,
+) {
+  if (!config) return []
+
+  const bySize = new Map<number, StagedBeerDestinationOption>()
+
+  for (const option of getStagedBeerDestinationOptions(config)) {
+    const match = option.label.match(/\b(\d+(?:\.\d+)?)\s*oz\b/i)
+    if (!match || /\bcan\b/i.test(option.label)) continue
+
+    const sizeOz = Number(match[1])
+    if (!Number.isFinite(sizeOz) || sizeOz <= 0 || bySize.has(sizeOz)) continue
+    bySize.set(sizeOz, option)
+  }
+
+  return [...bySize.entries()]
+    .map(([sizeOz, option]) => ({ sizeOz, option }))
+    .sort((left, right) => left.sizeOz - right.sizeOz)
+}
+
+function applyOrganizationBeerDraftImportMappings(
+  sourceItems: NormalizedMenuItem[],
+  config: InventoryOrganizationConfig | null,
+) {
+  if (!config || sourceItems.length === 0) return sourceItems
+
+  const destinationOptions = getOrganizationDraftSizeOptions(config)
+  if (destinationOptions.length === 0) return sourceItems
+
+  const sourceSizes = [
+    ...new Set(
+      sourceItems.flatMap((item) => {
+        const category = normalizeStagedMenuCategory(
+          item.category || item.toastCategory,
+        )
+        if (category.toLowerCase() !== 'beer') return []
+
+        const sizeOz = getStagedDraftSizeOz(item)
+        return sizeOz === null ? [] : [sizeOz]
+      }),
+    ),
+  ].sort((left, right) => left - right)
+
+  if (sourceSizes.length === 0) return sourceItems
+
+  const destinationBySize = new Map(
+    destinationOptions.map(({ sizeOz, option }) => [sizeOz, option]),
+  )
+  const exactSizes = new Set(
+    sourceSizes.filter((sizeOz) => destinationBySize.has(sizeOz)),
+  )
+  const unmatchedSourceSizes = sourceSizes.filter(
+    (sizeOz) => !exactSizes.has(sizeOz),
+  )
+  const unmatchedDestinationSizes = destinationOptions
+    .map(({ sizeOz }) => sizeOz)
+    .filter((sizeOz) => !exactSizes.has(sizeOz))
+
+  if (unmatchedSourceSizes.length !== unmatchedDestinationSizes.length) {
+    return sourceItems
+  }
+
+  const sizeMapping = new Map<number, number>()
+  exactSizes.forEach((sizeOz) => sizeMapping.set(sizeOz, sizeOz))
+  unmatchedSourceSizes.forEach((sourceSizeOz, index) => {
+    sizeMapping.set(sourceSizeOz, unmatchedDestinationSizes[index])
+  })
+
+  let changed = false
+  const mappedItems = sourceItems.map((item) => {
+    const category = normalizeStagedMenuCategory(
+      item.category || item.toastCategory,
+    )
+    if (category.toLowerCase() !== 'beer') return item
+
+    const sourceSizeOz = getStagedDraftSizeOz(item)
+    if (sourceSizeOz === null) return item
+
+    const targetSizeOz = sizeMapping.get(sourceSizeOz)
+    if (targetSizeOz === undefined || targetSizeOz === sourceSizeOz) return item
+
+    const targetOption = destinationBySize.get(targetSizeOz)
+    if (!targetOption) return item
+
+    changed = true
+    const mappingNote =
+      `Organization Beer import mapping: ${sourceSizeOz}oz Draft → ${targetSizeOz}oz Draft.`
+
+    return {
+      ...item,
+      category: 'Beer',
+      toastCategory: 'Beer',
+      toastDestination: targetOption.value,
+      toastSlot: targetOption.toastSlot,
+      variantKind: 'draft',
+      variantSizeOz: targetSizeOz,
+      variantPackageType: null,
+      variantLabel: `${targetSizeOz}oz Draft`,
+      notes: item.notes.includes(mappingNote)
+        ? item.notes
+        : [...item.notes, mappingNote],
+    }
+  })
+
+  return changed ? mappedItems : sourceItems
 }
 
 function getStagedDestinationSelectValue(
