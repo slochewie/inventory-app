@@ -592,10 +592,11 @@ function mergeWorkbookBeerRow(target: BeerTabPreviewRow, source: BeerTabPreviewR
 function isOmittedWorkbookBeer(beerName: string) {
   const key = normalizeWorkbookBeerName(beerName)
   const compactKey = workbookBeerKey(beerName)
+
+  // Numeric product names are valid beer names (for example Firestone 805).
+  // Only omit names that are explicitly known source/report noise.
   return OMIT_WORKBOOK_BEERS.has(key)
     || OMIT_WORKBOOK_BEERS.has(compactKey)
-    || /^\$?\d+(?:\.\d{2})?$/.test(key)
-    || /^\$?\d+(?:\.\d{2})?$/.test(compactKey)
 }
 
 function normalizeWorkbookBeerName(value: string) {
