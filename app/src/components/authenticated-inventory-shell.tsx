@@ -70,6 +70,7 @@ export function useInventoryAccessRole() {
       role !== null && (role !== "viewer" || isToastWorkbookPage),
     canEdit: role === "manager" || role === "admin",
     canManageAssignments: role === "admin",
+    canManageMasterCatalog: role === "admin",
   }
 }
 
@@ -79,7 +80,7 @@ export function AuthenticatedInventoryShell({
   children,
 }: {
   currentPath: string
-  requiredCapability?: "import-export" | "edit" | "manage-assignments"
+  requiredCapability?: "import-export" | "edit" | "manage-assignments" | "manage-master-catalog"
   children: ReactNode
 }) {
   const { data: session, isPending: isSessionPending } = authClient.useSession()
@@ -95,6 +96,7 @@ export function AuthenticatedInventoryShell({
     canImportExport,
     canEdit,
     canManageAssignments,
+    canManageMasterCatalog,
   } = useInventoryAccessRole()
   const [allowedOrganizationIds, setAllowedOrganizationIds] = useState<Set<string> | null>(null)
   const [deviceSessions, setDeviceSessions] = useState<Array<{
@@ -277,9 +279,11 @@ export function AuthenticatedInventoryShell({
   }
 
   const routeAllowed =
-    requiredCapability === "manage-assignments"
-      ? canManageAssignments
-      : requiredCapability === "edit"
+    requiredCapability === "manage-master-catalog"
+      ? canManageMasterCatalog
+      : requiredCapability === "manage-assignments"
+        ? canManageAssignments
+        : requiredCapability === "edit"
         ? canEdit
         : requiredCapability === "import-export"
           ? canImportExport
@@ -317,6 +321,7 @@ export function AuthenticatedInventoryShell({
           canImportExport={canImportExport || inventoryRole === "viewer"}
           canEdit={canEdit}
           canManageAssignments={canManageAssignments}
+          canManageMasterCatalog={canManageMasterCatalog}
         />
 
         <SidebarInset className="inventory-authenticated-main">
