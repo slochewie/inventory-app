@@ -31,6 +31,20 @@ export function getBuiltInToastDestinations() {
   return [...BUILT_IN_TOAST_DESTINATIONS]
 }
 
+export function isBeerToastDestination(value: string) {
+  const normalized = value.trim().toLowerCase()
+
+  if (!normalized) return false
+  if (normalized.startsWith('beer tab ·')) return true
+
+  return (
+    normalized === 'can' ||
+    normalized === 'bottle' ||
+    normalized === 'pitcher' ||
+    /^(?:draft\s+beer\s+)?\d+(?:\.\d+)?\s*oz(?:\s+draft)?$/.test(normalized)
+  )
+}
+
 const BEER_DESTINATIONS = new Map<string, ToastDestination>([
   [
     'BEER CAN',
