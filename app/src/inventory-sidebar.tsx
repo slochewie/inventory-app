@@ -50,13 +50,11 @@ export function InventorySidebar({
   canImportExport = false,
   canEdit = false,
   canManageAssignments = false,
-  canManageMasterCatalog = false,
 }: {
   currentPath: string
   canImportExport?: boolean
   canEdit?: boolean
   canManageAssignments?: boolean
-  canManageMasterCatalog?: boolean
 }) {
   const hostname = useCurrentHostname()
   const appLinks = hostname ? getDefaultAppUrls(hostname) : null
@@ -69,10 +67,6 @@ export function InventorySidebar({
         canAccess: ({ key }) => {
           if (key === "inventory:manage-assignments") {
             return canManageAssignments
-          }
-
-          if (key === "inventory:manage-master-catalog") {
-            return canManageMasterCatalog
           }
 
           if (key === "inventory:import-export") {
