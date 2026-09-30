@@ -3,62 +3,79 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import {
-  listInventoryCatalog,
-  persistInventoryImport,
-  updateInventoryOrganizationVariant,
-  type InventoryCatalogRow,
+  createInventoryCocktail,
+  listInventoryCocktailMasters,
+  listInventoryCocktails,
+  removeInventoryCocktail,
+  updateInventoryCocktail,
+  type InventoryCocktailMaster,
+  type InventoryCocktailSection,
+  type InventoryOrganizationCocktail,
 } from '#/lib/inventory-access'
 import './cocktails.css'
 
 export const Route = createFileRoute('/cocktails')({ component: CocktailsPage })
 
-const OFF_MENU_GROUPS = [
-  'Vodka Cocktails',
-  'Gin Cocktails',
-  'Rum Cocktails',
-  'Tequila Cocktails',
-  'Whiskey/Bourbon Cocktails',
-] as const
-
-type CocktailGroup = 'House Cocktails' | (typeof OFF_MENU_GROUPS)[number]
+const SECTION_OPTIONS: Array<{
+  value: InventoryCocktailSection
+  label: string
+}> = [
+  { value: 'house', label: 'House Cocktails' },
+  { value: 'vodka', label: 'Vodka Cocktails' },
+  { value: 'gin', label: 'Gin Cocktails' },
+  { value: 'rum', label: 'Rum Cocktails' },
+  { value: 'tequila', label: 'Tequila Cocktails' },
+  { value: 'whiskey-bourbon', label: 'Whiskey/Bourbon Cocktails' },
+]
 
 type Draft = {
-  group: CocktailGroup
+  section: InventoryCocktailSection
   name: string
+  description: string
   price: string
   happyHourPrice: string
 }
 
 const EMPTY_DRAFT: Draft = {
-  group: 'House Cocktails',
+  section: 'house',
   name: '',
+  description: '',
   price: '',
   happyHourPrice: '',
 }
 
 function CocktailsPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
-  const [catalog, setCatalog] = useState<InventoryCatalogRow[]>([])
+  const [cocktails, setCocktails] = useState<InventoryOrganizationCocktail[]>([])
+  const [masters, setMasters] = useState<InventoryCocktailMaster[]>([])
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
+  const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null)
+  const [selectedCocktailId, setSelectedCocktailId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<Draft | null>(null)
+  const [editEnabled, setEditEnabled] = useState(true)
+  const [editExportToToast, setEditExportToToast] = useState(true)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<Draft | null>(null)
-  const [editAvailableHere, setEditAvailableHere] = useState(true)
-  const [editExportToToast, setEditExportToToast] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
   async function reload(signal?: AbortSignal) {
     if (!activeOrganization?.id) {
-      setCatalog([])
+      setCocktails([])
+      setMasters([])
       return
     }
 
     setLoading(true)
+    setError(null)
+
     try {
-      const result = await listInventoryCatalog(activeOrganization.id, signal)
-      setCatalog(result.items)
+      const [cocktailResult, masterResult] = await Promise.all([
+        listInventoryCocktails(activeOrganization.id, signal),
+        listInventoryCocktailMasters(activeOrganization.id, signal),
+      ])
+      setCocktails(cocktailResult.cocktails)
+      setMasters(masterResult)
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError') return
       setError(caught instanceof Error ? caught.message : 'Unable to load cocktails.')
@@ -73,63 +90,71 @@ function CocktailsPage() {
     return () => controller.abort()
   }, [activeOrganization?.id])
 
-  const cocktailRows = useMemo(
-    () =>
-      catalog.filter((row) => {
-        const category = (
-          row.organization.toastCategoryOverride ??
-          row.category?.toastCategory ??
-          row.category?.name ??
-          ''
-        ).toLowerCase()
-        const destination = (
-          row.organization.toastDestinationOverride ?? ''
-        ).toLowerCase()
-        return category.includes('cocktail') || destination.includes('cocktail')
-      }),
-    [catalog],
-  )
+  const grouped = useMemo(() => {
+    const result = new Map<InventoryCocktailSection, InventoryOrganizationCocktail[]>()
+    SECTION_OPTIONS.forEach(({ value }) => result.set(value, []))
 
-  const selectedRow =
-    catalog.find((row) => row.variant.id === selectedVariantId) ?? null
+    cocktails.forEach((cocktail) => result.get(cocktail.section)?.push(cocktail))
+
+    result.forEach((rows) =>
+      rows.sort(
+        (left, right) =>
+          left.sortOrder - right.sortOrder ||
+          displayName(left).localeCompare(displayName(right)),
+      ),
+    )
+
+    return result
+  }, [cocktails])
+
+  const selectedCocktail =
+    cocktails.find((cocktail) => cocktail.id === selectedCocktailId) ?? null
 
   useEffect(() => {
-    if (!selectedRow) {
+    if (!selectedCocktail) {
       setEditDraft(null)
       return
     }
 
-    const group = getCocktailGroup(selectedRow)
     setEditDraft({
-      group,
-      name: displayName(selectedRow),
+      section: selectedCocktail.section,
+      name: displayName(selectedCocktail),
+      description: selectedCocktail.description ?? '',
       price:
-        selectedRow.effectivePriceCents === null
+        selectedCocktail.priceCents === null
           ? ''
-          : (selectedRow.effectivePriceCents / 100).toFixed(2),
+          : (selectedCocktail.priceCents / 100).toFixed(2),
       happyHourPrice:
-        selectedRow.organization.happyHourPriceCents === null
+        selectedCocktail.happyHourPriceCents === null
           ? ''
-          : (selectedRow.organization.happyHourPriceCents / 100).toFixed(2),
+          : (selectedCocktail.happyHourPriceCents / 100).toFixed(2),
     })
-    setEditAvailableHere(selectedRow.organization.enabled)
-    setEditExportToToast(selectedRow.organization.exportToToast)
-  }, [selectedRow?.variant.id])
+    setEditEnabled(selectedCocktail.enabled)
+    setEditExportToToast(selectedCocktail.exportToToast)
+  }, [selectedCocktail?.id])
 
-  const grouped = useMemo(() => {
-    const result = new Map<CocktailGroup, InventoryCatalogRow[]>()
-    result.set('House Cocktails', [])
-    OFF_MENU_GROUPS.forEach((group) => result.set(group, []))
+  const masterSuggestions = useMemo(() => {
+    const query = normalize(draft.name)
+    if (!query) return []
 
-    cocktailRows.forEach((row) => {
-      result.get(getCocktailGroup(row))!.push(row)
-    })
+    return masters
+      .filter((master) => !master.assigned)
+      .filter((master) => normalize(master.name).includes(query))
+      .slice(0, 8)
+  }, [draft.name, masters])
 
-    result.forEach((rows) =>
-      rows.sort((left, right) => displayName(left).localeCompare(displayName(right))),
-    )
-    return result
-  }, [cocktailRows])
+  const selectedMaster =
+    masters.find((master) => master.id === selectedMasterId) ?? null
+
+  function selectMaster(master: InventoryCocktailMaster) {
+    setSelectedMasterId(master.id)
+    setDraft((current) => ({ ...current, name: master.name }))
+  }
+
+  function clearAddDraft() {
+    setDraft(EMPTY_DRAFT)
+    setSelectedMasterId(null)
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -138,7 +163,7 @@ function CocktailsPage() {
     const name = draft.name.trim()
     const price = moneyToCents(draft.price)
     const happyHourPrice =
-      draft.group === 'House Cocktails'
+      draft.section === 'house'
         ? moneyToCents(draft.happyHourPrice, true)
         : null
 
@@ -146,15 +171,21 @@ function CocktailsPage() {
       setError('Enter a cocktail name.')
       return
     }
+
     if (price === null) {
       setError(
-        draft.group === 'House Cocktails'
+        draft.section === 'house'
           ? 'Enter a valid base price.'
           : 'Enter a valid upcharge price.',
       )
       return
     }
-    if (draft.group === 'House Cocktails' && draft.happyHourPrice.trim() && happyHourPrice === null) {
+
+    if (
+      draft.section === 'house' &&
+      draft.happyHourPrice.trim() &&
+      happyHourPrice === null
+    ) {
       setError('Enter a valid Happy Hour price.')
       return
     }
@@ -164,43 +195,21 @@ function CocktailsPage() {
     setSuccess(null)
 
     try {
-      const sourceId =
-        'manual-cocktail-' +
-        Date.now() +
-        '-' +
-        Math.random().toString(36).slice(2, 8)
-
-      await persistInventoryImport({
+      await createInventoryCocktail({
         organizationId: activeOrganization.id,
-        sourceType: 'aloha-csv',
-        sourceName: 'Manual Cocktail - ' + name,
-        reconciliationMode: 'explicit',
-        items: [
-          {
-            id: sourceId,
-            sourceItemNumber: sourceId,
-            name,
-            category: 'Cocktails',
-            toastCategory: draft.group,
-            toastDestination: 'Cocktails',
-            basePriceCents: price,
-            happyHourPriceCents: happyHourPrice,
-            status: 'ready',
-            exportIncluded: true,
-            createNewMaster: true,
-          },
-        ],
+        inventoryCocktailId: selectedMaster?.id,
+        name: selectedMaster?.name ?? name,
+        createNewMaster: !selectedMaster,
+        section: draft.section,
+        description: draft.description.trim() || null,
+        priceCents: price,
+        happyHourPriceCents: happyHourPrice,
+        enabled: true,
+        exportToToast: true,
       })
 
-      setDraft((current) => ({
-        ...EMPTY_DRAFT,
-        group: current.group,
-      }))
-      setSuccess(
-        draft.group === 'House Cocktails'
-          ? 'Added ' + name + ' as a House Cocktail.'
-          : 'Added ' + name + ' to ' + draft.group + ' with its Toast upcharge.',
-      )
+      setSuccess('Added ' + (selectedMaster?.name ?? name) + '.')
+      clearAddDraft()
       await reload()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to add cocktail.')
@@ -210,23 +219,19 @@ function CocktailsPage() {
   }
 
   async function saveSelectedCocktail() {
-    if (!activeOrganization?.id || !selectedRow || !editDraft || saving) return
-
-    const name = editDraft.name.trim()
-    const price = moneyToCents(editDraft.price)
-    const happyHourPrice =
-      editDraft.group === 'House Cocktails'
-        ? moneyToCents(editDraft.happyHourPrice, true)
-        : null
-
-    if (!name) {
-      setError('Enter a cocktail name.')
+    if (!activeOrganization?.id || !selectedCocktail || !editDraft || saving) {
       return
     }
 
+    const price = moneyToCents(editDraft.price)
+    const happyHourPrice =
+      editDraft.section === 'house'
+        ? moneyToCents(editDraft.happyHourPrice, true)
+        : null
+
     if (price === null) {
       setError(
-        editDraft.group === 'House Cocktails'
+        editDraft.section === 'house'
           ? 'Enter a valid base price.'
           : 'Enter a valid upcharge price.',
       )
@@ -234,7 +239,7 @@ function CocktailsPage() {
     }
 
     if (
-      editDraft.group === 'House Cocktails' &&
+      editDraft.section === 'house' &&
       editDraft.happyHourPrice.trim() &&
       happyHourPrice === null
     ) {
@@ -247,21 +252,24 @@ function CocktailsPage() {
     setSuccess(null)
 
     try {
-      await updateInventoryOrganizationVariant({
+      await updateInventoryCocktail({
         organizationId: activeOrganization.id,
-        variantId: selectedRow.variant.id,
-        enabled: editAvailableHere,
-        exportToToast: editAvailableHere && editExportToToast,
-        priceOverrideCents: price,
+        organizationCocktailId: selectedCocktail.id,
+        section: editDraft.section,
+        description: editDraft.description.trim() || null,
+        priceCents: price,
         happyHourPriceCents: happyHourPrice,
+        enabled: editEnabled,
+        exportToToast: editEnabled && editExportToToast,
         toastNameOverride:
-          name === selectedRow.name ? null : name,
-        toastCategoryOverride: editDraft.group,
-        toastDestinationOverride: 'Cocktails',
+          editDraft.name.trim() &&
+          editDraft.name.trim() !== selectedCocktail.masterName
+            ? editDraft.name.trim()
+            : null,
       })
 
-      setSuccess('Updated ' + name + '.')
-      setSelectedVariantId(null)
+      setSuccess('Updated ' + editDraft.name.trim() + '.')
+      setSelectedCocktailId(null)
       await reload()
     } catch (caught) {
       setError(
@@ -272,22 +280,22 @@ function CocktailsPage() {
     }
   }
 
-  async function removeSelectedCocktail() {
-    if (!activeOrganization?.id || !selectedRow || saving) return
+  async function removeSelected() {
+    if (!activeOrganization?.id || !selectedCocktail || saving) return
 
     setSaving(true)
     setError(null)
     setSuccess(null)
 
     try {
-      await updateInventoryOrganizationVariant({
+      await removeInventoryCocktail({
         organizationId: activeOrganization.id,
-        variantId: selectedRow.variant.id,
-        enabled: false,
-        exportToToast: false,
+        organizationCocktailId: selectedCocktail.id,
       })
-      setSuccess('Removed ' + displayName(selectedRow) + ' from this organization.')
-      setSelectedVariantId(null)
+      setSuccess(
+        'Removed ' + displayName(selectedCocktail) + ' from this organization.',
+      )
+      setSelectedCocktailId(null)
       await reload()
     } catch (caught) {
       setError(
@@ -306,8 +314,8 @@ function CocktailsPage() {
             <p className="inventory-kicker">Cocktails</p>
             <h1>Cocktails</h1>
             <p>
-              Manage House Cocktails and Toast off-menu cocktail upcharges for{' '}
-              {activeOrganization?.name ?? 'the selected organization'}.
+              Shared cocktail names with organization-specific pricing and Toast
+              placement for {activeOrganization?.name ?? 'the selected organization'}.
             </p>
           </div>
         </header>
@@ -317,8 +325,8 @@ function CocktailsPage() {
             <div>
               <h2>Add cocktail</h2>
               <p>
-                House Cocktails use a base price. Off-menu cocktail groups use the
-                Toast upcharge amount.
+                Reuse an existing master cocktail when possible. Pricing,
+                description, and Toast placement belong to this organization.
               </p>
             </div>
           </div>
@@ -330,148 +338,173 @@ function CocktailsPage() {
             <label>
               <span>Placement</span>
               <select
-                value={draft.group}
+                value={draft.section}
                 disabled={saving}
                 onChange={(event) =>
                   setDraft((current) => ({
                     ...current,
-                    group: event.target.value as CocktailGroup,
+                    section: event.target.value as InventoryCocktailSection,
                     happyHourPrice:
-                      event.target.value === 'House Cocktails'
+                      event.target.value === 'house'
                         ? current.happyHourPrice
                         : '',
                   }))
                 }
               >
-                <option value="House Cocktails">House Cocktails</option>
-                {OFF_MENU_GROUPS.map((group) => (
-                  <option key={group} value={group}>
-                    {group}
+                {SECTION_OPTIONS.map((section) => (
+                  <option key={section.value} value={section.value}>
+                    {section.label}
                   </option>
                 ))}
               </select>
             </label>
 
-            <label>
+            <label className="cocktails-master-field">
               <span>Cocktail name</span>
               <input
                 value={draft.name}
                 disabled={saving}
                 placeholder={
-                  draft.group === 'House Cocktails'
-                    ? 'Espresso Martini'
-                    : 'Moscow Mule'
+                  draft.section === 'house' ? 'Espresso Martini' : 'Moscow Mule'
                 }
-                onChange={(event) =>
+                onChange={(event) => {
+                  setSelectedMasterId(null)
                   setDraft((current) => ({ ...current, name: event.target.value }))
-                }
+                }}
               />
+
+              {selectedMaster ? (
+                <small className="cocktails-master-selected">
+                  Using shared master: {selectedMaster.name}
+                </small>
+              ) : null}
+
+              {!selectedMaster && masterSuggestions.length > 0 ? (
+                <div className="cocktails-master-suggestions">
+                  {masterSuggestions.map((master) => (
+                    <button
+                      key={master.id}
+                      type="button"
+                      onClick={() => selectMaster(master)}
+                    >
+                      <strong>{master.name}</strong>
+                      <span>Use existing master</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </label>
 
             <label>
               <span>
-                {draft.group === 'House Cocktails' ? 'Base price' : 'Upcharge price'}
+                {draft.section === 'house' ? 'Base price' : 'Upcharge price'}
               </span>
-              <div className="cocktails-money-input">
-                <span>$</span>
-                <input
-                  inputMode="decimal"
-                  value={draft.price}
-                  disabled={saving}
-                  placeholder="0.00"
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, price: event.target.value }))
-                  }
-                />
-              </div>
+              <MoneyInput
+                value={draft.price}
+                disabled={saving}
+                onChange={(value) =>
+                  setDraft((current) => ({ ...current, price: value }))
+                }
+              />
             </label>
 
-            {draft.group === 'House Cocktails' ? (
+            {draft.section === 'house' ? (
               <label>
                 <span>Happy Hour price</span>
-                <div className="cocktails-money-input">
-                  <span>$</span>
-                  <input
-                    inputMode="decimal"
-                    value={draft.happyHourPrice}
-                    disabled={saving}
-                    placeholder="Optional"
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        happyHourPrice: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
+                <MoneyInput
+                  value={draft.happyHourPrice}
+                  disabled={saving}
+                  placeholder="Optional"
+                  onChange={(value) =>
+                    setDraft((current) => ({ ...current, happyHourPrice: value }))
+                  }
+                />
               </label>
             ) : null}
+
+            <label className="cocktails-description-field">
+              <span>Description</span>
+              <textarea
+                value={draft.description}
+                disabled={saving}
+                placeholder="Optional Toast menu description"
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+              />
+            </label>
 
             <div className="cocktails-form-actions">
               <button
                 type="button"
                 className="inventory-secondary-button"
                 disabled={saving}
-                onClick={() => setDraft(EMPTY_DRAFT)}
+                onClick={clearAddDraft}
               >
                 Clear
               </button>
-              <button type="submit" className="inventory-primary-button" disabled={saving}>
-                {saving ? 'Adding…' : 'Add cocktail'}
+              <button
+                type="submit"
+                className="inventory-primary-button"
+                disabled={saving}
+              >
+                {saving ? 'Adding…' : selectedMaster ? 'Add existing cocktail' : 'Create cocktail'}
               </button>
             </div>
           </form>
         </section>
 
         <section className="cocktails-groups">
-          {(['House Cocktails', ...OFF_MENU_GROUPS] as CocktailGroup[]).map((group) => {
-            const rows = grouped.get(group) ?? []
-            const isEmpty = rows.length === 0
+          {SECTION_OPTIONS.map((section) => {
+            const rows = grouped.get(section.value) ?? []
             return (
               <section
                 className={
-                  isEmpty
+                  rows.length === 0
                     ? 'inventory-card cocktails-group-card is-empty'
                     : 'inventory-card cocktails-group-card'
                 }
-                key={group}
+                key={section.value}
               >
                 <div className="inventory-table-heading">
                   <div>
-                    <h2>{group}</h2>
+                    <h2>{section.label}</h2>
                     <p>
-                      {group === 'House Cocktails'
-                        ? 'Exports to columns A–E on the Toast Cocktails tab.'
-                        : 'Exports as cocktail name + upcharge in the matching Toast section.'}
+                      {section.value === 'house'
+                        ? 'Base-price cocktails exported to the House Cocktails section.'
+                        : 'Common cocktail preparations exported with a Toast upcharge.'}
                     </p>
                   </div>
                   <strong>{rows.length}</strong>
                 </div>
 
                 {loading ? (
-                  <p>Loading…</p>
+                  <p className="cocktails-empty">Loading…</p>
                 ) : rows.length === 0 ? (
-                  <p className="cocktails-empty">No items for this organization.</p>
+                  <p className="cocktails-empty">No cocktails for this organization.</p>
                 ) : (
                   <div className="cocktails-list">
-                    {rows.map((row) => (
+                    {rows.map((cocktail) => (
                       <button
                         className="cocktails-row"
-                        key={row.variant.id}
+                        key={cocktail.id}
                         type="button"
-                        onClick={() => setSelectedVariantId(row.variant.id)}
+                        onClick={() => setSelectedCocktailId(cocktail.id)}
                       >
                         <div>
-                          <strong>{displayName(row)}</strong>
+                          <strong>{displayName(cocktail)}</strong>
                           <span>
-                            {group === 'House Cocktails' ? 'Price' : 'Upcharge'}
-                            {!row.organization.enabled ? ' · Not carried here' : ''}
-                            {row.organization.enabled && !row.organization.exportToToast
+                            {section.value === 'house' ? 'Price' : 'Upcharge'}
+                            {!cocktail.enabled ? ' · Not carried here' : ''}
+                            {cocktail.enabled && !cocktail.exportToToast
                               ? ' · Not exporting'
                               : ''}
                           </span>
                         </div>
-                        <strong>{formatMoney(row.effectivePriceCents)}</strong>
+                        <strong>{formatMoney(cocktail.priceCents)}</strong>
                       </button>
                     ))}
                   </div>
@@ -481,7 +514,7 @@ function CocktailsPage() {
           })}
         </section>
 
-        {selectedRow && editDraft ? (
+        {selectedCocktail && editDraft ? (
           <div
             className="cocktails-edit-backdrop"
             role="dialog"
@@ -489,7 +522,7 @@ function CocktailsPage() {
             aria-labelledby="cocktails-edit-title"
             onMouseDown={(event) => {
               if (event.currentTarget === event.target && !saving) {
-                setSelectedVariantId(null)
+                setSelectedCocktailId(null)
               }
             }}
           >
@@ -497,13 +530,14 @@ function CocktailsPage() {
               <header className="cocktails-edit-header">
                 <div>
                   <p className="inventory-kicker">Cocktail</p>
-                  <h2 id="cocktails-edit-title">{displayName(selectedRow)}</h2>
+                  <h2 id="cocktails-edit-title">{displayName(selectedCocktail)}</h2>
+                  <small>Master: {selectedCocktail.masterName}</small>
                 </div>
                 <button
                   type="button"
                   className="inventory-secondary-button"
                   disabled={saving}
-                  onClick={() => setSelectedVariantId(null)}
+                  onClick={() => setSelectedCocktailId(null)}
                 >
                   Close
                 </button>
@@ -513,16 +547,17 @@ function CocktailsPage() {
                 <label>
                   <span>Placement</span>
                   <select
-                    value={editDraft.group}
+                    value={editDraft.section}
                     disabled={saving}
                     onChange={(event) =>
                       setEditDraft((current) =>
                         current
                           ? {
                               ...current,
-                              group: event.target.value as CocktailGroup,
+                              section: event.target
+                                .value as InventoryCocktailSection,
                               happyHourPrice:
-                                event.target.value === 'House Cocktails'
+                                event.target.value === 'house'
                                   ? current.happyHourPrice
                                   : '',
                             }
@@ -530,17 +565,16 @@ function CocktailsPage() {
                       )
                     }
                   >
-                    <option value="House Cocktails">House Cocktails</option>
-                    {OFF_MENU_GROUPS.map((group) => (
-                      <option key={group} value={group}>
-                        {group}
+                    {SECTION_OPTIONS.map((section) => (
+                      <option key={section.value} value={section.value}>
+                        {section.label}
                       </option>
                     ))}
                   </select>
                 </label>
 
                 <label>
-                  <span>Cocktail name</span>
+                  <span>Toast name</span>
                   <input
                     value={editDraft.name}
                     disabled={saving}
@@ -554,56 +588,64 @@ function CocktailsPage() {
 
                 <label>
                   <span>
-                    {editDraft.group === 'House Cocktails'
+                    {editDraft.section === 'house'
                       ? 'Base price'
                       : 'Upcharge price'}
                   </span>
-                  <div className="cocktails-money-input">
-                    <span>$</span>
-                    <input
-                      inputMode="decimal"
-                      value={editDraft.price}
+                  <MoneyInput
+                    value={editDraft.price}
+                    disabled={saving}
+                    onChange={(value) =>
+                      setEditDraft((current) =>
+                        current ? { ...current, price: value } : current,
+                      )
+                    }
+                  />
+                </label>
+
+                {editDraft.section === 'house' ? (
+                  <label>
+                    <span>Happy Hour price</span>
+                    <MoneyInput
+                      value={editDraft.happyHourPrice}
                       disabled={saving}
-                      onChange={(event) =>
+                      placeholder="Optional"
+                      onChange={(value) =>
                         setEditDraft((current) =>
-                          current ? { ...current, price: event.target.value } : current,
+                          current
+                            ? { ...current, happyHourPrice: value }
+                            : current,
                         )
                       }
                     />
-                  </div>
-                </label>
-
-                {editDraft.group === 'House Cocktails' ? (
-                  <label>
-                    <span>Happy Hour price</span>
-                    <div className="cocktails-money-input">
-                      <span>$</span>
-                      <input
-                        inputMode="decimal"
-                        value={editDraft.happyHourPrice}
-                        disabled={saving}
-                        placeholder="Optional"
-                        onChange={(event) =>
-                          setEditDraft((current) =>
-                            current
-                              ? { ...current, happyHourPrice: event.target.value }
-                              : current,
-                          )
-                        }
-                      />
-                    </div>
                   </label>
                 ) : null}
+
+                <label className="cocktails-description-field">
+                  <span>Description</span>
+                  <textarea
+                    value={editDraft.description}
+                    disabled={saving}
+                    placeholder="Optional Toast menu description"
+                    onChange={(event) =>
+                      setEditDraft((current) =>
+                        current
+                          ? { ...current, description: event.target.value }
+                          : current,
+                      )
+                    }
+                  />
+                </label>
               </div>
 
               <div className="cocktails-edit-toggles">
                 <label>
                   <input
                     type="checkbox"
-                    checked={editAvailableHere}
+                    checked={editEnabled}
                     disabled={saving}
                     onChange={(event) => {
-                      setEditAvailableHere(event.target.checked)
+                      setEditEnabled(event.target.checked)
                       if (!event.target.checked) setEditExportToToast(false)
                     }}
                   />
@@ -613,7 +655,7 @@ function CocktailsPage() {
                   <input
                     type="checkbox"
                     checked={editExportToToast}
-                    disabled={saving || !editAvailableHere}
+                    disabled={saving || !editEnabled}
                     onChange={(event) => setEditExportToToast(event.target.checked)}
                   />
                   <span>Export to Toast</span>
@@ -629,11 +671,11 @@ function CocktailsPage() {
                     if (
                       window.confirm(
                         'Remove "' +
-                          displayName(selectedRow) +
-                          '" from this organization? The shared master item is kept.',
+                          displayName(selectedCocktail) +
+                          '" from this organization? The shared cocktail master is kept.',
                       )
                     ) {
-                      void removeSelectedCocktail()
+                      void removeSelected()
                     }
                   }}
                 >
@@ -645,7 +687,7 @@ function CocktailsPage() {
                     type="button"
                     className="inventory-secondary-button"
                     disabled={saving}
-                    onClick={() => setSelectedVariantId(null)}
+                    onClick={() => setSelectedCocktailId(null)}
                   >
                     Cancel
                   </button>
@@ -667,22 +709,33 @@ function CocktailsPage() {
   )
 }
 
-function getCocktailGroup(row: InventoryCatalogRow): CocktailGroup {
-  const rawGroup =
-    row.organization.toastCategoryOverride ??
-    row.category?.toastCategory ??
-    row.category?.name ??
-    ''
-
+function MoneyInput({
+  value,
+  disabled,
+  placeholder = '0.00',
+  onChange,
+}: {
+  value: string
+  disabled: boolean
+  placeholder?: string
+  onChange: (value: string) => void
+}) {
   return (
-    OFF_MENU_GROUPS.find(
-      (candidate) => candidate.toLowerCase() === rawGroup.trim().toLowerCase(),
-    ) ?? 'House Cocktails'
+    <div className="cocktails-money-input">
+      <span>$</span>
+      <input
+        inputMode="decimal"
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
   )
 }
 
-function displayName(row: InventoryCatalogRow) {
-  return row.organization.toastNameOverride?.trim() || row.name
+function displayName(cocktail: InventoryOrganizationCocktail) {
+  return cocktail.toastNameOverride?.trim() || cocktail.masterName
 }
 
 function formatMoney(cents: number | null) {
@@ -696,4 +749,8 @@ function moneyToCents(value: string, allowBlank = false) {
   const parsed = Number(cleaned)
   if (!Number.isFinite(parsed) || parsed < 0) return null
   return Math.round(parsed * 100)
+}
+
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
