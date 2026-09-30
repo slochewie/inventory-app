@@ -18,7 +18,7 @@ type MenuCategoryDefault = {
   toastDestination: string
 }
 
-const BUILT_IN_MENU_CATEGORIES = ['Beer', 'Cocktails', 'NA Bev'] as const
+const BUILT_IN_MENU_CATEGORIES = ['Beer', 'Wine', 'Cocktails', 'NA Bev'] as const
 
 const MENU_CATEGORY_DEFAULTS: readonly MenuCategoryDefault[] = [
   {
@@ -259,6 +259,7 @@ function withDefaultMenuCategories(
 export function getMenuCategoryDestination(value: string) {
   const key = normalizeMenuCategoryKey(value)
 
+  if (key === 'wine') return 'Wine'
   if (key === 'cocktail' || key === 'cocktails') return 'Cocktails'
   if (
     key === 'na bev' ||
