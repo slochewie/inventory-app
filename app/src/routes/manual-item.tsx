@@ -44,6 +44,15 @@ type ManualItemDraft = {
   exportToToast: boolean
 }
 
+type ManualMasterOption = {
+  id: string
+  name: string
+  normalizedName: string
+  categoryName: string
+  toastCategory: string
+  variantCount: number
+}
+
 const EMPTY_DRAFT: ManualItemDraft = {
   name: '',
   category: '',
@@ -78,6 +87,8 @@ function ManualItemPage() {
   const [draft, setDraft] = useState<ManualItemDraft>(EMPTY_DRAFT)
   const [catalogCategoryOptions, setCatalogCategoryOptions] = useState<string[]>([])
   const [destinationOptions, setDestinationOptions] = useState<string[]>([])
+  const [masterOptions, setMasterOptions] = useState<ManualMasterOption[]>([])
+  const [selectedMasterItemId, setSelectedMasterItemId] = useState<string | null>(null)
   const [menuCategories, setMenuCategories] = useState<InventoryMenuCategory[]>([])
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryConfig[]>([])
   const [organizationConfig, setOrganizationConfig] =
@@ -91,6 +102,8 @@ function ManualItemPage() {
     if (!activeOrganization?.id) {
       setCatalogCategoryOptions([])
       setDestinationOptions([])
+      setMasterOptions([])
+      setSelectedMasterItemId(null)
       setMenuCategories([])
       setOptionalBeerCategories([])
       setOrganizationConfig(null)
@@ -128,6 +141,8 @@ function ManualItemPage() {
     if (!activeOrganization?.id) {
       setCatalogCategoryOptions([])
       setDestinationOptions([])
+      setMasterOptions([])
+      setSelectedMasterItemId(null)
       setOptionalBeerCategories([])
       return
     }
@@ -143,6 +158,8 @@ function ManualItemPage() {
         const categories = new Set<string>()
         const destinations = new Set<string>()
 
+        const mastersById = new Map<string, ManualMasterOption>()
+
         catalog.items.forEach((row) => {
           const category =
             row.category?.name ??
@@ -152,8 +169,30 @@ function ManualItemPage() {
 
           const destination = row.organization.toastDestinationOverride
           if (destination?.trim()) destinations.add(destination.trim())
+
+          const existing = mastersById.get(row.id)
+          if (existing) {
+            existing.variantCount += 1
+          } else {
+            mastersById.set(row.id, {
+              id: row.id,
+              name: row.name,
+              normalizedName: row.normalizedName,
+              categoryName: row.category?.name?.trim() || 'Uncategorized',
+              toastCategory:
+                row.category?.toastCategory?.trim() ||
+                row.category?.name?.trim() ||
+                'Uncategorized',
+              variantCount: 1,
+            })
+          }
         })
 
+        setMasterOptions(
+          [...mastersById.values()].sort((left, right) =>
+            left.name.localeCompare(right.name),
+          ),
+        )
         setCatalogCategoryOptions([...categories].sort((left, right) => left.localeCompare(right)))
         setDestinationOptions([...destinations].sort((left, right) => left.localeCompare(right)))
         setOptionalBeerCategories(getOptionalBeerCategories(organizationConfig))
@@ -217,6 +256,8 @@ function ManualItemPage() {
   const isBeerItem = workbookCategory.toLowerCase() === 'beer'
   const showToastBeerSlot = isBeerItem && enabledOptionalBeerCategories.length > 0
   const exportToToast = draft.availableHere && draft.exportToToast
+  const selectedMaster =
+    masterOptions.find((option) => option.id === selectedMasterItemId) ?? null
 
   function updateDraft(patch: Partial<ManualItemDraft>) {
     setDraft((current) => ({ ...current, ...patch }))
@@ -272,13 +313,42 @@ function ManualItemPage() {
     setSuccess(null)
 
     try {
-      // The Better Auth inventory plugin currently persists catalog additions
-      // through imported source types. Use a unique manual source id so this
-      // behaves like a first-class catalog item without colliding with POS rows.
+      if (selectedMaster) {
+        const variantId = await addInventoryOrganizationVariant({
+          organizationId: activeOrganization.id,
+          itemId: selectedMaster.id,
+          toastCategory: workbookCategory,
+          toastDestination,
+          toastSlot,
+        })
+
+        await updateInventoryOrganizationVariant({
+          organizationId: activeOrganization.id,
+          variantId,
+          enabled: draft.availableHere,
+          exportToToast,
+          priceOverrideCents: basePrice.value,
+          happyHourPriceCents: happyHourPrice.value,
+          toastCategoryOverride: workbookCategory,
+          toastDestinationOverride: toastDestination || null,
+          toastSlot,
+        })
+
+        setDraft(EMPTY_DRAFT)
+        setSelectedMasterItemId(null)
+        setSuccess(
+          `Added existing master item ${selectedMaster.name} to ${activeOrganization.name ?? 'this organization'}.`,
+        )
+        return
+      }
+
+      // Explicitly create a new master item only when the user did not select
+      // an existing master from the name suggestions.
       await persistInventoryImport({
         organizationId: activeOrganization.id,
         sourceType: 'aloha-csv',
         sourceName: `Manual Entry - ${name}`,
+        reconciliationMode: 'explicit',
         items: [
           {
             id: sourceId,
@@ -291,6 +361,7 @@ function ManualItemPage() {
             happyHourPriceCents: happyHourPrice.value,
             status: basePrice.value === null ? 'review' : 'ready',
             exportIncluded: exportToToast,
+            createNewMaster: true,
           },
         ],
       })
@@ -325,6 +396,7 @@ function ManualItemPage() {
       }
 
       setDraft(EMPTY_DRAFT)
+      setSelectedMasterItemId(null)
       setSuccess(
         createdRow
           ? `Added ${name} to ${activeOrganization.name ?? 'this organization'}.`
@@ -378,16 +450,33 @@ function ManualItemPage() {
 
           <form className="inventory-manual-item-form" onSubmit={(event) => void submitManualItem(event)}>
             <div className="inventory-catalog-price-grid">
-              <label className="inventory-search-control">
-                <span>Item name</span>
-                <input
-                  value={draft.name}
-                  disabled={saving}
-                  onChange={(event) => updateDraft({ name: event.target.value })}
-                  placeholder="Guinness 0.0"
-                  required
-                />
-              </label>
+              <MasterNameCombobox
+                value={draft.name}
+                options={masterOptions}
+                selectedMasterItemId={selectedMasterItemId}
+                disabled={saving}
+                placeholder="Guinness 0.0"
+                onChange={(value) => {
+                  setSelectedMasterItemId(null)
+                  updateDraft({ name: value })
+                }}
+                onSelect={(option) => {
+                  setSelectedMasterItemId(option.id)
+                  setDraft((current) => ({
+                    ...current,
+                    name: option.name,
+                    category:
+                      current.category.trim() ||
+                      option.categoryName ||
+                      option.toastCategory,
+                  }))
+                  setSuccess(null)
+                }}
+                onCreateNew={() => {
+                  setSelectedMasterItemId(null)
+                  setSuccess(null)
+                }}
+              />
 
               <ManualCombobox
                 label="Menu Category"
@@ -478,6 +567,7 @@ function ManualItemPage() {
                   disabled={saving}
                   onClick={() => {
                     setDraft(EMPTY_DRAFT)
+                    setSelectedMasterItemId(null)
                     setError(null)
                     setSuccess(null)
                   }}
@@ -493,6 +583,192 @@ function ManualItemPage() {
         </section>
       </section>
     </AuthenticatedInventoryShell>
+  )
+}
+
+type MasterNameComboboxProps = {
+  value: string
+  options: ManualMasterOption[]
+  selectedMasterItemId: string | null
+  placeholder?: string
+  disabled?: boolean
+  onChange: (value: string) => void
+  onSelect: (option: ManualMasterOption) => void
+  onCreateNew: () => void
+}
+
+function MasterNameCombobox({
+  value,
+  options,
+  selectedMasterItemId,
+  placeholder,
+  disabled = false,
+  onChange,
+  onSelect,
+  onCreateNew,
+}: MasterNameComboboxProps) {
+  const wrapperRef = useRef<HTMLLabelElement>(null)
+  const [open, setOpen] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
+  const normalizedQuery = value.trim().toLowerCase()
+
+  const matches = useMemo(() => {
+    if (normalizedQuery.length < 2 || selectedMasterItemId) return []
+
+    return options
+      .filter((option) =>
+        option.name.toLowerCase().includes(normalizedQuery) ||
+        option.normalizedName.includes(normalizedQuery),
+      )
+      .sort((left, right) => {
+        const leftPrefix = left.name.toLowerCase().startsWith(normalizedQuery)
+        const rightPrefix = right.name.toLowerCase().startsWith(normalizedQuery)
+        if (leftPrefix !== rightPrefix) return leftPrefix ? -1 : 1
+        return left.name.localeCompare(right.name)
+      })
+      .slice(0, 8)
+  }, [normalizedQuery, options, selectedMasterItemId])
+
+  const optionCount = matches.length + (normalizedQuery.length >= 2 ? 1 : 0)
+
+  useEffect(() => {
+    if (!open) return
+
+    function closeOnOutsidePointerDown(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !wrapperRef.current?.contains(event.target)
+      ) {
+        setOpen(false)
+      }
+    }
+
+    function closeOnEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown)
+    document.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [open])
+
+  useEffect(() => {
+    setHighlightedIndex(0)
+  }, [normalizedQuery])
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (!open || optionCount === 0) return
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setHighlightedIndex((current) => (current + 1) % optionCount)
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setHighlightedIndex((current) =>
+        current <= 0 ? optionCount - 1 : current - 1,
+      )
+    } else if (event.key === 'Enter') {
+      event.preventDefault()
+      if (highlightedIndex < matches.length) {
+        onSelect(matches[highlightedIndex])
+      } else {
+        onCreateNew()
+      }
+      setOpen(false)
+    }
+  }
+
+  return (
+    <label
+      ref={wrapperRef}
+      className="inventory-search-control inventory-master-name-combobox"
+    >
+      <span>Item name</span>
+      <input
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        autoComplete="off"
+        required
+        onFocus={() => {
+          if (normalizedQuery.length >= 2 && !selectedMasterItemId) setOpen(true)
+        }}
+        onKeyDown={handleKeyDown}
+        onChange={(event) => {
+          onChange(event.target.value)
+          setOpen(event.target.value.trim().length >= 2)
+        }}
+      />
+
+      {selectedMasterItemId ? (
+        <span className="inventory-master-name-selected">
+          Using existing master item
+        </span>
+      ) : null}
+
+      {open && normalizedQuery.length >= 2 ? (
+        <div className="inventory-master-name-list" role="listbox">
+          {matches.length > 0 ? (
+            <>
+              <div className="inventory-master-name-list-heading">
+                Existing master items
+              </div>
+              {matches.map((option, index) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="option"
+                  aria-selected={highlightedIndex === index}
+                  className={
+                    highlightedIndex === index
+                      ? 'inventory-master-name-option is-active'
+                      : 'inventory-master-name-option'
+                  }
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                  onClick={() => {
+                    onSelect(option)
+                    setOpen(false)
+                  }}
+                >
+                  <strong>{option.name}</strong>
+                  <span>
+                    {option.categoryName} · {option.variantCount} variant
+                    {option.variantCount === 1 ? '' : 's'}
+                  </span>
+                </button>
+              ))}
+            </>
+          ) : (
+            <div className="inventory-master-name-empty">
+              No matching master items
+            </div>
+          )}
+
+          <button
+            type="button"
+            className={
+              highlightedIndex === matches.length
+                ? 'inventory-master-name-create is-active'
+                : 'inventory-master-name-create'
+            }
+            onMouseDown={(event) => event.preventDefault()}
+            onMouseEnter={() => setHighlightedIndex(matches.length)}
+            onClick={() => {
+              onCreateNew()
+              setOpen(false)
+            }}
+          >
+            <strong>Create new master item</strong>
+            <span>Use “{value.trim()}” as a new shared master name</span>
+          </button>
+        </div>
+      ) : null}
+    </label>
   )
 }
 
