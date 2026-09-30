@@ -12,15 +12,20 @@ import {
   AuthenticatedInventoryShell,
   useInventoryAccessRole,
 } from '#/components/authenticated-inventory-shell'
-import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
+import {
+  catalogRowToNormalizedItem,
+  organizationCocktailToNormalizedItem,
+} from '#/features/menu-import/catalog'
 import { authClient } from '#/lib/auth-client'
 import {
   addInventoryOrganizationVariant,
   getInventoryOrganizationConfig,
   getOptionalBeerCategories,
   listInventoryCatalog,
+  listInventoryCocktails,
   persistInventoryImport,
   type InventoryCatalogRow,
+  type InventoryOrganizationCocktail,
   type InventoryOrganizationConfig,
 } from '#/lib/inventory-access'
 import { normalizeAlohaMenuItems, parseAlohaMenuCsv } from '#/features/menu-import/aloha'
@@ -204,6 +209,9 @@ function ToastWorkbook() {
   const [importingReviewedItems, setImportingReviewedItems] = useState(false)
   const [importReviewedError, setImportReviewedError] = useState<string | null>(null)
   const [masterCatalog, setMasterCatalog] = useState<InventoryCatalogRow[]>([])
+  const [organizationCocktails, setOrganizationCocktails] = useState<
+    InventoryOrganizationCocktail[]
+  >([])
   const [reconciliationActive, setReconciliationActive] = useState(false)
   const [reconciliationScopeIds, setReconciliationScopeIds] = useState<Set<string> | null>(null)
   const [reconciliationDecisions, setReconciliationDecisions] = useState<
@@ -214,17 +222,34 @@ function ToastWorkbook() {
   const [reconciliationQuery, setReconciliationQuery] = useState('')
 
   const summary = useMemo(() => summarizeMenuItems(items), [items])
-  const catalogExportItems = useMemo(
+  const cocktailExportItems = useMemo(
     () =>
-      masterCatalog
-        .map(catalogRowToNormalizedItem)
-        .filter((item) =>
-          isOrganizationCatalogExportItemEnabled(
-            item,
-            organizationConfig,
-          ),
+      organizationCocktails
+        .map(organizationCocktailToNormalizedItem)
+        .filter((item) => item.exportIncluded),
+    [organizationCocktails],
+  )
+  const catalogExportItems = useMemo(() => {
+    const dedicatedCocktailNames = new Set(
+      cocktailExportItems.map((item) => normalizeMasterName(item.name)),
+    )
+
+    return masterCatalog
+      .map(catalogRowToNormalizedItem)
+      .filter((item) =>
+        isOrganizationCatalogExportItemEnabled(
+          item,
+          organizationConfig,
         ),
-    [masterCatalog, organizationConfig],
+      )
+      .filter((item) => {
+        if (!isCocktailItem(item)) return true
+        return !dedicatedCocktailNames.has(normalizeMasterName(item.name))
+      })
+  }, [masterCatalog, organizationConfig, cocktailExportItems])
+  const toastExportItems = useMemo(
+    () => [...catalogExportItems, ...cocktailExportItems],
+    [catalogExportItems, cocktailExportItems],
   )
   const beerExportItemCount = items.filter(
     (item) => item.exportIncluded && getToastWorkbookCategory(item) === 'Beer',
@@ -336,6 +361,7 @@ function ToastWorkbook() {
       setOrganizationConfig(null)
       setImportFile(null)
       setItems([])
+      setOrganizationCocktails([])
       setReviewSource(null)
       setReviewSavedAt(null)
       return
@@ -388,11 +414,13 @@ function ToastWorkbook() {
 
     void Promise.all([
       listInventoryCatalog(organizationId, controller.signal),
+      listInventoryCocktails(organizationId, controller.signal),
       getInventoryOrganizationConfig(organizationId, controller.signal),
     ])
-      .then(([catalog, config]) => {
+      .then(([catalog, cocktails, config]) => {
         setOrganizationConfig(config)
         setMasterCatalog(catalog.items)
+        setOrganizationCocktails(cocktails.cocktails)
 
         if (savedReviewSession?.items.length) {
           const mappedItems = applyOrganizationBeerDraftImportMappings(
@@ -514,14 +542,16 @@ function ToastWorkbook() {
     setCatalogLoading(true)
 
     try {
-      const [catalog, config] = await Promise.all([
+      const [catalog, cocktails, config] = await Promise.all([
         listInventoryCatalog(activeOrganization.id),
+        listInventoryCocktails(activeOrganization.id),
         getInventoryOrganizationConfig(activeOrganization.id),
       ])
       const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
 
       setOrganizationConfig(config)
       setMasterCatalog(catalog.items)
+      setOrganizationCocktails(cocktails.cocktails)
       setImportFile({
         sourceKind: 'toast-template-sheet',
         sourceName: 'Persistent Inventory catalog',
@@ -1007,7 +1037,7 @@ function ToastWorkbook() {
     if (!workbook) throw new Error('Toast source template is not loaded')
 
     const happyHourEnabled = organizationConfig?.happyHourEnabled === true
-    const exportItems = catalogExportItems
+    const exportItems = toastExportItems
     if (exportItems.length === 0) {
       throw new Error('The persistent Inventory catalog has no rows to export')
     }
@@ -1868,7 +1898,7 @@ function ToastWorkbook() {
             <button
               className="inventory-template-download"
               type="button"
-              disabled={!workbook || catalogExportItems.length === 0}
+              disabled={!workbook || toastExportItems.length === 0}
               onClick={handleDownloadWorkbook}
             >
               Download populated XLSX
@@ -1877,7 +1907,7 @@ function ToastWorkbook() {
             <button
               className="inventory-template-download"
               type="button"
-              disabled={!workbook || catalogExportItems.length === 0}
+              disabled={!workbook || toastExportItems.length === 0}
               onClick={handleDownloadWorkbookZip}
             >
               Download ZIP for Toast
@@ -3318,6 +3348,14 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
       <span>{label}</span>
       <strong>{value.toLocaleString()}</strong>
     </article>
+  )
+}
+
+function isCocktailItem(item: NormalizedMenuItem) {
+  return (
+    /cocktail/i.test(item.category ?? '') ||
+    /cocktail/i.test(item.toastCategory) ||
+    /cocktail/i.test(item.toastDestination)
   )
 }
 
