@@ -56,9 +56,11 @@ export function getInventoryVariantLabel(variant: {
   name: string | null
 }) {
   if (variant.kind === 'draft') {
-    return variant.sizeOz !== null
-      ? `${variant.sizeOz}oz Draft`
-      : 'Draft'
+    if (variant.sizeOz !== null) {
+      return `${variant.sizeOz}oz Draft`
+    }
+
+    return variant.name?.trim() || 'Draft'
   }
 
   if (variant.kind === 'can') {
