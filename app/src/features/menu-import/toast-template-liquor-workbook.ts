@@ -134,6 +134,21 @@ type SimpleSheetMapping = {
   happyHourCol: number | null
 }
 
+type OffMenuCocktailSlot = {
+  label: string
+  kind: string
+  nameCol: number
+  priceCol: number
+}
+
+const OFF_MENU_COCKTAIL_SLOTS: readonly OffMenuCocktailSlot[] = [
+  { label: 'Vodka Cocktails', kind: 'vodka', nameCol: 7, priceCol: 8 },
+  { label: 'Gin Cocktails', kind: 'gin', nameCol: 10, priceCol: 11 },
+  { label: 'Rum Cocktails', kind: 'rum', nameCol: 13, priceCol: 14 },
+  { label: 'Tequila Cocktails', kind: 'tequila', nameCol: 16, priceCol: 17 },
+  { label: 'Whiskey/Bourbon Cocktails', kind: 'whiskey-bourbon', nameCol: 19, priceCol: 20 },
+]
+
 export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   templateArrayBuffer,
   items,
@@ -728,11 +743,13 @@ function populateCocktailsSheet(
   items: NormalizedMenuItem[],
   happyHourEnabled: boolean,
 ) {
-  const rows = getCocktailRows(items, happyHourEnabled)
-  if (rows.length === 0) return
+  const houseRows = getHouseCocktailRows(items, happyHourEnabled)
+  const offMenuRows = getOffMenuCocktailRows(items)
+  if (houseRows.length === 0 && offMenuRows.length === 0) return
 
   const mapping = getSimpleSheetMapping(workbookPackage, 'Cocktails')
-  writeSimpleMenuRows(workbookPackage, mapping, rows)
+  writeSimpleMenuRows(workbookPackage, mapping, houseRows)
+  writeOffMenuCocktailRows(workbookPackage, mapping, offMenuRows)
 }
 
 function populateNaBevSheet(
@@ -770,7 +787,7 @@ function populateOpenItemsSheet(
   writeSimpleMenuRows(workbookPackage, mapping, rows)
 }
 
-function getCocktailRows(
+function getHouseCocktailRows(
   items: NormalizedMenuItem[],
   happyHourEnabled: boolean,
 ): SimpleMenuRow[] {
@@ -782,7 +799,8 @@ function getCocktailRows(
         (
           /cocktail/i.test(clean(item.toastDestination)) ||
           /cocktail/i.test(clean(item.toastCategory))
-        ),
+        ) &&
+        getOffMenuCocktailKind(item) === null,
     )
     .map((item) => ({
       itemName: clean(item.name),
@@ -792,12 +810,80 @@ function getCocktailRows(
           ? item.happyHourPriceCents / 100
           : null,
       description: clean(item.rawRows[0]?.description),
-      menuGroup: getSimpleMenuGroup(item, 'Cocktails'),
+      menuGroup: 'House Cocktails',
     }))
     .filter((row) => row.itemName)
     .sort((left, right) => left.itemName.localeCompare(right.itemName))
 }
 
+function getOffMenuCocktailRows(items: NormalizedMenuItem[]) {
+  return items
+    .filter(
+      (item) =>
+        item.exportIncluded &&
+        item.basePriceCents !== null &&
+        getOffMenuCocktailKind(item) !== null,
+    )
+    .map((item) => ({
+      itemName: clean(item.name),
+      basePrice: item.basePriceCents! / 100,
+      kind: getOffMenuCocktailKind(item)!,
+    }))
+    .filter((row) => row.itemName)
+    .sort((left, right) => left.itemName.localeCompare(right.itemName))
+}
+
+function getOffMenuCocktailKind(item: NormalizedMenuItem) {
+  const values = [
+    clean(item.toastCategory),
+    clean(item.category),
+    clean(item.toastDestination),
+    clean(item.variantLabel ?? ''),
+  ]
+    .map((value) => value.toLowerCase().replace(/&/g, '/'))
+    .join(' | ')
+
+  if (/vodka\s+cocktails?/.test(values)) return 'vodka'
+  if (/gin\s+cocktails?/.test(values)) return 'gin'
+  if (/rum\s+cocktails?/.test(values)) return 'rum'
+  if (/tequila\s+cocktails?/.test(values)) return 'tequila'
+  if (/(?:whiskey|bourbon|whiskey\/bourbon)\s+cocktails?/.test(values)) {
+    return 'whiskey-bourbon'
+  }
+
+  return null
+}
+
+function writeOffMenuCocktailRows(
+  workbookPackage: WorkbookPackage,
+  mapping: SimpleSheetMapping,
+  rows: Array<{ itemName: string; basePrice: number; kind: string }>,
+) {
+  const sheetDoc = parseXml(
+    getTextFile(workbookPackage.files, mapping.sheetPath),
+  )
+  const dataStartRow = mapping.dataStartRow
+  const clearToRow = Math.max(mapping.lastTemplateRow, dataStartRow + 60)
+
+  clearCells(
+    sheetDoc,
+    OFF_MENU_COCKTAIL_SLOTS.flatMap((slot) => [slot.nameCol, slot.priceCol]),
+    dataStartRow,
+    clearToRow,
+  )
+
+  OFF_MENU_COCKTAIL_SLOTS.forEach((slot) => {
+    rows
+      .filter((row) => row.kind === slot.kind)
+      .forEach((row, index) => {
+        const rowNumber = dataStartRow + index
+        writeCellValue(sheetDoc, slot.nameCol, rowNumber, row.itemName, dataStartRow)
+        writeCellValue(sheetDoc, slot.priceCol, rowNumber, row.basePrice, dataStartRow)
+      })
+  })
+
+  workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
+}
 function getNaBevRows(items: NormalizedMenuItem[]): SimpleMenuRow[] {
   return getSimpleCategoryRows(items, 'NA Bev')
 }
@@ -1084,14 +1170,42 @@ function validateCocktailsSheet(
   happyHourEnabled: boolean,
   issues: string[],
 ) {
-  const rows = getCocktailRows(items, happyHourEnabled)
-  if (rows.length === 0) return 0
+  const houseRows = getHouseCocktailRows(items, happyHourEnabled)
+  const offMenuRows = getOffMenuCocktailRows(items)
+  if (houseRows.length === 0 && offMenuRows.length === 0) return 0
 
   const mapping = getSimpleSheetMapping(workbookPackage, 'Cocktails')
-  validateSimpleMenuRows(workbookPackage, mapping, rows, issues)
-  return rows.length
-}
+  validateSimpleMenuRows(workbookPackage, mapping, houseRows, issues)
 
+  const sheetDoc = parseXml(getTextFile(workbookPackage.files, mapping.sheetPath))
+  OFF_MENU_COCKTAIL_SLOTS.forEach((slot) => {
+    offMenuRows
+      .filter((row) => row.kind === slot.kind)
+      .forEach((row, index) => {
+        const rowNumber = mapping.dataStartRow + index
+        validateLiquorCell(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          slot.nameCol,
+          rowNumber,
+          row.itemName,
+          row.itemName + ' ' + slot.label + ' name',
+        )
+        validateLiquorCell(
+          issues,
+          sheetDoc,
+          workbookPackage.sharedStrings,
+          slot.priceCol,
+          rowNumber,
+          row.basePrice,
+          row.itemName + ' ' + slot.label + ' upcharge',
+        )
+      })
+  })
+
+  return houseRows.length + offMenuRows.length
+}
 function validateNaBevSheet(
   workbookPackage: WorkbookPackage,
   items: NormalizedMenuItem[],
