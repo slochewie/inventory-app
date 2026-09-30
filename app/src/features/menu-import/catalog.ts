@@ -60,7 +60,9 @@ export function getInventoryVariantLabel(variant: {
       return `${variant.sizeOz}oz Draft`
     }
 
-    return variant.name?.trim() || 'Draft'
+    const draftName = variant.name?.trim()
+    if (/^pitcher$/i.test(draftName ?? '')) return 'Pitcher'
+    return draftName || 'Draft'
   }
 
   if (variant.kind === 'can') {
