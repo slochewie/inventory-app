@@ -1632,6 +1632,18 @@ function ToastWorkbook() {
                           scopedItems,
                         )
                       }
+                      onAcceptExactSuggestions={(suggestions) => {
+                        setReconciliationDecisions((current) => {
+                          const next = { ...current }
+                          suggestions.forEach(({ itemId, variantId }) => {
+                            next[itemId] = {
+                              kind: 'existing',
+                              variantId,
+                            }
+                          })
+                          return next
+                        })
+                      }}
                       onCancel={() => {
                         setReconciliationActive(false)
                         setReconciliationScopeIds(null)
@@ -1848,6 +1860,7 @@ function StagedReconciliationPanel({
   onQueryChange,
   onReview,
   onApplyMaster,
+  onAcceptExactSuggestions,
   onCancel,
   onImport,
   importing,
@@ -1861,6 +1874,9 @@ function StagedReconciliationPanel({
   onApplyMaster: (
     masterItemId: string,
     scopedItems: NormalizedMenuItem[],
+  ) => void
+  onAcceptExactSuggestions: (
+    suggestions: Array<{ itemId: string; variantId: string }>,
   ) => void
   onCancel: () => void
   onImport: () => void
@@ -1890,6 +1906,22 @@ function StagedReconciliationPanel({
             normalizeMasterName(candidate.name) === normalizedNames[0],
         ) ?? null
       : null
+  const exactSuggestions = items.flatMap((item) => {
+    if (decisions[item.id]) return []
+
+    const suggested = findMasterCandidates(item, catalog)[0] ?? null
+    if (
+      !suggested ||
+      normalizeMasterName(suggested.name) !== normalizeMasterName(item.name)
+    ) {
+      return []
+    }
+
+    return [{
+      itemId: item.id,
+      variantId: suggested.variant.id,
+    }]
+  })
   const [groupMasterItemId, setGroupMasterItemId] = useState(
     exactMaster?.id ?? '',
   )
@@ -1910,6 +1942,28 @@ function StagedReconciliationPanel({
             <span><strong>{newCount}</strong> new masters</span>
           ) : null}
         </div>
+
+        {exactSuggestions.length > 0 ? (
+          <div className="inventory-reconciliation-master-picker">
+            <div>
+              <strong>Exact suggested matches</strong>
+              <span>
+                These staged rows have the same normalized item name and a
+                compatible existing master variant.
+              </span>
+            </div>
+            <div className="inventory-reconciliation-master-controls">
+              <button
+                type="button"
+                className="inventory-primary-button"
+                disabled={importing}
+                onClick={() => onAcceptExactSuggestions(exactSuggestions)}
+              >
+                Accept {exactSuggestions.length} exact suggestion{exactSuggestions.length === 1 ? '' : 's'}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="inventory-reconciliation-master-picker">
           <div>
@@ -1975,6 +2029,10 @@ function StagedReconciliationPanel({
                     )
                   : null
               const suggested = findMasterCandidates(item, catalog)[0] ?? null
+              const exactSuggested =
+                suggested &&
+                normalizeMasterName(suggested.name) ===
+                  normalizeMasterName(item.name)
 
               return (
                 <tr key={item.id}>
@@ -2001,13 +2059,28 @@ function StagedReconciliationPanel({
                       : 'No close match'}
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="inventory-row-action"
-                      onClick={() => onReview(item.id)}
-                    >
-                      {decision ? 'Change' : 'Review'}
-                    </button>
+                    {!decision && exactSuggested ? (
+                      <button
+                        type="button"
+                        className="inventory-row-action"
+                        onClick={() =>
+                          onAcceptExactSuggestions([{
+                            itemId: item.id,
+                            variantId: suggested.variant.id,
+                          }])
+                        }
+                      >
+                        Accept
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="inventory-row-action"
+                        onClick={() => onReview(item.id)}
+                      >
+                        {decision ? 'Change' : 'Review'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               )
