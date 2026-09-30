@@ -1,0 +1,131 @@
+.cocktails-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.cocktails-editor,
+.cocktails-group-card {
+  overflow: hidden;
+}
+
+.cocktails-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.cocktails-form label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.cocktails-form label > span {
+  color: var(--inventory-muted, #667085);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cocktails-form input,
+.cocktails-form select {
+  min-width: 0;
+  width: 100%;
+  min-height: 2.9rem;
+  border: 1px solid var(--inventory-border, #d0d5dd);
+  border-radius: 0.7rem;
+  background: #fff;
+  padding: 0 0.85rem;
+  font: inherit;
+}
+
+.cocktails-money-input {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  min-height: 2.9rem;
+  border: 1px solid var(--inventory-border, #d0d5dd);
+  border-radius: 0.7rem;
+  overflow: hidden;
+  background: #fff;
+}
+
+.cocktails-money-input > span {
+  padding-left: 0.85rem;
+  color: #667085;
+  font-weight: 700;
+}
+
+.cocktails-money-input input {
+  border: 0;
+  border-radius: 0;
+  min-height: 2.8rem;
+}
+
+.cocktails-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.cocktails-groups {
+  display: grid;
+  gap: 1rem;
+}
+
+.cocktails-group-card .inventory-table-heading > strong {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.3rem;
+  min-height: 2.3rem;
+  border-radius: 999px;
+  background: #f2f4f7;
+}
+
+.cocktails-list {
+  display: grid;
+}
+
+.cocktails-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.25rem;
+  border-top: 1px solid var(--inventory-border, #eaecf0);
+}
+
+.cocktails-row > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.cocktails-row span,
+.cocktails-empty {
+  color: #667085;
+}
+
+.cocktails-empty {
+  margin: 0;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+@media (max-width: 720px) {
+  .cocktails-form {
+    grid-template-columns: 1fr;
+  }
+
+  .cocktails-form-actions {
+    grid-column: auto;
+  }
+
+  .cocktails-form-actions > * {
+    flex: 1;
+  }
+
+  .cocktails-row {
+    align-items: flex-start;
+  }
+}
