@@ -25,6 +25,7 @@ import {
   parseToastWorkbookForReview,
   TOAST_WORKBOOK_STAGING_PARSER_VERSION,
 } from '#/features/menu-import/toast-workbook-import'
+import { getBuiltInToastDestinations } from '#/features/menu-import/toast-destination'
 import { getToastWorkbookCategory } from '#/features/menu-import/workbook-routing'
 import {
   buildPopulatedToastTemplateWorkbookWithLiquorAsync,
@@ -38,6 +39,11 @@ import {
   type ToastDraftSlotMapping,
   type ToastTemplateWorkbookInfo,
 } from '#/features/menu-import/toast-template-workbook'
+import {
+  getBuiltInMenuCategories,
+  listSavedMenuCategories,
+  mergeCategoryOptions,
+} from '#/lib/menu-categories'
 import {
   formatCurrency,
   summarizeMenuItems,
@@ -1276,6 +1282,8 @@ function ToastWorkbook() {
                 {selectedStagedItem ? (
                   <StagedItemDrawer
                     item={selectedStagedItem}
+                    organizationId={activeOrganization?.id ?? ''}
+                    organizationConfig={organizationConfig}
                     onClose={() => setSelectedStagedItemId(null)}
                     onUpdate={(patch) => {
                       updateStagedItem(selectedStagedItem.id, patch)
@@ -1764,17 +1772,49 @@ function formatMasterVariant(item: InventoryCatalogRow) {
 
 function StagedItemDrawer({
   item,
+  organizationId,
+  organizationConfig,
   onClose,
   onUpdate,
   onIgnore,
 }: {
   item: NormalizedMenuItem
+  organizationId: string
+  organizationConfig: InventoryOrganizationConfig | null
   onClose: () => void
   onUpdate: (patch: Partial<NormalizedMenuItem>) => void
   onIgnore: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [draft, setDraft] = useState(() => ({ ...item }))
+  const savedMenuCategories = organizationId
+    ? listSavedMenuCategories(organizationId)
+    : []
+  const menuCategoryOptions = mergeCategoryOptions(
+    getBuiltInMenuCategories(),
+    mergeCategoryOptions(
+      [...LIQUOR_CATEGORIES].map((category) => formatLiquorCategoryLabel(category)),
+      savedMenuCategories.map((category) => category.name),
+    ),
+  )
+  const normalizedDraftCategory = normalizeStagedMenuCategory(
+    draft.category || draft.toastCategory,
+  )
+  const beerDestinationOptions = getStagedBeerDestinationOptions(
+    organizationConfig,
+  )
+  const nonBeerDestinationOptions = mergeCategoryOptions(
+    getBuiltInToastDestinations().filter(
+      (destination) => !destination.toLowerCase().startsWith('beer tab'),
+    ),
+    savedMenuCategories
+      .map((category) => category.toastDestination)
+      .filter(Boolean),
+  )
+  const destinationOptions =
+    normalizedDraftCategory.toLowerCase() === 'beer'
+      ? beerDestinationOptions.map((option) => option.value)
+      : nonBeerDestinationOptions
 
   useEffect(() => {
     setDraft({ ...item })
@@ -1795,6 +1835,7 @@ function StagedItemDrawer({
     draft.category !== item.category ||
     draft.toastCategory !== item.toastCategory ||
     draft.toastDestination !== item.toastDestination ||
+    draft.toastSlot !== item.toastSlot ||
     draft.basePriceCents !== item.basePriceCents ||
     draft.exportIncluded !== item.exportIncluded
 
@@ -1879,31 +1920,58 @@ function StagedItemDrawer({
 
         <label className="inventory-search-control">
           <span>Menu Category</span>
-          <input
-            type="text"
-            value={draft.category || draft.toastCategory}
-            onChange={(event) =>
+          <select
+            value={normalizedDraftCategory}
+            onChange={(event) => {
+              const category = event.target.value
+              const isBeer = category.toLowerCase() === 'beer'
               setDraft((current) => ({
                 ...current,
-                category: event.target.value,
-                toastCategory: event.target.value,
+                category,
+                toastCategory: category,
+                toastDestination: isBeer ? '' : category,
+                toastSlot: null,
               }))
-            }
-          />
+            }}
+          >
+            {menuCategoryOptions.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label className="inventory-search-control">
           <span>Toast destination</span>
-          <input
-            type="text"
-            value={draft.toastDestination}
-            onChange={(event) =>
+          <select
+            value={getStagedDestinationSelectValue(
+              draft,
+              beerDestinationOptions,
+            )}
+            onChange={(event) => {
+              const value = event.target.value
+              const beerOption = beerDestinationOptions.find(
+                (option) => option.value === value,
+              )
+
               setDraft((current) => ({
                 ...current,
-                toastDestination: event.target.value,
+                toastDestination: value,
+                toastSlot: beerOption?.toastSlot ?? null,
               }))
-            }
-          />
+            }}
+          >
+            <option value="">Choose destination…</option>
+            {destinationOptions.map((destination) => (
+              <option key={destination} value={destination}>
+                {formatStagedDestinationLabel(
+                  destination,
+                  beerDestinationOptions,
+                )}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label className="inventory-search-control">
@@ -1973,6 +2041,7 @@ function StagedItemDrawer({
               category: draft.category,
               toastCategory: draft.toastCategory,
               toastDestination: draft.toastDestination,
+              toastSlot: draft.toastSlot ?? null,
               basePriceCents: draft.basePriceCents,
               exportIncluded: draft.exportIncluded,
               exportToToast: draft.exportIncluded,
@@ -1984,6 +2053,126 @@ function StagedItemDrawer({
       </div>
     </dialog>
   )
+}
+
+type StagedBeerDestinationOption = {
+  value: string
+  label: string
+  toastSlot: string | null
+}
+
+function normalizeStagedMenuCategory(value: string) {
+  const normalized = clean(value)
+  if (/^beer(?:\s*\/|$)/i.test(normalized)) return 'Beer'
+  if (/^cocktails?$/i.test(normalized)) return 'Cocktails'
+  if (/^na\s+bev/i.test(normalized)) return 'NA Bev'
+  return normalized || 'Beer'
+}
+
+function formatLiquorCategoryLabel(value: string) {
+  const labels: Record<string, string> = {
+    'BRANDY/COGNAC': 'Brandy/Cognac',
+    GIN: 'Gin',
+    LIQUEURS: 'Liqueurs',
+    RUM: 'Rum',
+    SCOTCH: 'Scotch',
+    TEQUILA: 'Tequila',
+    VODKA: 'Vodka',
+    'WHISKEY/BOURBON': 'Whiskey/Bourbon',
+  }
+  return labels[value] ?? value
+}
+
+function getStagedBeerDestinationOptions(
+  config: InventoryOrganizationConfig | null,
+): StagedBeerDestinationOption[] {
+  if (!config) return []
+
+  const options: StagedBeerDestinationOption[] = []
+
+  if (config.draft8Enabled) {
+    options.push({
+      value: 'Beer tab · Draft Beer 8oz',
+      label: '8oz Draft',
+      toastSlot: null,
+    })
+  }
+  if (config.draft16Enabled) {
+    options.push({
+      value: 'Beer tab · Draft Beer 16oz',
+      label: '16oz Draft',
+      toastSlot: null,
+    })
+  }
+  if (config.draft24Enabled) {
+    options.push({
+      value: 'Beer tab · Draft Beer 24oz',
+      label: '24oz Draft',
+      toastSlot: null,
+    })
+  }
+  if (config.pitcherEnabled) {
+    options.push({
+      value: 'Beer tab · Pitcher',
+      label: 'Pitcher',
+      toastSlot: null,
+    })
+  }
+  if (config.canEnabled) {
+    options.push({
+      value: 'Beer tab · Can',
+      label: 'Can',
+      toastSlot: null,
+    })
+  }
+  if (config.bottleEnabled) {
+    options.push({
+      value: 'Beer tab · Bottle',
+      label: 'Bottle',
+      toastSlot: null,
+    })
+  }
+
+  getOptionalBeerCategories(config)
+    .filter((category) => category.enabled)
+    .forEach((category) => {
+      options.push({
+        value: `Beer tab · ${category.label}`,
+        label: category.label,
+        toastSlot: category.key,
+      })
+    })
+
+  return options
+}
+
+function getStagedDestinationSelectValue(
+  item: NormalizedMenuItem,
+  beerOptions: StagedBeerDestinationOption[],
+) {
+  if (item.toastSlot) {
+    const bySlot = beerOptions.find(
+      (option) => option.toastSlot === item.toastSlot,
+    )
+    if (bySlot) return bySlot.value
+  }
+
+  if (beerOptions.some((option) => option.value === item.toastDestination)) {
+    return item.toastDestination
+  }
+
+  const normalizedDestination = clean(item.toastDestination).toLowerCase()
+  const byLabel = beerOptions.find((option) =>
+    normalizedDestination.includes(option.label.toLowerCase()),
+  )
+  return byLabel?.value ?? item.toastDestination
+}
+
+function formatStagedDestinationLabel(
+  value: string,
+  beerOptions: StagedBeerDestinationOption[],
+) {
+  return beerOptions.find((option) => option.value === value)?.label ?? value
 }
 
 function getStagedDraftSlotMappings(
