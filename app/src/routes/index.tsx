@@ -956,15 +956,25 @@ function CatalogPage() {
                 </thead>
                 <tbody>
                   {pageGroups.map((group) => {
-                    const carried = group.items.some(
+                    const organizationVisibleItems =
+                      isBeerCategoryName(group.category) && organizationConfig
+                        ? group.items.filter((item) =>
+                            isBeerVariantEnabledForOrganization(
+                              item,
+                              organizationConfig,
+                              optionalBeerCategories,
+                            ),
+                          )
+                        : group.items
+                    const carried = organizationVisibleItems.some(
                       (item) => item.organizationEnabled === true,
                     )
                     const visibleItems =
                       availability === 'carried'
-                        ? group.items.filter(
+                        ? organizationVisibleItems.filter(
                             (item) => item.organizationEnabled === true,
                           )
-                        : group.items
+                        : organizationVisibleItems
 
                     return (
                       <tr
@@ -1300,6 +1310,14 @@ function CatalogDrawer({
     }
   }, [])
 
+  const [mergeTargetId, setMergeTargetId] = useState('')
+  const mergeCandidates = allGroups.filter((candidate) => candidate.id !== group.id)
+  const categoryChanged =
+    Boolean(draftCategoryId) && draftCategoryId !== (group.categoryId ?? '')
+  const selectedCategoryName =
+    categoryOptions.find((option) => option.id === draftCategoryId)?.name ??
+    group.category
+  const selectedCategoryIsBeer = isBeerCategoryName(selectedCategoryName)
   const carriedCount =
     selectedCategoryIsBeer && organizationConfig
       ? draftItems.filter(
@@ -1312,14 +1330,6 @@ function CatalogDrawer({
             ),
         ).length
       : draftItems.filter((item) => item.organizationEnabled === true).length
-  const [mergeTargetId, setMergeTargetId] = useState('')
-  const mergeCandidates = allGroups.filter((candidate) => candidate.id !== group.id)
-  const categoryChanged =
-    Boolean(draftCategoryId) && draftCategoryId !== (group.categoryId ?? '')
-  const selectedCategoryName =
-    categoryOptions.find((option) => option.id === draftCategoryId)?.name ??
-    group.category
-  const selectedCategoryIsBeer = isBeerCategoryName(selectedCategoryName)
   const visibleDraftItems =
     selectedCategoryIsBeer && organizationConfig
       ? draftItems.filter(
