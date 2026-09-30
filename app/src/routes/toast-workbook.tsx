@@ -3233,10 +3233,12 @@ function getOrganizationDraftSlotMappings(
 
   if (!config) return fixedDraftMappings
 
-  const pitcherMapping =
-    config.pitcherEnabled && config.pitcherActualSizeOz !== null
-      ? [{ toastSizeOz: null, actualSizeOz: config.pitcherActualSizeOz }]
-      : []
+  const pitcherMapping = config.pitcherEnabled
+    ? [{
+        toastSizeOz: null,
+        actualSizeOz: config.pitcherActualSizeOz ?? null,
+      }]
+    : []
 
   return [...fixedDraftMappings, ...pitcherMapping]
 }
