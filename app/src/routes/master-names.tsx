@@ -263,6 +263,22 @@ function MasterNamesPage() {
           font-size: .9rem;
         }
 
+        .inventory-master-names-page .inventory-table-card {
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .inventory-master-names-page .inventory-table-scroll {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .inventory-master-names-page .inventory-table {
+          min-width: 58rem;
+        }
+
         .inventory-master-names-page .master-names-summary {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -347,7 +363,8 @@ function MasterNamesPage() {
         }
 
         .inventory-master-names-page .master-impact-table {
-          overflow: hidden;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
           border: 1px solid #e5e7eb;
           border-radius: .75rem;
         }
@@ -444,13 +461,137 @@ function MasterNamesPage() {
           }
         }
 
-        @media (max-width: 600px) {
+        @media (max-width: 700px) {
+          .inventory-master-names-page {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+          }
+
+          .inventory-master-names-page .inventory-hero {
+            padding: 1rem;
+          }
+
+          .inventory-master-names-page .inventory-hero h1 {
+            font-size: clamp(2rem, 12vw, 3rem);
+          }
+
           .inventory-master-names-page .master-names-toolbar {
             grid-template-columns: 1fr;
           }
 
-          .inventory-master-names-page .master-names-summary,
-          .inventory-master-names-page .master-impact-row {
+          .inventory-master-names-page .inventory-table-card {
+            padding: .75rem;
+          }
+
+          .inventory-master-names-page .inventory-table-scroll {
+            overflow: visible;
+          }
+
+          .inventory-master-names-page .inventory-table {
+            display: block;
+            width: 100%;
+            min-width: 0;
+          }
+
+          .inventory-master-names-page .inventory-table thead {
+            display: none;
+          }
+
+          .inventory-master-names-page .inventory-table tbody {
+            display: grid;
+            gap: .75rem;
+          }
+
+          .inventory-master-names-page .inventory-table tr {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .65rem .85rem;
+            border: 1px solid #e5e7eb;
+            border-radius: .8rem;
+            background: #fff;
+            padding: .85rem;
+          }
+
+          .inventory-master-names-page .inventory-table td {
+            display: grid;
+            gap: .15rem;
+            min-width: 0;
+            border: 0;
+            padding: 0;
+          }
+
+          .inventory-master-names-page .inventory-table td::before {
+            content: attr(data-label);
+            color: #64748b;
+            font-size: .68rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+          }
+
+          .inventory-master-names-page .inventory-table td:first-child,
+          .inventory-master-names-page .inventory-table td:last-child {
+            grid-column: 1 / -1;
+          }
+
+          .inventory-master-names-page .inventory-table td:first-child strong {
+            font-size: 1.05rem;
+          }
+
+          .inventory-master-names-page .inventory-table td:last-child::before {
+            display: none;
+          }
+
+          .inventory-master-names-page .inventory-table td:last-child button {
+            width: 100%;
+          }
+
+          .inventory-master-names-page .master-names-pagination {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .inventory-master-names-page .master-names-pagination-actions {
+            justify-content: space-between;
+          }
+
+          .inventory-master-names-page .master-rename-backdrop {
+            place-items: end center;
+            padding: .5rem;
+          }
+
+          .inventory-master-names-page .master-rename-panel {
+            width: 100%;
+            max-height: calc(100dvh - 1rem);
+            border-radius: 1rem 1rem .6rem .6rem;
+            padding: 1rem;
+          }
+
+          .inventory-master-names-page .master-names-summary {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .inventory-master-names-page .master-impact-table table {
+            min-width: 44rem;
+          }
+
+          .inventory-master-names-page .master-rename-footer {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .inventory-master-names-page .master-rename-actions {
+            width: 100%;
+          }
+
+          .inventory-master-names-page .master-rename-actions button {
+            flex: 1 1 0;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .inventory-master-names-page .master-names-summary {
             grid-template-columns: 1fr;
           }
         }
@@ -558,14 +699,14 @@ function MasterNamesPage() {
 
                   return (
                     <tr key={item.id}>
-                      <td>
+                      <td data-label="Master name">
                         <strong>{item.name}</strong>
                       </td>
-                      <td>{item.categoryName ?? 'Uncategorized'}</td>
-                      <td>{item.variantCount.toLocaleString()}</td>
-                      <td>{item.organizations.length.toLocaleString()}</td>
-                      <td>{exportImpact.toLocaleString()}</td>
-                      <td>
+                      <td data-label="Category">{item.categoryName ?? 'Uncategorized'}</td>
+                      <td data-label="Variants">{item.variantCount.toLocaleString()}</td>
+                      <td data-label="Organizations">{item.organizations.length.toLocaleString()}</td>
+                      <td data-label="Toast exports affected">{exportImpact.toLocaleString()}</td>
+                      <td data-label="Actions">
                         <button
                           className="inventory-template-download"
                           type="button"
