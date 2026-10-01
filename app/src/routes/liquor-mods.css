@@ -1,0 +1,241 @@
+.liquor-mods-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.liquor-mods-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.liquor-mods-header h1 {
+  margin: 0 0 0.35rem;
+}
+
+.liquor-mods-header p,
+.liquor-mods-note,
+.liquor-mods-empty,
+.liquor-mods-row-meta {
+  color: var(--inventory-muted, #667085);
+}
+
+.liquor-mods-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.liquor-mods-card {
+  overflow: hidden;
+}
+
+.liquor-mods-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--inventory-border, #eaecf0);
+  padding: 1rem 1.25rem;
+}
+
+.liquor-mods-card-header h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.liquor-mods-card-header p {
+  margin: 0;
+  color: var(--inventory-muted, #667085);
+}
+
+.liquor-mods-add-form,
+.liquor-mods-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) minmax(7rem, 9rem) auto;
+  gap: 0.75rem;
+  align-items: end;
+  padding: 1rem 1.25rem;
+}
+
+.liquor-mods-add-form {
+  border-bottom: 1px solid var(--inventory-border, #eaecf0);
+  background: #fcfcfd;
+}
+
+.liquor-mods-row {
+  border-bottom: 1px solid var(--inventory-border, #eaecf0);
+}
+
+.liquor-mods-row:last-child {
+  border-bottom: 0;
+}
+
+.liquor-mods-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.liquor-mods-field > span,
+.liquor-mods-enabled > span {
+  color: var(--inventory-muted, #667085);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.liquor-mods-field input {
+  min-width: 0;
+  width: 100%;
+  min-height: 2.65rem;
+  border: 1px solid var(--inventory-border, #d0d5dd);
+  border-radius: 0.7rem;
+  background: #fff;
+  padding: 0 0.8rem;
+  font: inherit;
+}
+
+.liquor-mods-money-input {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  min-height: 2.65rem;
+  border: 1px solid var(--inventory-border, #d0d5dd);
+  border-radius: 0.7rem;
+  overflow: hidden;
+  background: #fff;
+}
+
+.liquor-mods-money-input > span {
+  padding-left: 0.8rem;
+  color: #667085;
+  font-weight: 700;
+}
+
+.liquor-mods-money-input input {
+  border: 0;
+  border-radius: 0;
+  min-height: 2.55rem;
+}
+
+.liquor-mods-add-form button,
+.liquor-mods-row-actions button {
+  min-height: 2.65rem;
+  border: 1px solid #d0d5dd;
+  border-radius: 0.7rem;
+  background: #fff;
+  color: #101828;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.liquor-mods-add-form button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.95rem;
+}
+
+.liquor-mods-add-form button:not(:disabled):hover,
+.liquor-mods-row-actions button:not(:disabled):hover {
+  background: #f8fafc;
+}
+
+.liquor-mods-add-form button:disabled,
+.liquor-mods-row-actions button:disabled,
+.liquor-mods-field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.liquor-mods-row-body {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.liquor-mods-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.83rem;
+}
+
+.liquor-mods-enabled {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.65rem;
+  margin-top: 1.28rem;
+}
+
+.liquor-mods-enabled input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.liquor-mods-row-actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 0.4rem;
+}
+
+.liquor-mods-row-actions button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.65rem;
+  padding: 0;
+}
+
+.liquor-mods-empty {
+  margin: 0;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.liquor-mods-status {
+  border: 1px solid #d0d5dd;
+  border-radius: 0.85rem;
+  background: #fff;
+  padding: 0.85rem 1rem;
+}
+
+.liquor-mods-status.is-error {
+  border-color: #fecdca;
+  background: #fffbfa;
+  color: #b42318;
+}
+
+.liquor-mods-status.is-success {
+  border-color: #abefc6;
+  background: #f6fef9;
+  color: #067647;
+}
+
+@media (max-width: 1120px) {
+  .liquor-mods-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .liquor-mods-header {
+    display: grid;
+  }
+
+  .liquor-mods-add-form,
+  .liquor-mods-row {
+    grid-template-columns: 1fr;
+  }
+
+  .liquor-mods-enabled {
+    margin-top: 0;
+  }
+
+  .liquor-mods-row-actions {
+    grid-auto-flow: column;
+    justify-content: start;
+  }
+}

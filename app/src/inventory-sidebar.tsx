@@ -110,8 +110,20 @@ export function InventorySidebar({
     : null
 
   const primarySection = navigation?.primary[0]
-  const primaryItems =
+  const basePrimaryItems =
     primarySection?.items.filter((item) => item.label !== "Menu Categories") ?? []
+  const liquorModsItem = appLinks
+    ? ({
+        id: "inventory:liquor-mods",
+        label: "Liquor Mods",
+        href: `${appLinks.inventory.replace(/\/$/, "")}/liquor-mods`,
+        active: currentPath === "/liquor-mods",
+        icon: "martini",
+      } as (typeof basePrimaryItems)[number])
+    : null
+  const primaryItems = liquorModsItem
+    ? insertLiquorModsItem(basePrimaryItems, liquorModsItem)
+    : basePrimaryItems
   const appsSection = navigation?.apps[0]
   const currentHref = appLinks
     ? `${appLinks.inventory.replace(/\/$/, "")}${currentPath}`
@@ -146,7 +158,7 @@ export function InventorySidebar({
                     >
                       {item.label === "Export to Toast" ? (
                         <ToastBrandIcon />
-                      ) : item.label === "Cocktails" ? (
+                      ) : item.label === "Cocktails" || item.label === "Liquor Mods" ? (
                         <Martini className="size-4 shrink-0" aria-hidden="true" />
                       ) : (
                         <NiteOwlNavigationIcon icon={item.icon} />
@@ -179,7 +191,7 @@ export function InventorySidebar({
                     >
                       {item.label === "Export to Toast" ? (
                         <ToastBrandIcon />
-                      ) : item.label === "Cocktails" ? (
+                      ) : item.label === "Cocktails" || item.label === "Liquor Mods" ? (
                         <Martini className="size-4 shrink-0" aria-hidden="true" />
                       ) : (
                         <NiteOwlNavigationIcon icon={item.icon} />
@@ -195,4 +207,17 @@ export function InventorySidebar({
       </SidebarContent>
     </Sidebar>
   )
+}
+
+function insertLiquorModsItem<T extends { label: string }>(items: T[], item: T) {
+  if (items.some((existing) => existing.label === item.label)) return items
+
+  const cocktailsIndex = items.findIndex((existing) => existing.label === "Cocktails")
+  if (cocktailsIndex === -1) return [...items, item]
+
+  return [
+    ...items.slice(0, cocktailsIndex + 1),
+    item,
+    ...items.slice(cocktailsIndex + 1),
+  ]
 }
