@@ -612,6 +612,10 @@ function CatalogPage() {
   return (
     <AuthenticatedInventoryShell currentPath="/">
       <style>{`
+        .inventory-catalog-page .inventory-catalog-toolbar {
+          margin-block: 1rem;
+        }
+
         .inventory-catalog-page .inventory-catalog-bulk-toolbar {
           display: flex;
           flex-wrap: wrap;
