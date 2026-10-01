@@ -1,78 +1,53 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-react'
-import {
-  AuthenticatedInventoryShell,
-  useInventoryAccessRole,
-} from '#/components/authenticated-inventory-shell'
+import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import {
   createInventoryLiquorModifier,
   listInventoryLiquorModifierMasters,
   listInventoryLiquorModifiers,
   removeInventoryLiquorModifier,
-  reorderInventoryLiquorModifiers,
   updateInventoryLiquorModifier,
   type InventoryLiquorModifier,
   type InventoryLiquorModifierMaster,
   type InventoryLiquorModifierType,
 } from '#/lib/liquor-mods-access'
-import './liquor-mods.css'
+import './cocktails.css'
 
 export const Route = createFileRoute('/liquor-mods')({
   component: LiquorModsPage,
 })
 
-type ModifierDraft = {
-  inventoryLiquorModifierId: string
-  upcharge: string
-}
-
-type RowDraft = {
-  nameOverride: string
-  upcharge: string
-  enabled: boolean
-  exportToToast: boolean
-}
-
-const MODIFIER_TYPES: Array<{
-  type: InventoryLiquorModifierType
-  title: string
-  singular: string
-  description: string
+const PLACEMENT_OPTIONS: Array<{
+  value: InventoryLiquorModifierType
+  label: string
 }> = [
-  {
-    type: 'mixer',
-    title: 'Mixers',
-    singular: 'Mixer',
-    description:
-      'Organization-specific Mixer assignments, names, upcharges, availability, and Toast export.',
-  },
-  {
-    type: 'bar_prep',
-    title: 'Bar Prep Modifiers',
-    singular: 'Bar Prep Modifier',
-    description:
-      'Organization-specific prep and garnish assignments, names, upcharges, availability, and Toast export.',
-  },
+  { value: 'mixer', label: 'Mixers' },
+  { value: 'bar_prep', label: 'Bar Prep' },
 ]
 
-function emptyDrafts(): Record<InventoryLiquorModifierType, ModifierDraft> {
-  return {
-    mixer: { inventoryLiquorModifierId: '', upcharge: '0.00' },
-    bar_prep: { inventoryLiquorModifierId: '', upcharge: '0.00' },
-  }
+type Draft = {
+  type: InventoryLiquorModifierType
+  name: string
+  upcharge: string
+}
+
+const EMPTY_DRAFT: Draft = {
+  type: 'mixer',
+  name: '',
+  upcharge: '',
 }
 
 function LiquorModsPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
-  const { canEdit } = useInventoryAccessRole()
   const [modifiers, setModifiers] = useState<InventoryLiquorModifier[]>([])
-  const [masters, setMasters] = useState<
-    Record<InventoryLiquorModifierType, InventoryLiquorModifierMaster[]>
-  >({ mixer: [], bar_prep: [] })
-  const [drafts, setDrafts] = useState(emptyDrafts)
-  const [rowDrafts, setRowDrafts] = useState<Record<string, RowDraft>>({})
+  const [masters, setMasters] = useState<InventoryLiquorModifierMaster[]>([])
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
+  const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null)
+  const [selectedModifierId, setSelectedModifierId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<Draft | null>(null)
+  const [editEnabled, setEditEnabled] = useState(true)
+  const [editExportToToast, setEditExportToToast] = useState(true)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -81,8 +56,7 @@ function LiquorModsPage() {
   async function reload(signal?: AbortSignal) {
     if (!activeOrganization?.id) {
       setModifiers([])
-      setMasters({ mixer: [], bar_prep: [] })
-      setRowDrafts({})
+      setMasters([])
       return
     }
 
@@ -90,32 +64,18 @@ function LiquorModsPage() {
     setError(null)
 
     try {
-      const [modifierResult, mixerResult, barPrepResult] = await Promise.all([
+      const [modifierResult, mixerMasters, barPrepMasters] = await Promise.all([
         listInventoryLiquorModifiers(activeOrganization.id, signal),
-        listInventoryLiquorModifierMasters(
-          activeOrganization.id,
-          'mixer',
-          signal,
-        ),
-        listInventoryLiquorModifierMasters(
-          activeOrganization.id,
-          'bar_prep',
-          signal,
-        ),
+        listInventoryLiquorModifierMasters(activeOrganization.id, 'mixer', signal),
+        listInventoryLiquorModifierMasters(activeOrganization.id, 'bar_prep', signal),
       ])
 
       setModifiers(modifierResult.modifiers)
-      setMasters({
-        mixer: mixerResult.modifiers,
-        bar_prep: barPrepResult.modifiers,
-      })
-      setRowDrafts(buildRowDrafts(modifierResult.modifiers))
+      setMasters([...mixerMasters.modifiers, ...barPrepMasters.modifiers])
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError') return
       setError(
-        caught instanceof Error
-          ? caught.message
-          : 'Unable to load Liquor Mods.',
+        caught instanceof Error ? caught.message : 'Unable to load Liquor Mods.',
       )
     } finally {
       if (!signal?.aborted) setLoading(false)
@@ -124,102 +84,87 @@ function LiquorModsPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    setDrafts(emptyDrafts())
     void reload(controller.signal)
     return () => controller.abort()
   }, [activeOrganization?.id])
 
   const grouped = useMemo(() => {
-    const groups: Record<InventoryLiquorModifierType, InventoryLiquorModifier[]> = {
-      mixer: [],
-      bar_prep: [],
-    }
+    const result = new Map<InventoryLiquorModifierType, InventoryLiquorModifier[]>()
+    PLACEMENT_OPTIONS.forEach(({ value }) => result.set(value, []))
 
-    for (const modifier of modifiers) {
-      groups[modifier.type].push(modifier)
-    }
+    modifiers.forEach((modifier) => result.get(modifier.type)?.push(modifier))
 
-    for (const rows of Object.values(groups)) {
+    result.forEach((rows) =>
       rows.sort(
         (left, right) =>
-          left.sortOrder - right.sortOrder || left.name.localeCompare(right.name),
-      )
-    }
+          left.sortOrder - right.sortOrder ||
+          displayName(left).localeCompare(displayName(right)),
+      ),
+    )
 
-    return groups
+    return result
   }, [modifiers])
 
-  const availableMasters = useMemo(() => {
-    return {
-      mixer: masters.mixer.filter((master) => master.active && !master.assigned),
-      bar_prep: masters.bar_prep.filter(
-        (master) => master.active && !master.assigned,
-      ),
-    }
-  }, [masters])
+  const masterSuggestions = useMemo(() => {
+    const query = normalize(draft.name)
+    if (!query) return []
 
-  function updateDraft(
-    type: InventoryLiquorModifierType,
-    patch: Partial<ModifierDraft>,
-  ) {
-    setDrafts((current) => ({
-      ...current,
-      [type]: { ...current[type], ...patch },
-    }))
-  }
+    return masters
+      .filter((master) => master.type === draft.type)
+      .filter((master) => master.active && !master.assigned)
+      .filter((master) => normalize(master.name).includes(query))
+      .slice(0, 8)
+  }, [draft.name, draft.type, masters])
 
-  function updateRowDraft(modifierId: string, patch: Partial<RowDraft>) {
-    setRowDrafts((current) => ({
-      ...current,
-      [modifierId]: {
-        ...(current[modifierId] ?? {
-          nameOverride: '',
-          upcharge: '0.00',
-          enabled: true,
-          exportToToast: true,
-        }),
-        ...patch,
-      },
-    }))
-  }
+  const selectedMaster =
+    masters.find((master) => master.id === selectedMasterId) ?? null
 
-  function focusNewUpcharge(type: InventoryLiquorModifierType) {
-    const current = drafts[type].upcharge.trim()
-    if (current === '0.00' || current === '0') {
-      updateDraft(type, { upcharge: '' })
-    }
-  }
+  const selectedModifier =
+    modifiers.find((modifier) => modifier.id === selectedModifierId) ?? null
 
-  function blurNewUpcharge(type: InventoryLiquorModifierType) {
-    const current = drafts[type].upcharge.trim()
-    if (!current) {
-      updateDraft(type, { upcharge: '0.00' })
+  useEffect(() => {
+    if (!selectedModifier) {
+      setEditDraft(null)
       return
     }
 
-    const upchargeCents = parseDollarInput(current)
-    if (upchargeCents !== null) {
-      updateDraft(type, { upcharge: formatCents(upchargeCents) })
-    }
+    setEditDraft({
+      type: selectedModifier.type,
+      name: displayName(selectedModifier),
+      upcharge: formatMoneyValue(selectedModifier.upchargeCents),
+    })
+    setEditEnabled(selectedModifier.enabled)
+    setEditExportToToast(selectedModifier.exportToToast)
+  }, [selectedModifier?.id])
+
+  function selectMaster(master: InventoryLiquorModifierMaster) {
+    setSelectedMasterId(master.id)
+    setDraft((current) => ({
+      ...current,
+      type: master.type,
+      name: master.name,
+    }))
   }
 
-  async function addModifier(
-    event: FormEvent,
-    type: InventoryLiquorModifierType,
-  ) {
+  function clearAddDraft() {
+    setDraft(EMPTY_DRAFT)
+    setSelectedMasterId(null)
+  }
+
+  async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!canEdit || !activeOrganization?.id || saving) return
+    if (!activeOrganization?.id || saving) return
 
-    const draft = drafts[type]
-    const upchargeCents = parseDollarInput(draft.upcharge)
+    const name = draft.name.trim()
+    const upchargeCents = moneyToCents(draft.upcharge)
 
-    if (!draft.inventoryLiquorModifierId) {
-      setError(`Select a ${type === 'mixer' ? 'Mixer' : 'Bar Prep Modifier'} master.`)
+    if (!name) {
+      setError('Enter a Liquor Mod name.')
       return
     }
 
     if (upchargeCents === null) {
-      setError('Enter a valid upcharge dollar amount.')
+      setError('Enter a valid upcharge.')
       return
     }
 
@@ -230,15 +175,17 @@ function LiquorModsPage() {
     try {
       await createInventoryLiquorModifier({
         organizationId: activeOrganization.id,
-        inventoryLiquorModifierId: draft.inventoryLiquorModifierId,
-        type,
+        inventoryLiquorModifierId: selectedMaster?.id,
+        type: draft.type,
+        name: selectedMaster ? undefined : name,
         upchargeCents,
         enabled: true,
         exportToToast: true,
       })
-      updateDraft(type, { inventoryLiquorModifierId: '', upcharge: '0.00' })
+
+      setSuccess('Added ' + (selectedMaster?.name ?? name) + '.')
+      clearAddDraft()
       await reload()
-      setSuccess('Liquor Mod assigned to this organization.')
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : 'Unable to add Liquor Mod.',
@@ -248,15 +195,21 @@ function LiquorModsPage() {
     }
   }
 
-  async function saveModifier(modifier: InventoryLiquorModifier) {
-    if (!canEdit || !activeOrganization?.id || saving) return
+  async function saveSelectedModifier() {
+    if (!activeOrganization?.id || !selectedModifier || !editDraft || saving) {
+      return
+    }
 
-    const draft = rowDrafts[modifier.id]
-    const nameOverride = draft?.nameOverride.trim() ?? ''
-    const upchargeCents = parseDollarInput(draft?.upcharge ?? '')
+    const name = editDraft.name.trim()
+    const upchargeCents = moneyToCents(editDraft.upcharge)
+
+    if (!name) {
+      setError('Enter a Liquor Mod name.')
+      return
+    }
 
     if (upchargeCents === null) {
-      setError('Enter a valid upcharge dollar amount.')
+      setError('Enter a valid upcharge.')
       return
     }
 
@@ -267,32 +220,28 @@ function LiquorModsPage() {
     try {
       await updateInventoryLiquorModifier({
         organizationId: activeOrganization.id,
-        modifierId: modifier.id,
-        name: nameOverride || modifier.masterName,
+        modifierId: selectedModifier.id,
+        type: editDraft.type,
+        name,
         upchargeCents,
-        enabled: draft?.enabled ?? modifier.enabled,
-        exportToToast:
-          (draft?.enabled ?? modifier.enabled) &&
-          (draft?.exportToToast ?? modifier.exportToToast),
+        enabled: editEnabled,
+        exportToToast: editEnabled && editExportToToast,
       })
+
+      setSuccess('Updated ' + name + '.')
+      setSelectedModifierId(null)
       await reload()
-      setSuccess('Liquor Mod saved.')
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : 'Unable to save Liquor Mod.',
+        caught instanceof Error ? caught.message : 'Unable to update Liquor Mod.',
       )
     } finally {
       setSaving(false)
     }
   }
 
-  async function removeModifier(modifier: InventoryLiquorModifier) {
-    if (!canEdit || !activeOrganization?.id || saving) return
-
-    const confirmed = window.confirm(
-      `Remove ${modifier.name} from this organization? The shared master is kept.`,
-    )
-    if (!confirmed) return
+  async function removeSelected() {
+    if (!activeOrganization?.id || !selectedModifier || saving) return
 
     setSaving(true)
     setError(null)
@@ -301,10 +250,13 @@ function LiquorModsPage() {
     try {
       await removeInventoryLiquorModifier({
         organizationId: activeOrganization.id,
-        modifierId: modifier.id,
+        modifierId: selectedModifier.id,
       })
+      setSuccess(
+        'Removed ' + displayName(selectedModifier) + ' from this organization.',
+      )
+      setSelectedModifierId(null)
       await reload()
-      setSuccess('Liquor Mod removed from this organization.')
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : 'Unable to remove Liquor Mod.',
@@ -314,343 +266,396 @@ function LiquorModsPage() {
     }
   }
 
-  async function moveModifier(
-    type: InventoryLiquorModifierType,
-    modifierId: string,
-    direction: 'up' | 'down',
-  ) {
-    if (!canEdit || !activeOrganization?.id || saving) return
-
-    const rows = grouped[type]
-    const currentIndex = rows.findIndex((row) => row.id === modifierId)
-    const nextIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
-    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= rows.length) return
-
-    const nextRows = [...rows]
-    const [moved] = nextRows.splice(currentIndex, 1)
-    nextRows.splice(nextIndex, 0, moved)
-
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-
-    try {
-      const nextGroup = await reorderInventoryLiquorModifiers({
-        organizationId: activeOrganization.id,
-        type,
-        modifierIds: nextRows.map((row) => row.id),
-      })
-      setModifiers((current) => [
-        ...current.filter((modifier) => modifier.type !== type),
-        ...nextGroup,
-      ])
-      setRowDrafts((current) => ({
-        ...current,
-        ...buildRowDrafts(nextGroup),
-      }))
-      setSuccess('Liquor Mods reordered.')
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : 'Unable to reorder Liquor Mods.',
-      )
-      await reload()
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
-    <AuthenticatedInventoryShell currentPath="/liquor-mods">
-      <main className="inventory-page liquor-mods-page">
-        <header className="liquor-mods-header">
+    <AuthenticatedInventoryShell currentPath="/liquor-mods" requiredCapability="edit">
+      <section className="inventory-content cocktails-page">
+        <header className="inventory-page-heading">
           <div>
-            <p className="eyebrow">Organization variants</p>
+            <p className="inventory-kicker">Liquor Mods</p>
             <h1>Liquor Mods</h1>
-            <p className="liquor-mods-header-copy">
-              Assign shared Mixer and Bar Prep masters to{' '}
-              {activeOrganization?.name ?? 'the selected organization'}, then
-              manage local names, upcharges, availability, Toast export, and order.
+            <p>
+              Shared Mixer and Bar Prep names with organization-specific
+              upcharges and Toast availability for{' '}
+              {activeOrganization?.name ?? 'the selected organization'}.
             </p>
           </div>
-          <p className="liquor-mods-note">
-            {canEdit
-              ? 'Managers and Admins can edit organization variants.'
-              : 'Read-only access. Ask a Manager or Admin to make changes.'}
-          </p>
         </header>
 
-        {error ? <div className="liquor-mods-status is-error">{error}</div> : null}
-        {success ? (
-          <div className="liquor-mods-status is-success">{success}</div>
-        ) : null}
-        {loading ? <div className="liquor-mods-status">Loading Liquor Mods…</div> : null}
+        <section className="inventory-card cocktails-editor">
+          <div className="inventory-table-heading">
+            <div>
+              <h2>Add Liquor Mod</h2>
+              <p>
+                Reuse an existing master Liquor Mod when possible. Placement,
+                upcharge, availability, and Toast export belong to this organization.
+              </p>
+            </div>
+          </div>
 
-        <section className="liquor-mods-grid" aria-label="Liquor modifiers">
-          {MODIFIER_TYPES.map((section) => (
-            <article className="inventory-card liquor-mods-card" key={section.type}>
-              <div className="liquor-mods-card-header">
-                <div>
-                  <h2>{section.title}</h2>
-                  <p>{section.description}</p>
-                </div>
-              </div>
+          {error ? <p className="inventory-error">{error}</p> : null}
+          {success ? <p className="inventory-success">{success}</p> : null}
 
-              <form
-                className="liquor-mods-add-form"
-                onSubmit={(event) => void addModifier(event, section.type)}
+          <form className="cocktails-form" onSubmit={(event) => void submit(event)}>
+            <label>
+              <span>Placement</span>
+              <select
+                value={draft.type}
+                disabled={saving}
+                onChange={(event) => {
+                  setSelectedMasterId(null)
+                  setDraft((current) => ({
+                    ...current,
+                    type: event.target.value as InventoryLiquorModifierType,
+                  }))
+                }}
               >
-                <label className="liquor-mods-field">
-                  <span>{section.singular} master</span>
+                {PLACEMENT_OPTIONS.map((placement) => (
+                  <option key={placement.value} value={placement.value}>
+                    {placement.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="cocktails-master-field">
+              <span>Liquor Mod name</span>
+              <input
+                value={draft.name}
+                disabled={saving}
+                placeholder={
+                  draft.type === 'mixer' ? 'Ginger Beer' : 'Lemon garnish'
+                }
+                onChange={(event) => {
+                  setSelectedMasterId(null)
+                  setDraft((current) => ({ ...current, name: event.target.value }))
+                }}
+              />
+
+              {selectedMaster ? (
+                <small className="cocktails-master-selected">
+                  Using shared master: {selectedMaster.name}
+                </small>
+              ) : null}
+
+              {!selectedMaster && masterSuggestions.length > 0 ? (
+                <div className="cocktails-master-suggestions">
+                  {masterSuggestions.map((master) => (
+                    <button
+                      key={master.id}
+                      type="button"
+                      onClick={() => selectMaster(master)}
+                    >
+                      <strong>{master.name}</strong>
+                      <span>Use existing master</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </label>
+
+            <label>
+              <span>Upcharge</span>
+              <MoneyInput
+                value={draft.upcharge}
+                disabled={saving}
+                onChange={(value) =>
+                  setDraft((current) => ({ ...current, upcharge: value }))
+                }
+              />
+            </label>
+
+            <div className="cocktails-form-actions">
+              <button
+                type="button"
+                className="inventory-secondary-button"
+                disabled={saving}
+                onClick={clearAddDraft}
+              >
+                Clear
+              </button>
+              <button
+                type="submit"
+                className="inventory-primary-button"
+                disabled={saving}
+              >
+                {saving
+                  ? 'Adding…'
+                  : selectedMaster
+                    ? 'Add existing Liquor Mod'
+                    : 'Create Liquor Mod'}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="cocktails-groups">
+          {PLACEMENT_OPTIONS.map((placement) => {
+            const rows = grouped.get(placement.value) ?? []
+
+            return (
+              <section
+                className={
+                  rows.length === 0
+                    ? 'inventory-card cocktails-group-card is-empty'
+                    : 'inventory-card cocktails-group-card'
+                }
+                key={placement.value}
+              >
+                <div className="inventory-table-heading">
+                  <div>
+                    <h2>{placement.label}</h2>
+                    <p>
+                      {placement.value === 'mixer'
+                        ? 'Mixer options exported as liquor modifiers with organization-specific upcharges.'
+                        : 'Prep and garnish options exported as liquor modifiers.'}
+                    </p>
+                  </div>
+                  <strong>{rows.length}</strong>
+                </div>
+
+                {loading ? (
+                  <p className="cocktails-empty">Loading…</p>
+                ) : rows.length === 0 ? (
+                  <p className="cocktails-empty">
+                    No {placement.label.toLowerCase()} for this organization.
+                  </p>
+                ) : (
+                  <div className="cocktails-list">
+                    {rows.map((modifier) => (
+                      <button
+                        className="cocktails-row"
+                        key={modifier.id}
+                        type="button"
+                        onClick={() => setSelectedModifierId(modifier.id)}
+                      >
+                        <div>
+                          <strong>{displayName(modifier)}</strong>
+                          <span>
+                            Upcharge
+                            {!modifier.enabled ? ' · Not carried here' : ''}
+                            {modifier.enabled && !modifier.exportToToast
+                              ? ' · Not exporting'
+                              : ''}
+                          </span>
+                        </div>
+                        <strong>{formatMoney(modifier.upchargeCents)}</strong>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )
+          })}
+        </section>
+
+        {selectedModifier && editDraft ? (
+          <div
+            className="cocktails-edit-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="liquor-mod-edit-title"
+            onMouseDown={(event) => {
+              if (event.currentTarget === event.target && !saving) {
+                setSelectedModifierId(null)
+              }
+            }}
+          >
+            <section className="cocktails-edit-panel">
+              <header className="cocktails-edit-header">
+                <div>
+                  <p className="inventory-kicker">Liquor Mod</p>
+                  <h2 id="liquor-mod-edit-title">{displayName(selectedModifier)}</h2>
+                  <small>Master: {selectedModifier.masterName}</small>
+                </div>
+                <button
+                  type="button"
+                  className="inventory-secondary-button"
+                  disabled={saving}
+                  onClick={() => setSelectedModifierId(null)}
+                >
+                  Close
+                </button>
+              </header>
+
+              <div className="cocktails-edit-grid">
+                <label>
+                  <span>Placement</span>
                   <select
-                    value={drafts[section.type].inventoryLiquorModifierId}
+                    value={editDraft.type}
+                    disabled={saving}
                     onChange={(event) =>
-                      updateDraft(section.type, {
-                        inventoryLiquorModifierId: event.target.value,
-                      })
-                    }
-                    disabled={
-                      !canEdit ||
-                      saving ||
-                      availableMasters[section.type].length === 0
+                      setEditDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              type: event.target
+                                .value as InventoryLiquorModifierType,
+                            }
+                          : current,
+                      )
                     }
                   >
-                    <option value="">
-                      {availableMasters[section.type].length
-                        ? `Select ${section.singular}`
-                        : 'No unassigned masters'}
-                    </option>
-                    {availableMasters[section.type].map((master) => (
-                      <option key={master.id} value={master.id}>
-                        {master.name}
+                    {PLACEMENT_OPTIONS.map((placement) => (
+                      <option key={placement.value} value={placement.value}>
+                        {placement.label}
                       </option>
                     ))}
                   </select>
                 </label>
 
-                <label className="liquor-mods-field">
-                  <span>Upcharge</span>
-                  <span className="liquor-mods-money-input">
-                    <span>$</span>
-                    <input
-                      value={drafts[section.type].upcharge}
-                      onFocus={() => focusNewUpcharge(section.type)}
-                      onBlur={() => blurNewUpcharge(section.type)}
-                      onChange={(event) =>
-                        updateDraft(section.type, { upcharge: event.target.value })
-                      }
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      disabled={!canEdit || saving}
-                    />
-                  </span>
+                <label>
+                  <span>Name</span>
+                  <input
+                    value={editDraft.name}
+                    disabled={saving}
+                    onChange={(event) =>
+                      setEditDraft((current) =>
+                        current ? { ...current, name: event.target.value } : current,
+                      )
+                    }
+                  />
                 </label>
 
+                <label>
+                  <span>Upcharge</span>
+                  <MoneyInput
+                    value={editDraft.upcharge}
+                    disabled={saving}
+                    onChange={(value) =>
+                      setEditDraft((current) =>
+                        current ? { ...current, upcharge: value } : current,
+                      )
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="cocktails-edit-toggles">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={editEnabled}
+                    disabled={saving}
+                    onChange={(event) => {
+                      setEditEnabled(event.target.checked)
+                      if (!event.target.checked) setEditExportToToast(false)
+                    }}
+                  />
+                  <span>Available here</span>
+                </label>
+
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={editExportToToast}
+                    disabled={saving || !editEnabled}
+                    onChange={(event) => setEditExportToToast(event.target.checked)}
+                  />
+                  <span>Export to Toast</span>
+                </label>
+              </div>
+
+              <footer className="cocktails-edit-actions">
                 <button
-                  type="submit"
-                  disabled={
-                    !canEdit ||
-                    saving ||
-                    !drafts[section.type].inventoryLiquorModifierId
-                  }
+                  type="button"
+                  className="inventory-danger-button"
+                  disabled={saving}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'Remove "' +
+                          displayName(selectedModifier) +
+                          '" from this organization? The shared master is kept.',
+                      )
+                    ) {
+                      void removeSelected()
+                    }
+                  }}
                 >
-                  <Plus size={16} aria-hidden="true" />
-                  Add
+                  Remove from organization
                 </button>
-              </form>
 
-              {grouped[section.type].length ? (
-                grouped[section.type].map((modifier, index) => {
-                  const draft = rowDrafts[modifier.id] ?? {
-                    nameOverride: modifier.nameOverride ?? '',
-                    upcharge: formatCents(modifier.upchargeCents),
-                    enabled: modifier.enabled,
-                    exportToToast: modifier.exportToToast,
-                  }
-                  const changed = rowHasChanges(modifier, draft)
-
-                  return (
-                    <div className="liquor-mods-row" key={modifier.id}>
-                      <div className="liquor-mods-master-identity">
-                        <span>{section.singular}</span>
-                        <strong>{modifier.masterName}</strong>
-                      </div>
-
-                      <div className="liquor-mods-row-fields">
-                        <label className="liquor-mods-field">
-                          <span>Name override</span>
-                          <input
-                            value={draft.nameOverride}
-                            placeholder={modifier.masterName}
-                            onChange={(event) =>
-                              updateRowDraft(modifier.id, {
-                                nameOverride: event.target.value,
-                              })
-                            }
-                            disabled={!canEdit || saving}
-                          />
-                          <small>
-                            Leave blank to use the master name.
-                          </small>
-                        </label>
-
-                        <label className="liquor-mods-field">
-                          <span>Upcharge</span>
-                          <span className="liquor-mods-money-input">
-                            <span>$</span>
-                            <input
-                              value={draft.upcharge}
-                              onChange={(event) =>
-                                updateRowDraft(modifier.id, {
-                                  upcharge: event.target.value,
-                                })
-                              }
-                              inputMode="decimal"
-                              disabled={!canEdit || saving}
-                            />
-                          </span>
-                        </label>
-
-                        <div className="liquor-mods-toggles">
-                          <label className="liquor-mods-enabled">
-                            <input
-                              type="checkbox"
-                              checked={draft.enabled}
-                              onChange={(event) => {
-                                const enabled = event.target.checked
-                                updateRowDraft(modifier.id, {
-                                  enabled,
-                                  exportToToast: enabled
-                                    ? draft.exportToToast
-                                    : false,
-                                })
-                              }}
-                              disabled={!canEdit || saving}
-                            />
-                            <span>Available here</span>
-                          </label>
-
-                          <label className="liquor-mods-enabled">
-                            <input
-                              type="checkbox"
-                              checked={draft.exportToToast}
-                              onChange={(event) =>
-                                updateRowDraft(modifier.id, {
-                                  exportToToast: event.target.checked,
-                                })
-                              }
-                              disabled={!canEdit || saving || !draft.enabled}
-                            />
-                            <span>Export to Toast</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      <div className="liquor-mods-row-footer">
-                        <div className="liquor-mods-row-meta">
-                          <span>Display order {index + 1}</span>
-                          {!draft.enabled ? <span>Not carried here</span> : null}
-                          {draft.enabled && !draft.exportToToast ? (
-                            <span>Not exporting</span>
-                          ) : null}
-                        </div>
-
-                        <div className="liquor-mods-row-actions">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void moveModifier(section.type, modifier.id, 'up')
-                            }
-                            disabled={!canEdit || saving || index === 0}
-                            aria-label={`Move ${modifier.name} up`}
-                          >
-                            <ArrowUp size={16} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void moveModifier(section.type, modifier.id, 'down')
-                            }
-                            disabled={
-                              !canEdit ||
-                              saving ||
-                              index === grouped[section.type].length - 1
-                            }
-                            aria-label={`Move ${modifier.name} down`}
-                          >
-                            <ArrowDown size={16} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void saveModifier(modifier)}
-                            disabled={!canEdit || saving || !changed}
-                            aria-label={`Save ${modifier.name}`}
-                          >
-                            <Save size={16} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void removeModifier(modifier)}
-                            disabled={!canEdit || saving}
-                            aria-label={`Remove ${modifier.name}`}
-                          >
-                            <Trash2 size={16} aria-hidden="true" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              ) : (
-                <p className="liquor-mods-empty">
-                  No {section.title.toLowerCase()} assigned to this organization.
-                </p>
-              )}
-            </article>
-          ))}
-        </section>
-      </main>
+                <div>
+                  <button
+                    type="button"
+                    className="inventory-secondary-button"
+                    disabled={saving}
+                    onClick={() => setSelectedModifierId(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="inventory-primary-button"
+                    disabled={saving}
+                    onClick={() => void saveSelectedModifier()}
+                  >
+                    {saving ? 'Saving…' : 'Update'}
+                  </button>
+                </div>
+              </footer>
+            </section>
+          </div>
+        ) : null}
+      </section>
     </AuthenticatedInventoryShell>
   )
 }
 
-function buildRowDrafts(modifiers: InventoryLiquorModifier[]) {
-  return Object.fromEntries(
-    modifiers.map((modifier) => [
-      modifier.id,
-      {
-        nameOverride: modifier.nameOverride ?? '',
-        upcharge: formatCents(modifier.upchargeCents),
-        enabled: modifier.enabled,
-        exportToToast: modifier.exportToToast,
-      } satisfies RowDraft,
-    ]),
-  )
-}
-
-function rowHasChanges(modifier: InventoryLiquorModifier, draft: RowDraft) {
-  const cents = parseDollarInput(draft.upcharge)
+function MoneyInput({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string
+  disabled: boolean
+  onChange: (value: string) => void
+}) {
+  function blur() {
+    const cents = moneyToCents(value)
+    onChange(cents === null ? value : formatMoneyValue(cents))
+  }
 
   return (
-    draft.nameOverride.trim() !== (modifier.nameOverride ?? '') ||
-    cents !== modifier.upchargeCents ||
-    draft.enabled !== modifier.enabled ||
-    draft.exportToToast !== modifier.exportToToast
+    <div className="cocktails-money-input">
+      <span>$</span>
+      <input
+        inputMode="decimal"
+        value={value}
+        disabled={disabled}
+        placeholder="0.00"
+        onFocus={() => {
+          if (value.trim() === '0.00' || value.trim() === '0') onChange('')
+        }}
+        onBlur={blur}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
   )
 }
 
-function parseDollarInput(value: string) {
-  const normalized = value.trim().replace(/^\$/, '')
-  if (!normalized) return 0
-  if (!/^\d+(?:\.\d{0,2})?$/.test(normalized)) return null
-
-  const dollars = Number(normalized)
-  if (!Number.isFinite(dollars) || dollars < 0) return null
-
-  return Math.round(dollars * 100)
+function displayName(modifier: InventoryLiquorModifier) {
+  return modifier.nameOverride?.trim() || modifier.masterName
 }
 
-function formatCents(cents: number) {
+function formatMoney(cents: number) {
+  return '$' + (cents / 100).toFixed(2)
+}
+
+function formatMoneyValue(cents: number) {
   return (cents / 100).toFixed(2)
+}
+
+function moneyToCents(value: string) {
+  const cleaned = value.trim().replace(/^\$/, '').replace(/,/g, '')
+  if (!cleaned) return 0
+
+  const parsed = Number(cleaned)
+  if (!Number.isFinite(parsed) || parsed < 0) return null
+
+  return Math.round(parsed * 100)
+}
+
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
