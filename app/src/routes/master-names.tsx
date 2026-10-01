@@ -6,10 +6,19 @@ import {
 } from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import {
+  listInventoryCocktailMasters,
   listInventoryMasterItems,
   renameInventoryMasterItem,
+  updateInventoryCocktailMaster,
+  type InventoryCocktailMaster,
   type InventoryMasterItem,
 } from '#/lib/inventory-access'
+import {
+  listInventoryLiquorModifierMasters,
+  updateInventoryLiquorModifierMaster,
+  type InventoryLiquorModifierMaster,
+  type InventoryLiquorModifierType,
+} from '#/lib/liquor-mods-access'
 
 export const Route = createFileRoute('/master-names')({
   component: MasterNamesRoute,
@@ -28,21 +37,39 @@ function MasterNamesRoute() {
   )
 }
 
+type MasterFamily = 'items' | 'cocktails' | 'liquor-mods'
+type ImpactFilter = 'all' | 'affected' | 'override' | 'unused'
+type LiquorPlacementFilter = 'all' | InventoryLiquorModifierType
+type StatusFilter = 'all' | 'active' | 'inactive'
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 250] as const
+const DEFAULT_PAGE_SIZE = 25
+
 function MasterNamesPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
+  const [family, setFamily] = useState<MasterFamily>('items')
   const [items, setItems] = useState<InventoryMasterItem[]>([])
+  const [cocktailMasters, setCocktailMasters] = useState<InventoryCocktailMaster[]>([])
+  const [liquorMasters, setLiquorMasters] = useState<InventoryLiquorModifierMaster[]>([])
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('all')
   const [organization, setOrganization] = useState('all')
-  const [impact, setImpact] = useState<'all' | 'affected' | 'override' | 'unused'>('all')
+  const [impact, setImpact] = useState<ImpactFilter>('all')
+  const [liquorPlacement, setLiquorPlacement] = useState<LiquorPlacementFilter>('all')
+  const [status, setStatus] = useState<StatusFilter>('all')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
+  const [selectedSharedMaster, setSelectedSharedMaster] = useState<{
+    family: Exclude<MasterFamily, 'items'>
+    id: string
+  } | null>(null)
+  const [sharedDraftName, setSharedDraftName] = useState('')
+  const [sharedDraftActive, setSharedDraftActive] = useState(true)
   const [saving, setSaving] = useState(false)
   const [page, setPage] = useState(1)
-
-  const PAGE_SIZE = 50
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
   async function reload() {
     if (!activeOrganization?.id) return
@@ -51,9 +78,20 @@ function MasterNamesPage() {
     setError(null)
 
     try {
-      setItems(await listInventoryMasterItems(activeOrganization.id))
+      const [nextItems, nextCocktails, mixerResult, barPrepResult] =
+        await Promise.all([
+          listInventoryMasterItems(activeOrganization.id),
+          listInventoryCocktailMasters(activeOrganization.id),
+          listInventoryLiquorModifierMasters(activeOrganization.id, 'mixer'),
+          listInventoryLiquorModifierMasters(activeOrganization.id, 'bar_prep'),
+        ])
+      setItems(nextItems)
+      setCocktailMasters(nextCocktails)
+      setLiquorMasters([...mixerResult.modifiers, ...barPrepResult.modifiers])
     } catch (nextError) {
       setItems([])
+      setCocktailMasters([])
+      setLiquorMasters([])
       setError(
         nextError instanceof Error
           ? nextError.message
@@ -67,8 +105,19 @@ function MasterNamesPage() {
   useEffect(() => {
     setSelectedItemId(null)
     setDraftName('')
+    setSelectedSharedMaster(null)
+    setSharedDraftName('')
+    setPage(1)
     void reload()
   }, [activeOrganization?.id])
+
+  useEffect(() => {
+    setPage(1)
+    setSelectedItemId(null)
+    setDraftName('')
+    setSelectedSharedMaster(null)
+    setSharedDraftName('')
+  }, [family])
 
   const categories = useMemo(
     () =>
@@ -140,18 +189,59 @@ function MasterNamesPage() {
     })
   }, [category, impact, items, organization, query])
 
+  const filteredCocktails = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    return cocktailMasters.filter((master) => {
+      if (status === 'active' && !master.active) return false
+      if (status === 'inactive' && master.active) return false
+      if (!normalizedQuery) return true
+      return [master.name, master.normalizedName].some((value) =>
+        value.toLowerCase().includes(normalizedQuery),
+      )
+    })
+  }, [cocktailMasters, query, status])
+
+  const filteredLiquorMasters = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    return liquorMasters.filter((master) => {
+      if (liquorPlacement !== 'all' && master.type !== liquorPlacement) return false
+      if (status === 'active' && !master.active) return false
+      if (status === 'inactive' && master.active) return false
+      if (!normalizedQuery) return true
+      return [master.name, master.normalizedName, liquorPlacementLabel(master.type)]
+        .some((value) => value.toLowerCase().includes(normalizedQuery))
+    })
+  }, [liquorMasters, liquorPlacement, query, status])
+
   useEffect(() => {
     setPage(1)
-  }, [category, impact, organization, query])
+  }, [category, family, impact, liquorPlacement, organization, query, status, pageSize])
 
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const currentCount =
+    family === 'items'
+      ? filteredItems.length
+      : family === 'cocktails'
+        ? filteredCocktails.length
+        : filteredLiquorMasters.length
+  const pageCount = Math.max(1, Math.ceil(currentCount / pageSize))
   const clampedPage = Math.min(page, pageCount)
-  const pageStart = (clampedPage - 1) * PAGE_SIZE
-  const pageItems = filteredItems.slice(pageStart, pageStart + PAGE_SIZE)
-  const pageEnd = pageStart + pageItems.length
+  const pageStart = (clampedPage - 1) * pageSize
+  const pageItems = filteredItems.slice(pageStart, pageStart + pageSize)
+  const pageCocktails = filteredCocktails.slice(pageStart, pageStart + pageSize)
+  const pageLiquorMasters = filteredLiquorMasters.slice(pageStart, pageStart + pageSize)
+  const pageEnd = Math.min(currentCount, pageStart + pageSize)
 
   const selectedItem =
     items.find((item) => item.id === selectedItemId) ?? null
+  const selectedCocktail =
+    selectedSharedMaster?.family === 'cocktails'
+      ? cocktailMasters.find((master) => master.id === selectedSharedMaster.id) ?? null
+      : null
+  const selectedLiquorMaster =
+    selectedSharedMaster?.family === 'liquor-mods'
+      ? liquorMasters.find((master) => master.id === selectedSharedMaster.id) ?? null
+      : null
+  const selectedShared = selectedCocktail ?? selectedLiquorMaster
 
   const selectedImpact = useMemo(() => {
     if (!selectedItem) {
@@ -193,32 +283,45 @@ function MasterNamesPage() {
     setError(null)
   }
 
+  function beginSharedRename(
+    nextFamily: Exclude<MasterFamily, 'items'>,
+    master: InventoryCocktailMaster | InventoryLiquorModifierMaster,
+  ) {
+    setSelectedSharedMaster({ family: nextFamily, id: master.id })
+    setSharedDraftName(master.name)
+    setSharedDraftActive(master.active)
+    setError(null)
+  }
+
   function cancelRename() {
     if (saving) return
     setSelectedItemId(null)
     setDraftName('')
   }
 
+  function cancelSharedRename() {
+    if (saving) return
+    setSelectedSharedMaster(null)
+    setSharedDraftName('')
+  }
+
   useEffect(() => {
-    if (!selectedItem) return
-
+    if (!selectedItem && !selectedShared) return
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') cancelRename()
+      if (event.key !== 'Escape') return
+      if (selectedItem) cancelRename()
+      else cancelSharedRename()
     }
-
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItem, saving])
+  }, [selectedItem, selectedShared, saving])
 
   async function saveRename() {
     if (!activeOrganization?.id || !selectedItem || saving) return
-
     const nextName = draftName.trim()
     if (!nextName || nextName === selectedItem.name) return
-
     setSaving(true)
     setError(null)
-
     try {
       await renameInventoryMasterItem({
         organizationId: activeOrganization.id,
@@ -229,24 +332,87 @@ function MasterNamesPage() {
       setSelectedItemId(null)
       setDraftName('')
     } catch (nextError) {
-      setError(
-        nextError instanceof Error
-          ? nextError.message
-          : 'Unable to rename the Inventory master item.',
-      )
+      setError(nextError instanceof Error ? nextError.message : 'Unable to rename the Inventory master item.')
     } finally {
       setSaving(false)
     }
   }
 
+  async function saveSharedRename() {
+    if (!activeOrganization?.id || !selectedShared || !selectedSharedMaster || saving) return
+    const nextName = sharedDraftName.trim()
+    if (!nextName) return
+    setSaving(true)
+    setError(null)
+    try {
+      if (selectedSharedMaster.family === 'cocktails') {
+        await updateInventoryCocktailMaster({
+          organizationId: activeOrganization.id,
+          inventoryCocktailId: selectedShared.id,
+          name: nextName,
+          active: sharedDraftActive,
+        })
+      } else {
+        await updateInventoryLiquorModifierMaster({
+          organizationId: activeOrganization.id,
+          inventoryLiquorModifierId: selectedShared.id,
+          name: nextName,
+          active: sharedDraftActive,
+        })
+      }
+      await reload()
+      setSelectedSharedMaster(null)
+      setSharedDraftName('')
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Unable to update the master record.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const sharedChanged =
+    selectedShared !== null &&
+    (sharedDraftName.trim() !== selectedShared.name ||
+      sharedDraftActive !== selectedShared.active)
+
   return (
     <section className="inventory-content inventory-master-names-page">
       <style>{`
+        .inventory-master-names-page {
+          display: grid;
+          gap: 1rem;
+        }
+
+        .inventory-master-names-page .master-family-tabs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: .5rem;
+        }
+
+        .inventory-master-names-page .master-family-tabs button {
+          min-height: 2.5rem;
+          border: 1px solid #d1d5db;
+          border-radius: .65rem;
+          background: #fff;
+          color: #374151;
+          padding: .45rem .8rem;
+          font-weight: 800;
+        }
+
+        .inventory-master-names-page .master-family-tabs button.is-active {
+          border-color: #111827;
+          background: #111827;
+          color: #fff;
+        }
+
         .inventory-master-names-page .master-names-toolbar {
           display: grid;
           grid-template-columns: minmax(20rem, 2fr) repeat(3, minmax(10rem, 1fr));
           gap: .75rem;
-          margin-bottom: 1rem;
+        }
+
+        .inventory-master-names-page .master-names-toolbar.is-shared {
+          grid-template-columns: minmax(20rem, 2fr) minmax(10rem, 1fr) minmax(10rem, 1fr);
         }
 
         .inventory-master-names-page .master-names-toolbar .inventory-search-control {
@@ -439,14 +605,38 @@ function MasterNamesPage() {
           padding: .8rem 1rem;
         }
 
-        .inventory-master-names-page .master-names-pagination-actions {
+        .inventory-master-names-page .master-names-pagination-left,
+        .inventory-master-names-page .master-names-pagination-actions,
+        .inventory-master-names-page .master-page-size {
           display: flex;
           align-items: center;
           gap: .5rem;
         }
 
+        .inventory-master-names-page .master-page-size {
+          color: #475569;
+          font-size: .85rem;
+          font-weight: 700;
+        }
+
+        .inventory-master-names-page .master-page-size select {
+          min-height: 2.25rem;
+          border: 1px solid #d1d5db;
+          border-radius: .55rem;
+          background: #fff;
+          padding: 0 .55rem;
+        }
+
+        .inventory-master-names-page .master-active-toggle {
+          display: inline-flex;
+          align-items: center;
+          gap: .5rem;
+          font-weight: 700;
+        }
+
         @media (max-width: 1100px) {
-          .inventory-master-names-page .master-names-toolbar {
+          .inventory-master-names-page .master-names-toolbar,
+          .inventory-master-names-page .master-names-toolbar.is-shared {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
@@ -476,7 +666,8 @@ function MasterNamesPage() {
             font-size: clamp(2rem, 12vw, 3rem);
           }
 
-          .inventory-master-names-page .master-names-toolbar {
+          .inventory-master-names-page .master-names-toolbar,
+          .inventory-master-names-page .master-names-toolbar.is-shared {
             grid-template-columns: 1fr;
           }
 
@@ -547,7 +738,8 @@ function MasterNamesPage() {
             width: 100%;
           }
 
-          .inventory-master-names-page .master-names-pagination {
+          .inventory-master-names-page .master-names-pagination,
+          .inventory-master-names-page .master-names-pagination-left {
             align-items: stretch;
             flex-direction: column;
           }
@@ -601,74 +793,82 @@ function MasterNamesPage() {
         <p className="inventory-kicker">Admin</p>
         <h1>Master Names</h1>
         <p>
-          Rename shared master catalog items and review the organization-level
-          impact before saving. The selected organization is used only to verify
-          your Inventory Admin permission.
+          Rename shared master records used by Catalog Items, Cocktails, and Liquor Mods.
+          Renames are global; organization-specific overrides remain local.
         </p>
       </header>
 
-      <section className="master-names-toolbar" aria-label="Master name filters">
-        <label className="inventory-search-control">
-          <span>Search</span>
-          <input
-            type="search"
-            value={query}
-            placeholder="Search master names, aliases, organizations…"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+      <div className="master-family-tabs" role="group" aria-label="Master record type">
+        <button type="button" className={family === 'items' ? 'is-active' : ''} onClick={() => setFamily('items')}>Catalog Items</button>
+        <button type="button" className={family === 'cocktails' ? 'is-active' : ''} onClick={() => setFamily('cocktails')}>Cocktails</button>
+        <button type="button" className={family === 'liquor-mods' ? 'is-active' : ''} onClick={() => setFamily('liquor-mods')}>Liquor Mods</button>
+      </div>
 
-        <label className="inventory-search-control">
-          <span>Category</span>
-          <select value={category} onChange={(event) => setCategory(event.target.value)}>
-            <option value="all">All categories</option>
-            {categories.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="inventory-search-control">
-          <span>Organization</span>
-          <select
-            value={organization}
-            onChange={(event) => setOrganization(event.target.value)}
-          >
-            <option value="all">All organizations</option>
-            {organizations.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="inventory-search-control">
-          <span>Rename impact</span>
-          <select
-            value={impact}
-            onChange={(event) =>
-              setImpact(
-                event.target.value as 'all' | 'affected' | 'override' | 'unused',
-              )
-            }
-          >
-            <option value="all">All master items</option>
-            <option value="affected">Affects Toast exports</option>
-            <option value="override">Has local Toast override</option>
-            <option value="unused">Unused by organizations</option>
-          </select>
-        </label>
-      </section>
+      {family === 'items' ? (
+        <section className="master-names-toolbar" aria-label="Master item filters">
+          <label className="inventory-search-control">
+            <span>Search</span>
+            <input type="search" value={query} placeholder="Search master names, aliases, organizations…" onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          <label className="inventory-search-control">
+            <span>Category</span>
+            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+              <option value="all">All categories</option>
+              {categories.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
+          <label className="inventory-search-control">
+            <span>Organization</span>
+            <select value={organization} onChange={(event) => setOrganization(event.target.value)}>
+              <option value="all">All organizations</option>
+              {organizations.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
+          <label className="inventory-search-control">
+            <span>Rename impact</span>
+            <select value={impact} onChange={(event) => setImpact(event.target.value as ImpactFilter)}>
+              <option value="all">All master items</option>
+              <option value="affected">Affects Toast exports</option>
+              <option value="override">Has local Toast override</option>
+              <option value="unused">Unused by organizations</option>
+            </select>
+          </label>
+        </section>
+      ) : (
+        <section className="master-names-toolbar is-shared" aria-label="Shared master filters">
+          <label className="inventory-search-control">
+            <span>Search</span>
+            <input type="search" value={query} placeholder={family === 'cocktails' ? 'Search Cocktail masters…' : 'Search Liquor Mod masters…'} onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          {family === 'liquor-mods' ? (
+            <label className="inventory-search-control">
+              <span>Placement</span>
+              <select value={liquorPlacement} onChange={(event) => setLiquorPlacement(event.target.value as LiquorPlacementFilter)}>
+                <option value="all">All placements</option>
+                <option value="mixer">Mixers</option>
+                <option value="bar_prep">Bar Prep</option>
+              </select>
+            </label>
+          ) : <div />}
+          <label className="inventory-search-control">
+            <span>Status</span>
+            <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)}>
+              <option value="all">All records</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+        </section>
+      )}
 
       <section className="inventory-card inventory-table-card">
         <div className="inventory-table-heading">
           <div>
-            <h2>Shared master catalog</h2>
+            <h2>
+              {family === 'items' ? 'Shared master catalog' : family === 'cocktails' ? 'Cocktail masters' : 'Liquor Mod masters'}
+            </h2>
             <p className="master-names-result-count">
-              {filteredItems.length.toLocaleString()} of {items.length.toLocaleString()} master items shown. Renames are global.
+              {currentCount.toLocaleString()} of {(family === 'items' ? items.length : family === 'cocktails' ? cocktailMasters.length : liquorMasters.length).toLocaleString()} master records shown. Renames are global.
             </p>
           </div>
         </div>
@@ -676,45 +876,21 @@ function MasterNamesPage() {
         {error ? <p className="inventory-error">{error}</p> : null}
         {loading ? <p>Loading master catalog…</p> : null}
 
-        {!loading && filteredItems.length > 0 ? (
+        {!loading && family === 'items' && filteredItems.length > 0 ? (
           <div className="inventory-table-scroll">
             <table className="inventory-table">
-              <thead>
-                <tr>
-                  <th>Master name</th>
-                  <th>Category</th>
-                  <th>Variants</th>
-                  <th>Organizations</th>
-                  <th>Toast exports affected</th>
-                  <th />
-                </tr>
-              </thead>
+              <thead><tr><th>Master name</th><th>Category</th><th>Variants</th><th>Organizations</th><th>Toast exports affected</th><th /></tr></thead>
               <tbody>
                 {pageItems.map((item) => {
-                  const exportImpact = item.organizations.reduce(
-                    (sum, organization) =>
-                      sum + organization.followsMasterNameCount,
-                    0,
-                  )
-
+                  const exportImpact = item.organizations.reduce((sum, entry) => sum + entry.followsMasterNameCount, 0)
                   return (
                     <tr key={item.id}>
-                      <td data-label="Master name">
-                        <strong>{item.name}</strong>
-                      </td>
+                      <td data-label="Master name"><strong>{item.name}</strong></td>
                       <td data-label="Category">{item.categoryName ?? 'Uncategorized'}</td>
                       <td data-label="Variants">{item.variantCount.toLocaleString()}</td>
                       <td data-label="Organizations">{item.organizations.length.toLocaleString()}</td>
                       <td data-label="Toast exports affected">{exportImpact.toLocaleString()}</td>
-                      <td data-label="Actions">
-                        <button
-                          className="inventory-template-download"
-                          type="button"
-                          onClick={() => beginRename(item)}
-                        >
-                          Review / Rename
-                        </button>
-                      </td>
+                      <td data-label="Actions"><button className="inventory-template-download" type="button" onClick={() => beginRename(item)}>Review / Rename</button></td>
                     </tr>
                   )
                 })}
@@ -723,34 +899,60 @@ function MasterNamesPage() {
           </div>
         ) : null}
 
-        {!loading && filteredItems.length > 0 ? (
+        {!loading && family === 'cocktails' && filteredCocktails.length > 0 ? (
+          <div className="inventory-table-scroll">
+            <table className="inventory-table">
+              <thead><tr><th>Master name</th><th>Status</th><th>Selected organization</th><th /></tr></thead>
+              <tbody>
+                {pageCocktails.map((master) => (
+                  <tr key={master.id}>
+                    <td data-label="Master name"><strong>{master.name}</strong></td>
+                    <td data-label="Status">{master.active ? 'Active' : 'Inactive'}</td>
+                    <td data-label="Selected organization">{master.assigned ? 'Assigned' : 'Not assigned'}</td>
+                    <td data-label="Actions"><button className="inventory-template-download" type="button" onClick={() => beginSharedRename('cocktails', master)}>Review / Rename</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
+        {!loading && family === 'liquor-mods' && filteredLiquorMasters.length > 0 ? (
+          <div className="inventory-table-scroll">
+            <table className="inventory-table">
+              <thead><tr><th>Master name</th><th>Placement</th><th>Status</th><th>Selected organization</th><th /></tr></thead>
+              <tbody>
+                {pageLiquorMasters.map((master) => (
+                  <tr key={master.id}>
+                    <td data-label="Master name"><strong>{master.name}</strong></td>
+                    <td data-label="Placement">{liquorPlacementLabel(master.type)}</td>
+                    <td data-label="Status">{master.active ? 'Active' : 'Inactive'}</td>
+                    <td data-label="Selected organization">{master.assigned ? 'Assigned' : 'Not assigned'}</td>
+                    <td data-label="Actions"><button className="inventory-template-download" type="button" onClick={() => beginSharedRename('liquor-mods', master)}>Review / Rename</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
+        {!loading && currentCount === 0 ? <p className="inventory-empty-state">No master records match these filters.</p> : null}
+
+        {!loading && currentCount > 0 ? (
           <div className="master-names-pagination">
-            <span>
-              Showing {(pageStart + 1).toLocaleString()}–{pageEnd.toLocaleString()} of{' '}
-              {filteredItems.length.toLocaleString()}
-            </span>
+            <div className="master-names-pagination-left">
+              <span>Showing {(pageStart + 1).toLocaleString()}–{pageEnd.toLocaleString()} of {currentCount.toLocaleString()}</span>
+              <label className="master-page-size">
+                <span>Max records</span>
+                <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
+                  {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
+                </select>
+              </label>
+            </div>
             <div className="master-names-pagination-actions">
-              <button
-                className="inventory-template-download"
-                type="button"
-                disabled={clampedPage <= 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-              >
-                Previous
-              </button>
-              <span>
-                Page {clampedPage} of {pageCount}
-              </span>
-              <button
-                className="inventory-template-download"
-                type="button"
-                disabled={clampedPage >= pageCount}
-                onClick={() =>
-                  setPage((current) => Math.min(pageCount, current + 1))
-                }
-              >
-                Next
-              </button>
+              <button className="inventory-template-download" type="button" disabled={clampedPage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
+              <span>Page {clampedPage} of {pageCount}</span>
+              <button className="inventory-template-download" type="button" disabled={clampedPage >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>Next</button>
             </div>
           </div>
         ) : null}
