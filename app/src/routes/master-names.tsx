@@ -1097,6 +1097,119 @@ function MasterNamesPage() {
           </section>
         </div>
       ) : null}
+
+      {selectedShared ? (
+        <div
+          className="master-rename-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shared-master-rename-title"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) cancelSharedRename()
+          }}
+        >
+          <section className="master-rename-panel">
+            <div className="master-rename-header">
+              <div className="master-name-current">
+                <small>
+                  {selectedSharedMaster?.family === 'cocktails'
+                    ? 'Cocktail master'
+                    : selectedLiquorMaster
+                      ? liquorPlacementLabel(selectedLiquorMaster.type)
+                      : 'Liquor Mod master'}
+                </small>
+                <h2 id="shared-master-rename-title">{selectedShared.name}</h2>
+              </div>
+              <button
+                className="inventory-template-download"
+                type="button"
+                disabled={saving}
+                onClick={cancelSharedRename}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="master-names-summary">
+              <article>
+                <span>Status</span>
+                <strong>{selectedShared.active ? 'Active' : 'Inactive'}</strong>
+              </article>
+              <article>
+                <span>Selected organization</span>
+                <strong>{selectedShared.assigned ? 'Assigned' : 'Not assigned'}</strong>
+              </article>
+              <article>
+                <span>Record type</span>
+                <strong>
+                  {selectedSharedMaster?.family === 'cocktails'
+                    ? 'Cocktail'
+                    : selectedLiquorMaster
+                      ? liquorPlacementLabel(selectedLiquorMaster.type)
+                      : 'Liquor Mod'}
+                </strong>
+              </article>
+              <article>
+                <span>Scope</span>
+                <strong>Global</strong>
+              </article>
+            </div>
+
+            <label className="master-rename-field">
+              <span>New master name</span>
+              <input
+                className="inventory-input"
+                value={sharedDraftName}
+                maxLength={160}
+                disabled={saving}
+                autoFocus
+                onChange={(event) => setSharedDraftName(event.target.value)}
+              />
+            </label>
+
+            <label className="master-active-toggle">
+              <input
+                type="checkbox"
+                checked={sharedDraftActive}
+                disabled={saving}
+                onChange={(event) => setSharedDraftActive(event.target.checked)}
+              />
+              <span>Active master</span>
+            </label>
+
+            <div className="master-rename-footer">
+              <p className="master-rename-help">
+                Renaming this record changes the shared master name. Existing
+                organization-specific name overrides remain unchanged. Inactive
+                masters cannot be newly assigned.
+              </p>
+
+              <div className="master-rename-actions">
+                <button
+                  className="inventory-template-download"
+                  type="button"
+                  disabled={saving}
+                  onClick={cancelSharedRename}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="inventory-template-download"
+                  type="button"
+                  disabled={saving || !sharedDraftName.trim() || !sharedChanged}
+                  onClick={() => void saveSharedRename()}
+                >
+                  {saving ? 'Saving…' : 'Save master'}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   )
+}
+
+function liquorPlacementLabel(type: InventoryLiquorModifierType) {
+  return type === 'mixer' ? 'Mixer' : 'Bar Prep'
 }
