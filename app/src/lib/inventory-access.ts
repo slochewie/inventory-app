@@ -304,6 +304,7 @@ export type InventoryImportItem = {
   toastDestination: string
   basePriceCents: number | null
   happyHourPriceCents: number | null
+  doublePriceCents?: number | null
   status: "ready" | "review" | "ignored"
   exportIncluded: boolean
   targetVariantId?: string
