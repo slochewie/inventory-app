@@ -2,14 +2,30 @@ import { authBaseURL } from "#/lib/auth-client"
 
 export type InventoryLiquorModifierType = "mixer" | "bar_prep"
 
-export type InventoryLiquorModifier = {
+export type InventoryLiquorModifierMaster = {
   id: string
-  organizationId: string
   type: InventoryLiquorModifierType
   name: string
   normalizedName: string
+  active: boolean
+  createdAt: string
+  updatedAt: string
+  organizationModifierId?: string | null
+  assigned?: boolean
+}
+
+export type InventoryLiquorModifier = {
+  id: string
+  organizationId: string
+  inventoryLiquorModifierId: string
+  type: InventoryLiquorModifierType
+  masterName: string
+  normalizedName: string
+  nameOverride: string | null
+  name: string
   upchargeCents: number
   enabled: boolean
+  exportToToast: boolean
   sortOrder: number
   createdAt: string
   updatedAt: string
@@ -22,11 +38,25 @@ type LiquorModsResponse = {
   error?: string
 }
 
+type LiquorModifierMastersResponse = {
+  organizationId?: string
+  role?: string | null
+  modifiers?: InventoryLiquorModifierMaster[]
+  error?: string
+}
+
 type LiquorModifierResponse = {
   created?: boolean
   updated?: boolean
   removed?: boolean
   modifier?: InventoryLiquorModifier
+  error?: string
+}
+
+type LiquorModifierMasterResponse = {
+  created?: boolean
+  updated?: boolean
+  modifier?: InventoryLiquorModifierMaster
   error?: string
 }
 
@@ -59,6 +89,91 @@ async function readJson(response: Response) {
   }
 }
 
+export async function listInventoryLiquorModifierMasters(
+  organizationId: string,
+  type: InventoryLiquorModifierType,
+  signal?: AbortSignal,
+) {
+  const url = new URL(authEndpoint("/api/auth/inventory/liquor-mod-masters"))
+  url.searchParams.set("organizationId", organizationId)
+  url.searchParams.set("type", type)
+
+  const response = await fetch(url, {
+    credentials: "include",
+    signal,
+  })
+
+  const result = await readInventoryResponse<LiquorModifierMastersResponse>(
+    response,
+    "Unable to load Liquor Mod masters.",
+  )
+
+  return {
+    organizationId:
+      typeof result.organizationId === "string"
+        ? result.organizationId
+        : organizationId,
+    role: result.role ?? null,
+    modifiers: Array.isArray(result.modifiers) ? result.modifiers : [],
+  }
+}
+
+export async function createInventoryLiquorModifierMaster(input: {
+  organizationId: string
+  type: InventoryLiquorModifierType
+  name: string
+  active?: boolean
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/liquor-mod-master"),
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  )
+
+  const result = await readInventoryResponse<LiquorModifierMasterResponse>(
+    response,
+    "Unable to create Liquor Mod master.",
+  )
+
+  if (!result.modifier) {
+    throw new Error("Unable to create Liquor Mod master.")
+  }
+
+  return result.modifier
+}
+
+export async function updateInventoryLiquorModifierMaster(input: {
+  organizationId: string
+  inventoryLiquorModifierId: string
+  name?: string
+  active?: boolean
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/liquor-mod-master"),
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  )
+
+  const result = await readInventoryResponse<LiquorModifierMasterResponse>(
+    response,
+    "Unable to update Liquor Mod master.",
+  )
+
+  if (!result.modifier) {
+    throw new Error("Unable to update Liquor Mod master.")
+  }
+
+  return result.modifier
+}
+
 export async function listInventoryLiquorModifiers(
   organizationId: string,
   signal?: AbortSignal,
@@ -88,18 +203,17 @@ export async function listInventoryLiquorModifiers(
 
 export async function createInventoryLiquorModifier(input: {
   organizationId: string
-  type: InventoryLiquorModifierType
-  name: string
+  inventoryLiquorModifierId: string
+  type?: InventoryLiquorModifierType
   upchargeCents: number
   enabled?: boolean
+  exportToToast?: boolean
   sortOrder?: number
 }) {
   const response = await fetch(authEndpoint("/api/auth/inventory/liquor-mod"), {
     method: "POST",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   })
 
@@ -118,18 +232,16 @@ export async function createInventoryLiquorModifier(input: {
 export async function updateInventoryLiquorModifier(input: {
   organizationId: string
   modifierId: string
-  type?: InventoryLiquorModifierType
   name?: string
   upchargeCents?: number
   enabled?: boolean
+  exportToToast?: boolean
   sortOrder?: number
 }) {
   const response = await fetch(authEndpoint("/api/auth/inventory/liquor-mod"), {
     method: "PATCH",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   })
 
@@ -154,9 +266,7 @@ export async function removeInventoryLiquorModifier(input: {
     {
       method: "POST",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     },
   )
@@ -179,9 +289,7 @@ export async function reorderInventoryLiquorModifiers(input: {
     {
       method: "PATCH",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     },
   )
