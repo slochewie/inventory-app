@@ -111,7 +111,9 @@ export function InventorySidebar({
 
   const primarySection = navigation?.primary[0]
   const basePrimaryItems =
-    primarySection?.items.filter((item) => item.label !== "Menu Categories") ?? []
+    primarySection?.items.filter(
+      (item) => item.label !== "Menu Categories" && item.label !== "Add Item",
+    ) ?? []
   const liquorModsItem = appLinks
     ? ({
         id: "inventory:liquor-mods",
