@@ -50,6 +50,7 @@ export type InventoryCatalogRow = {
     exportToToast: boolean
     priceOverrideCents: number | null
     happyHourPriceCents: number | null
+    doublePriceCents: number | null
     toastNameOverride: string | null
     toastCategoryOverride: string | null
     toastDestinationOverride: string | null
@@ -945,6 +946,7 @@ export async function updateInventoryOrganizationVariant(input: {
   exportToToast?: boolean
   priceOverrideCents?: number | null
   happyHourPriceCents?: number | null
+  doublePriceCents?: number | null
   toastNameOverride?: string | null
   toastCategoryOverride?: string | null
   toastDestinationOverride?: string | null
@@ -982,6 +984,7 @@ export async function updateInventoryOrganizationVariants(input: {
   exportToToast?: boolean
   priceOverrideCents?: number | null
   happyHourPriceCents?: number | null
+  doublePriceCents?: number | null
   toastCategoryOverride?: string | null
   toastDestinationOverride?: string | null
 }) {
