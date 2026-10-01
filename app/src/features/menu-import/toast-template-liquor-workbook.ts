@@ -63,6 +63,26 @@ type LiquorRow = {
   liquorType: string
 }
 
+export type ToastLiquorModifier = {
+  type: 'mixer' | 'bar_prep'
+  name: string
+  upchargeCents: number
+  enabled: boolean
+  exportToToast: boolean
+}
+
+type LiquorModifierSheetMapping = {
+  sheetPath: string
+  sheetName: string
+  headerRow: number
+  dataStartRow: number
+  lastTemplateRow: number
+  mixerNameCol: number
+  mixerPriceCol: number
+  barPrepNameCol: number
+  barPrepPriceCol: number
+}
+
 type LiquorSlot = {
   label: string
   kind: string
@@ -163,6 +183,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   draftSlotMappings,
   optionalBeerCategories,
   builtInFormatVisibility,
+  liquorModifiers = [],
 }: {
   templateArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -177,6 +198,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
   optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
   builtInFormatVisibility?: BeerBuiltInFormatVisibility
+  liquorModifiers?: readonly ToastLiquorModifier[]
 }) {
   const beerPopulatedWorkbook = buildPopulatedToastTemplateWorkbook({
     templateArrayBuffer,
@@ -192,6 +214,7 @@ export async function buildPopulatedToastTemplateWorkbookWithLiquorAsync({
   populateLiquorSheet(workbookPackage, items, happyHourEnabled)
   populateWineSheet(workbookPackage, items, happyHourEnabled)
   populateCocktailsSheet(workbookPackage, items, happyHourEnabled)
+  populateLiquorModifiersSheet(workbookPackage, liquorModifiers)
   // Retail and Open Items duplicate the pristine NA Bev sheet when needed,
   // so create them before writing NA Bev rows into the source worksheet.
   populateRetailSheet(workbookPackage, items)
@@ -227,6 +250,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   draftSlotMappings,
   optionalBeerCategories,
   builtInFormatVisibility,
+  liquorModifiers = [],
 }: {
   workbookArrayBuffer: ArrayBuffer
   items: NormalizedMenuItem[]
@@ -241,6 +265,7 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
   draftSlotMappings?: readonly ToastDraftSlotMapping[]
   optionalBeerCategories?: readonly OptionalBeerCategoryOptions[]
   builtInFormatVisibility?: BeerBuiltInFormatVisibility
+  liquorModifiers?: readonly ToastLiquorModifier[]
 }) {
   const beer = validatePopulatedBeerWorkbook({
     workbookArrayBuffer,
@@ -283,6 +308,11 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     happyHourEnabled,
     issues,
   )
+  const liquorModifiersCount = validateLiquorModifiersSheet(
+    workbookPackage,
+    liquorModifiers,
+    issues,
+  )
   const retail = validateRetailSheet(workbookPackage, items, issues)
   const openItems = validateOpenItemsSheet(workbookPackage, items, issues)
   const naBev = validateNaBevSheet(workbookPackage, items, issues)
@@ -313,11 +343,210 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
     liquorRows,
     wineRows: wine,
     cocktailRows: cocktails,
+    liquorModifierRows: liquorModifiersCount,
     naBevRows: naBev,
     retailRows: retail,
     openItemsRows: openItems,
     happyHourNotes: happyHourNotes.valid,
   }
+}
+
+function populateLiquorModifiersSheet(
+  workbookPackage: WorkbookPackage,
+  modifiers: readonly ToastLiquorModifier[],
+) {
+  const rows = getExportableLiquorModifiers(modifiers)
+  const mapping = getLiquorModifierSheetMapping(workbookPackage)
+  const sheetDoc = parseXml(
+    getTextFile(workbookPackage.files, mapping.sheetPath),
+  )
+
+  clearCells(
+    sheetDoc,
+    [
+      mapping.mixerNameCol,
+      mapping.mixerPriceCol,
+      mapping.barPrepNameCol,
+      mapping.barPrepPriceCol,
+    ],
+    mapping.dataStartRow,
+    mapping.lastTemplateRow,
+  )
+
+  const mixers = rows.filter((modifier) => modifier.type === 'mixer')
+  const barPrep = rows.filter((modifier) => modifier.type === 'bar_prep')
+
+  mixers.forEach((modifier, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    writeCellValue(
+      sheetDoc,
+      mapping.mixerNameCol,
+      rowNumber,
+      modifier.name,
+      mapping.dataStartRow,
+    )
+    writeCellValue(
+      sheetDoc,
+      mapping.mixerPriceCol,
+      rowNumber,
+      modifier.upchargeCents / 100,
+      mapping.dataStartRow,
+    )
+  })
+
+  barPrep.forEach((modifier, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    writeCellValue(
+      sheetDoc,
+      mapping.barPrepNameCol,
+      rowNumber,
+      modifier.name,
+      mapping.dataStartRow,
+    )
+    writeCellValue(
+      sheetDoc,
+      mapping.barPrepPriceCol,
+      rowNumber,
+      modifier.upchargeCents / 100,
+      mapping.dataStartRow,
+    )
+  })
+
+  workbookPackage.files[mapping.sheetPath] = strToU8(serializeXml(sheetDoc))
+}
+
+function validateLiquorModifiersSheet(
+  workbookPackage: WorkbookPackage,
+  modifiers: readonly ToastLiquorModifier[],
+  issues: string[],
+) {
+  const rows = getExportableLiquorModifiers(modifiers)
+  const mapping = getLiquorModifierSheetMapping(workbookPackage)
+  const sheetDoc = parseXml(
+    getTextFile(workbookPackage.files, mapping.sheetPath),
+  )
+
+  const mixers = rows.filter((modifier) => modifier.type === 'mixer')
+  const barPrep = rows.filter((modifier) => modifier.type === 'bar_prep')
+
+  mixers.forEach((modifier, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    validateLiquorCell(
+      issues,
+      sheetDoc,
+      workbookPackage.sharedStrings,
+      mapping.mixerNameCol,
+      rowNumber,
+      modifier.name,
+      modifier.name + ' Mixer name',
+    )
+    validateLiquorCell(
+      issues,
+      sheetDoc,
+      workbookPackage.sharedStrings,
+      mapping.mixerPriceCol,
+      rowNumber,
+      modifier.upchargeCents / 100,
+      modifier.name + ' Mixer price',
+    )
+  })
+
+  barPrep.forEach((modifier, index) => {
+    const rowNumber = mapping.dataStartRow + index
+    validateLiquorCell(
+      issues,
+      sheetDoc,
+      workbookPackage.sharedStrings,
+      mapping.barPrepNameCol,
+      rowNumber,
+      modifier.name,
+      modifier.name + ' Bar Prep name',
+    )
+    validateLiquorCell(
+      issues,
+      sheetDoc,
+      workbookPackage.sharedStrings,
+      mapping.barPrepPriceCol,
+      rowNumber,
+      modifier.upchargeCents / 100,
+      modifier.name + ' Bar Prep price',
+    )
+  })
+
+  return rows.length
+}
+
+function getExportableLiquorModifiers(
+  modifiers: readonly ToastLiquorModifier[],
+) {
+  return modifiers.filter(
+    (modifier) =>
+      modifier.enabled &&
+      modifier.exportToToast &&
+      clean(modifier.name) !== '',
+  )
+}
+
+function getLiquorModifierSheetMapping(
+  workbookPackage: WorkbookPackage,
+): LiquorModifierSheetMapping {
+  const sheet = getWorkbookSheets(workbookPackage).find(
+    (candidate) => normalizeHeader(candidate.name) === 'liquor mods',
+  )
+  if (!sheet) {
+    throw new Error('Toast template is missing a Liquor Mods tab')
+  }
+
+  const sheetDoc = parseXml(
+    getTextFile(workbookPackage.files, sheet.path),
+  )
+
+  for (let rowNumber = 1; rowNumber <= 40; rowNumber += 1) {
+    const values = getRowValues(
+      sheetDoc,
+      rowNumber,
+      workbookPackage.sharedStrings,
+    )
+
+    const mixer = values.find(
+      (cell) => normalizeHeader(cell.value) === 'mixers',
+    )
+    const barPrep = values.find((cell) =>
+      normalizeHeader(cell.value).includes('bar prep'),
+    )
+
+    if (!mixer || !barPrep) continue
+
+    const mixerPrice = values.find(
+      (cell) =>
+        cell.col > mixer.col &&
+        cell.col < barPrep.col &&
+        normalizeHeader(cell.value).includes('price'),
+    )
+    const barPrepPrice = values.find(
+      (cell) =>
+        cell.col > barPrep.col &&
+        normalizeHeader(cell.value).includes('price'),
+    )
+
+    if (!mixerPrice || !barPrepPrice) continue
+
+    return {
+      sheetPath: sheet.path,
+      sheetName: sheet.name,
+      headerRow: rowNumber,
+      dataStartRow: rowNumber + 1,
+      lastTemplateRow: getLastWorksheetRow(sheetDoc),
+      mixerNameCol: mixer.col,
+      mixerPriceCol: mixerPrice.col,
+      barPrepNameCol: barPrep.col,
+      barPrepPriceCol: barPrepPrice.col,
+    }
+  }
+
+  throw new Error(
+    'Liquor Mods tab is missing the expected Mixers / Bar Prep Modifiers headers',
+  )
 }
 
 function populateWineSheet(
