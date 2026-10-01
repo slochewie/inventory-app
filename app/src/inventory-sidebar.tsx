@@ -121,9 +121,28 @@ export function InventorySidebar({
         icon: "martini",
       } as (typeof basePrimaryItems)[number])
     : null
-  const primaryItems = liquorModsItem
+  const withLiquorMods = liquorModsItem
     ? insertLiquorModsItem(basePrimaryItems, liquorModsItem)
     : basePrimaryItems
+  const masterLiquorItems = appLinks && canManageMasterCatalog
+    ? [
+        {
+          id: "inventory:master-mixers",
+          label: "Master Mixers",
+          href: `${appLinks.inventory.replace(/\/$/, "")}/master-mixers`,
+          active: currentPath === "/master-mixers",
+          icon: "martini",
+        },
+        {
+          id: "inventory:master-bar-prep",
+          label: "Master Bar Prep",
+          href: `${appLinks.inventory.replace(/\/$/, "")}/master-bar-prep`,
+          active: currentPath === "/master-bar-prep",
+          icon: "martini",
+        },
+      ] as Array<(typeof basePrimaryItems)[number]>
+    : []
+  const primaryItems = insertMasterLiquorItems(withLiquorMods, masterLiquorItems)
   const appsSection = navigation?.apps[0]
   const currentHref = appLinks
     ? `${appLinks.inventory.replace(/\/$/, "")}${currentPath}`
@@ -158,7 +177,7 @@ export function InventorySidebar({
                     >
                       {item.label === "Export to Toast" ? (
                         <ToastBrandIcon />
-                      ) : item.label === "Cocktails" || item.label === "Liquor Mods" ? (
+                      ) : ["Cocktails", "Liquor Mods", "Master Mixers", "Master Bar Prep"].includes(item.label) ? (
                         <Martini className="size-4 shrink-0" aria-hidden="true" />
                       ) : (
                         <NiteOwlNavigationIcon icon={item.icon} />
@@ -191,7 +210,7 @@ export function InventorySidebar({
                     >
                       {item.label === "Export to Toast" ? (
                         <ToastBrandIcon />
-                      ) : item.label === "Cocktails" || item.label === "Liquor Mods" ? (
+                      ) : ["Cocktails", "Liquor Mods", "Master Mixers", "Master Bar Prep"].includes(item.label) ? (
                         <Martini className="size-4 shrink-0" aria-hidden="true" />
                       ) : (
                         <NiteOwlNavigationIcon icon={item.icon} />
@@ -219,5 +238,26 @@ function insertLiquorModsItem<T extends { label: string }>(items: T[], item: T) 
     ...items.slice(0, cocktailsIndex + 1),
     item,
     ...items.slice(cocktailsIndex + 1),
+  ]
+}
+
+function insertMasterLiquorItems<T extends { label: string }>(
+  items: T[],
+  masterItems: T[],
+) {
+  if (!masterItems.length) return items
+
+  const filtered = items.filter(
+    (item) => !masterItems.some((master) => master.label === item.label),
+  )
+  const liquorModsIndex = filtered.findIndex(
+    (item) => item.label === "Liquor Mods",
+  )
+  const insertAt = liquorModsIndex === -1 ? filtered.length : liquorModsIndex + 1
+
+  return [
+    ...filtered.slice(0, insertAt),
+    ...masterItems,
+    ...filtered.slice(insertAt),
   ]
 }
