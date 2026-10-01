@@ -979,6 +979,7 @@ function ToastWorkbook() {
             toastDestination: item.toastDestination,
             basePriceCents: item.basePriceCents,
             happyHourPriceCents: item.happyHourPriceCents,
+            doublePriceCents: item.doublePriceCents ?? null,
             status: item.status,
             exportIncluded: item.exportIncluded,
             targetVariantId:
