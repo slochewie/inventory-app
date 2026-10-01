@@ -432,11 +432,41 @@ function MasterNamesPage() {
   return (
     <section className="inventory-content inventory-master-names-page">
       <style>{`
+        .inventory-master-names-page {
+          display: grid;
+          gap: 1rem;
+        }
+
+        .inventory-master-names-page .master-family-tabs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: .5rem;
+        }
+
+        .inventory-master-names-page .master-family-tabs button {
+          min-height: 2.5rem;
+          border: 1px solid #d1d5db;
+          border-radius: .65rem;
+          background: #fff;
+          color: #374151;
+          padding: .45rem .8rem;
+          font-weight: 800;
+        }
+
+        .inventory-master-names-page .master-family-tabs button.is-active {
+          border-color: #111827;
+          background: #111827;
+          color: #fff;
+        }
+
         .inventory-master-names-page .master-names-toolbar {
           display: grid;
           grid-template-columns: minmax(20rem, 2fr) repeat(3, minmax(10rem, 1fr));
           gap: .75rem;
-          margin-bottom: 1rem;
+        }
+
+        .inventory-master-names-page .master-names-toolbar.is-shared {
+          grid-template-columns: minmax(20rem, 2fr) minmax(10rem, 1fr) minmax(10rem, 1fr);
         }
 
         .inventory-master-names-page .master-names-toolbar .inventory-search-control {
