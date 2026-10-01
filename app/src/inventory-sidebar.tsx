@@ -110,6 +110,8 @@ export function InventorySidebar({
     : null
 
   const primarySection = navigation?.primary[0]
+  const primaryItems =
+    primarySection?.items.filter((item) => item.label !== "Menu Categories") ?? []
   const appsSection = navigation?.apps[0]
   const currentHref = appLinks
     ? `${appLinks.inventory.replace(/\/$/, "")}${currentPath}`
@@ -128,14 +130,14 @@ export function InventorySidebar({
       <SidebarSeparator />
 
       <SidebarContent>
-        {primarySection ? (
+        {primarySection && primaryItems.length ? (
           <SidebarGroup>
             {primarySection.label ? (
               <SidebarGroupLabel>{primarySection.label}</SidebarGroupLabel>
             ) : null}
             <SidebarGroupContent>
               <SidebarMenu>
-                {primarySection.items.map((item) => (
+                {primaryItems.map((item) => (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
                       isActive={item.active}
