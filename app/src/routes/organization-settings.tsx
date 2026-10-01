@@ -104,6 +104,7 @@ function OrganizationSettingsPage() {
   const [happyHourExpanded, setHappyHourExpanded] = useState(true)
   const [timeRange1Expanded, setTimeRange1Expanded] = useState(true)
   const [timeRange2Expanded, setTimeRange2Expanded] = useState(false)
+  const [menuCategoriesExpanded, setMenuCategoriesExpanded] = useState(true)
   const [beerFormatsExpanded, setBeerFormatsExpanded] = useState(true)
 
   const [happyHourEnabled, setHappyHourEnabled] = useState(false)
@@ -683,15 +684,23 @@ function OrganizationSettingsPage() {
               </div>
             </details>
 
-            <section className="inventory-organization-settings-section inventory-menu-category-card">
-              <div className="inventory-draft-slots-copy">
-                <h2>Menu Categories</h2>
-                <p>
-                  Enable optional categories that should appear in Add Item and
-                  Toast export routing. Beer, Cocktails, and NA Bev are always
-                  available.
-                </p>
-              </div>
+            <details
+              className="inventory-organization-settings-section inventory-menu-category-card"
+              open={menuCategoriesExpanded}
+              onToggle={(event) =>
+                setMenuCategoriesExpanded(event.currentTarget.open)
+              }
+            >
+              <summary className="inventory-settings-card-summary">
+                <div className="inventory-draft-slots-copy">
+                  <h2>Menu Categories</h2>
+                  <p>
+                    Enable optional categories that should appear in Add Item and
+                    Toast export routing. Beer, Cocktails, and NA Bev are always
+                    available.
+                  </p>
+                </div>
+              </summary>
 
               <div className="inventory-draft-slots-grid">
                 {OPTIONAL_MENU_CATEGORIES.map((category) => (
@@ -739,7 +748,7 @@ function OrganizationSettingsPage() {
                   {savingMenuCategories ? 'Saving…' : 'Update'}
                 </button>
               </div>
-            </section>
+            </details>
 
             <details
               className="inventory-organization-settings-section inventory-draft-slots-settings"

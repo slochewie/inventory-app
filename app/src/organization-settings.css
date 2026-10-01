@@ -212,9 +212,13 @@
   min-width: 6rem;
 }
 
-.inventory-menu-category-card {
+.inventory-menu-category-card[open] {
   display: grid !important;
   gap: 1rem;
+}
+
+.inventory-menu-category-card > .inventory-settings-card-summary {
+  grid-column: 1 / -1;
 }
 
 .inventory-menu-category-card .inventory-draft-slots-grid {
