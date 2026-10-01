@@ -87,16 +87,17 @@
   display: grid;
   grid-template-columns: minmax(11rem, 1fr) minmax(6.75rem, 8rem) auto;
   gap: 0.65rem;
-  align-items: end;
   padding: 0.9rem 1.25rem;
 }
 
 .liquor-mods-add-form {
+  align-items: end;
   border-bottom: 1px solid var(--inventory-border, #eaecf0);
   background: #fcfcfd;
 }
 
 .liquor-mods-row {
+  align-items: start;
   border-bottom: 1px solid var(--inventory-border, #eaecf0);
 }
 
@@ -107,6 +108,11 @@
 .liquor-mods-field {
   display: grid;
   gap: 0.35rem;
+}
+
+.liquor-mods-row > .liquor-mods-field,
+.liquor-mods-row-body {
+  align-self: start;
 }
 
 .liquor-mods-field > span,
@@ -215,6 +221,7 @@
 .liquor-mods-row-actions {
   display: grid;
   grid-auto-flow: column;
+  align-self: start;
   gap: 0.35rem;
 }
 
@@ -222,6 +229,7 @@
   display: inline-grid;
   place-items: center;
   width: 2.45rem;
+  margin-top: 1.18rem;
   padding: 0;
 }
 
@@ -275,7 +283,8 @@
     grid-template-columns: 1fr;
   }
 
-  .liquor-mods-enabled {
+  .liquor-mods-enabled,
+  .liquor-mods-row-actions button {
     margin-top: 0;
   }
 
