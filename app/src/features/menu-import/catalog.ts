@@ -39,6 +39,7 @@ export function catalogRowToNormalizedItem(
     toastSlot: row.organization.toastSlot,
     basePriceCents: row.effectivePriceCents,
     happyHourPriceCents: row.organization.happyHourPriceCents,
+    doublePriceCents: row.organization.doublePriceCents,
     effectiveTimes: [],
     sourceRowCount: 0,
     status: row.active && row.variant.active ? 'ready' : 'ignored',
