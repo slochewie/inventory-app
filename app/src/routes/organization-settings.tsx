@@ -635,7 +635,7 @@ function OrganizationSettingsPage() {
 
                 <HappyHourRangeCard
                   title="Time Range 2"
-                  description="Optional second Happy Hour window."
+                  description="Optional second time-based pricing window."
                   open={timeRange2Expanded}
                   onOpenChange={setTimeRange2Expanded}
                   enabled={happyHourRange2DraftEnabled}
