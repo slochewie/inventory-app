@@ -29,7 +29,7 @@ type ModifierDraft = {
 }
 
 type RowDraft = {
-  name: string
+  nameOverride: string
   upcharge: string
   enabled: boolean
   exportToToast: boolean
@@ -173,7 +173,7 @@ function LiquorModsPage() {
       ...current,
       [modifierId]: {
         ...(current[modifierId] ?? {
-          name: '',
+          nameOverride: '',
           upcharge: '0.00',
           enabled: true,
           exportToToast: true,
@@ -232,13 +232,8 @@ function LiquorModsPage() {
     if (!canEdit || !activeOrganization?.id || saving) return
 
     const draft = rowDrafts[modifier.id]
-    const name = draft?.name.trim() ?? ''
+    const nameOverride = draft?.nameOverride.trim() ?? ''
     const upchargeCents = parseDollarInput(draft?.upcharge ?? '')
-
-    if (!name) {
-      setError('Name is required.')
-      return
-    }
 
     if (upchargeCents === null) {
       setError('Enter a valid upcharge dollar amount.')
@@ -253,7 +248,7 @@ function LiquorModsPage() {
       await updateInventoryLiquorModifier({
         organizationId: activeOrganization.id,
         modifierId: modifier.id,
-        name,
+        name: nameOverride || modifier.masterName,
         upchargeCents,
         enabled: draft?.enabled ?? modifier.enabled,
         exportToToast:
@@ -446,7 +441,7 @@ function LiquorModsPage() {
               {grouped[section.type].length ? (
                 grouped[section.type].map((modifier, index) => {
                   const draft = rowDrafts[modifier.id] ?? {
-                    name: modifier.name,
+                    nameOverride: modifier.nameOverride ?? '',
                     upcharge: formatCents(modifier.upchargeCents),
                     enabled: modifier.enabled,
                     exportToToast: modifier.exportToToast,
@@ -455,21 +450,27 @@ function LiquorModsPage() {
 
                   return (
                     <div className="liquor-mods-row" key={modifier.id}>
+                      <div className="liquor-mods-master-identity">
+                        <span>{section.singular}</span>
+                        <strong>{modifier.masterName}</strong>
+                      </div>
+
                       <div className="liquor-mods-row-fields">
                         <label className="liquor-mods-field">
-                          <span>Organization name</span>
+                          <span>Name override</span>
                           <input
-                            value={draft.name}
+                            value={draft.nameOverride}
+                            placeholder={modifier.masterName}
                             onChange={(event) =>
                               updateRowDraft(modifier.id, {
-                                name: event.target.value,
+                                nameOverride: event.target.value,
                               })
                             }
                             disabled={!canEdit || saving}
                           />
-                          {draft.name.trim() !== modifier.masterName ? (
-                            <small>Master: {modifier.masterName}</small>
-                          ) : null}
+                          <small>
+                            Leave blank to use the master name.
+                          </small>
                         </label>
 
                         <label className="liquor-mods-field">
@@ -597,7 +598,7 @@ function buildRowDrafts(modifiers: InventoryLiquorModifier[]) {
     modifiers.map((modifier) => [
       modifier.id,
       {
-        name: modifier.name,
+        nameOverride: modifier.nameOverride ?? '',
         upcharge: formatCents(modifier.upchargeCents),
         enabled: modifier.enabled,
         exportToToast: modifier.exportToToast,
@@ -610,7 +611,7 @@ function rowHasChanges(modifier: InventoryLiquorModifier, draft: RowDraft) {
   const cents = parseDollarInput(draft.upcharge)
 
   return (
-    draft.name.trim() !== modifier.name ||
+    draft.nameOverride.trim() !== (modifier.nameOverride ?? '') ||
     cents !== modifier.upchargeCents ||
     draft.enabled !== modifier.enabled ||
     draft.exportToToast !== modifier.exportToToast
