@@ -203,8 +203,9 @@ export async function listInventoryLiquorModifiers(
 
 export async function createInventoryLiquorModifier(input: {
   organizationId: string
-  inventoryLiquorModifierId: string
-  type?: InventoryLiquorModifierType
+  inventoryLiquorModifierId?: string
+  type: InventoryLiquorModifierType
+  name?: string
   upchargeCents: number
   enabled?: boolean
   exportToToast?: boolean
@@ -232,6 +233,7 @@ export async function createInventoryLiquorModifier(input: {
 export async function updateInventoryLiquorModifier(input: {
   organizationId: string
   modifierId: string
+  type?: InventoryLiquorModifierType
   name?: string
   upchargeCents?: number
   enabled?: boolean
