@@ -698,3 +698,59 @@ function CocktailsPage() {
                     onClick={() => void saveSelectedCocktail()}
                   >
                     {saving ? 'Saving…' : 'Update'}
+                  </button>
+                </div>
+              </footer>
+            </section>
+          </div>
+        ) : null}
+      </section>
+    </AuthenticatedInventoryShell>
+  )
+}
+
+function MoneyInput({
+  value,
+  disabled,
+  placeholder = '0.00',
+  onChange,
+}: {
+  value: string
+  disabled: boolean
+  placeholder?: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="cocktails-money-input">
+      <span>$</span>
+      <input
+        inputMode="decimal"
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  )
+}
+
+function displayName(cocktail: InventoryOrganizationCocktail) {
+  return cocktail.toastNameOverride?.trim() || cocktail.masterName
+}
+
+function formatMoney(cents: number | null) {
+  if (cents === null) return '—'
+  return '$' + (cents / 100).toFixed(2)
+}
+
+function moneyToCents(value: string, allowBlank = false) {
+  const cleaned = value.trim().replace(/^\$/, '').replace(/,/g, '')
+  if (!cleaned) return allowBlank ? null : null
+  const parsed = Number(cleaned)
+  if (!Number.isFinite(parsed) || parsed < 0) return null
+  return Math.round(parsed * 100)
+}
+
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
