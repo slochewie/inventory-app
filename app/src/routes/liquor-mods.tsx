@@ -376,7 +376,7 @@ function LiquorModsPage() {
               <button
                 type="submit"
                 className="inventory-primary-button"
-                disabled={saving}
+                disabled={saving || !draft.name.trim()}
               >
                 {saving
                   ? 'Adding…'
