@@ -183,6 +183,26 @@ function LiquorModsPage() {
     }))
   }
 
+  function focusNewUpcharge(type: InventoryLiquorModifierType) {
+    const current = drafts[type].upcharge.trim()
+    if (current === '0.00' || current === '0') {
+      updateDraft(type, { upcharge: '' })
+    }
+  }
+
+  function blurNewUpcharge(type: InventoryLiquorModifierType) {
+    const current = drafts[type].upcharge.trim()
+    if (!current) {
+      updateDraft(type, { upcharge: '0.00' })
+      return
+    }
+
+    const upchargeCents = parseDollarInput(current)
+    if (upchargeCents !== null) {
+      updateDraft(type, { upcharge: formatCents(upchargeCents) })
+    }
+  }
+
   async function addModifier(
     event: FormEvent,
     type: InventoryLiquorModifierType,
@@ -415,6 +435,8 @@ function LiquorModsPage() {
                     <span>$</span>
                     <input
                       value={drafts[section.type].upcharge}
+                      onFocus={() => focusNewUpcharge(section.type)}
+                      onBlur={() => blurNewUpcharge(section.type)}
                       onChange={(event) =>
                         updateDraft(section.type, { upcharge: event.target.value })
                       }
