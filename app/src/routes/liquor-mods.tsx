@@ -406,7 +406,7 @@ function LiquorModsPage() {
 
                   return (
                     <div className="liquor-mods-row" key={modifier.id}>
-                      <div className="liquor-mods-row-body">
+                      <div className="liquor-mods-row-fields">
                         <label className="liquor-mods-field">
                           <span>Name</span>
                           <input
@@ -419,30 +419,24 @@ function LiquorModsPage() {
                             disabled={!canEdit || saving}
                           />
                         </label>
-                        <div className="liquor-mods-row-meta">
-                          <span>Display order {index + 1}</span>
-                          {!draft.enabled ? <span>Disabled</span> : null}
-                        </div>
-                      </div>
 
-                      <label className="liquor-mods-field">
-                        <span>Upcharge</span>
-                        <span className="liquor-mods-money-input">
-                          <span>$</span>
-                          <input
-                            value={draft.upcharge}
-                            onChange={(event) =>
-                              updateRowDraft(modifier.id, {
-                                upcharge: event.target.value,
-                              })
-                            }
-                            inputMode="decimal"
-                            disabled={!canEdit || saving}
-                          />
-                        </span>
-                      </label>
+                        <label className="liquor-mods-field">
+                          <span>Upcharge</span>
+                          <span className="liquor-mods-money-input">
+                            <span>$</span>
+                            <input
+                              value={draft.upcharge}
+                              onChange={(event) =>
+                                updateRowDraft(modifier.id, {
+                                  upcharge: event.target.value,
+                                })
+                              }
+                              inputMode="decimal"
+                              disabled={!canEdit || saving}
+                            />
+                          </span>
+                        </label>
 
-                      <div className="liquor-mods-row-actions">
                         <label className="liquor-mods-enabled">
                           <input
                             type="checkbox"
@@ -456,42 +450,54 @@ function LiquorModsPage() {
                           />
                           <span>Enabled</span>
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => moveModifier(section.type, modifier.id, 'up')}
-                          disabled={!canEdit || saving || index === 0}
-                          aria-label={`Move ${modifier.name} up`}
-                        >
-                          <ArrowUp size={16} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveModifier(section.type, modifier.id, 'down')}
-                          disabled={
-                            !canEdit ||
-                            saving ||
-                            index === grouped[section.type].length - 1
-                          }
-                          aria-label={`Move ${modifier.name} down`}
-                        >
-                          <ArrowDown size={16} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => saveModifier(modifier)}
-                          disabled={!canEdit || saving || !changed}
-                          aria-label={`Save ${modifier.name}`}
-                        >
-                          <Save size={16} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeModifier(modifier)}
-                          disabled={!canEdit || saving}
-                          aria-label={`Remove ${modifier.name}`}
-                        >
-                          <Trash2 size={16} aria-hidden="true" />
-                        </button>
+                      </div>
+
+                      <div className="liquor-mods-row-footer">
+                        <div className="liquor-mods-row-meta">
+                          <span>Display order {index + 1}</span>
+                          {!draft.enabled ? <span>Disabled</span> : null}
+                        </div>
+
+                        <div className="liquor-mods-row-actions">
+                          <button
+                            type="button"
+                            onClick={() => moveModifier(section.type, modifier.id, 'up')}
+                            disabled={!canEdit || saving || index === 0}
+                            aria-label={`Move ${modifier.name} up`}
+                          >
+                            <ArrowUp size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              moveModifier(section.type, modifier.id, 'down')
+                            }
+                            disabled={
+                              !canEdit ||
+                              saving ||
+                              index === grouped[section.type].length - 1
+                            }
+                            aria-label={`Move ${modifier.name} down`}
+                          >
+                            <ArrowDown size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveModifier(modifier)}
+                            disabled={!canEdit || saving || !changed}
+                            aria-label={`Save ${modifier.name}`}
+                          >
+                            <Save size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeModifier(modifier)}
+                            disabled={!canEdit || saving}
+                            aria-label={`Remove ${modifier.name}`}
+                          >
+                            <Trash2 size={16} aria-hidden="true" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
