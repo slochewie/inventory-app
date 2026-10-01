@@ -169,7 +169,7 @@ Canonical shared Mixer or Bar Prep modifier.
 - `updatedAt`
 - unique: `type + normalizedName`
 
-Master Mixers and Master Bar Prep are global catalog records. Admins manage them from `/master-mixers` and `/master-bar-prep`.
+Mixer and Bar Prep masters remain global catalog records, but they are created/reused through the single `/liquor-mods` workflow rather than separate master-management pages.
 
 ### inventoryOrganizationLiquorModifier
 
@@ -187,7 +187,7 @@ Joins one organization to one shared Liquor Mod master.
 - `updatedAt`
 - unique: `organizationId + inventoryLiquorModifierId`
 
-The `/liquor-mods` page edits only this organization-specific state. Adding a Liquor Mod there selects an existing active master; it does not create a new canonical master.
+The `/liquor-mods` page follows the Cocktails flow: the user chooses a Placement of Mixers or Bar Prep, enters a name, reuses a matching active master when appropriate, or creates a new master through the same add flow. The resulting organization variant stores the local upcharge, availability, export state, ordering, and optional name override.
 
 Important separation:
 
@@ -297,86 +297,3 @@ Persistent organization/source → master mapping.
 - `createdAt`
 - `updatedAt`
 - unique: `organizationId + sourceType + sourceKey`
-
-`mappingConfirmed` distinguishes a mapping that has been explicitly reviewed/accepted from an automatically inferred mapping that may still need review.
-
-Aloha and Toast source rows from different organizations can map to the same shared master item/variant while retaining organization/source-specific identifiers.
-
-## Explicit reconciliation
-
-The import endpoint supports:
-
-- `reconciliationMode: "automatic"`
-- `reconciliationMode: "explicit"`
-
-In explicit mode, every included item must choose exactly one:
-
-- `targetVariantId`, or
-- `createNewMaster: true`
-
-Supplying both, or neither, is rejected.
-
-This is used by the post-staging master mapping review so a reviewed source row cannot be silently reconciled to a merely similar product.
-
-## Bulk organization updates
-
-The Inventory API supports updating multiple organization variants in one request.
-
-Supported fields include:
-
-- `enabled`
-- `exportToToast`
-- `priceOverrideCents`
-- `happyHourPriceCents`
-- organization Toast routing overrides
-
-The Catalog bulk UI currently uses this for availability, Toast export state, and bulk price changes.
-
-## Master-item category and merge operations
-
-The API supports:
-
-- updating a shared master item's `categoryId`,
-- merging one shared master item into another.
-
-Merge reconciles/moves variants and source mappings under the target master identity.
-
-These are shared/global catalog operations, not organization-local edits.
-
-## Optional Menu Categories
-
-Retail and Open Items are currently organization-local frontend configuration rather than first-class persistent Auth tables.
-
-They control Add Item choices and workbook routing for the organization.
-
-Built-in choices:
-
-- Beer
-- Cocktails
-- NA Bev
-
-Optional choices:
-
-- Retail
-- Open Items
-
-Open Items is allowed to export with a null/blank price.
-
-## Toast workbook ownership boundary
-
-The Toast workbook is an output format, not the persistent data model.
-
-The pristine template is never modified in place.
-
-Each export:
-
-1. loads a fresh template copy,
-2. writes the selected organization's catalog,
-3. creates Retail/Open Items clones when needed,
-4. adjusts Beer column visibility,
-5. writes Notes/Happy Hour schedule,
-6. moves Notes to the final tab,
-7. validates generated values/visibility,
-8. stages the final XLSX/ZIP briefly for same-origin browser download.
-
-The generated file is disposable output; persistent truth remains in Inventory/Auth.
