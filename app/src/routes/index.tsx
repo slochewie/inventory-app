@@ -26,7 +26,8 @@ export const Route = createFileRoute('/')({ component: CatalogPage })
 
 type AvailabilityFilter = 'carried' | 'not-carried' | 'all'
 
-const PAGE_SIZE = 50
+const DEFAULT_PAGE_SIZE = 50
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 250] as const
 
 
 type CatalogGroup = {
@@ -74,6 +75,7 @@ function CatalogPage() {
     () => new Set(),
   )
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [optionalBeerCategories, setOptionalBeerCategories] = useState<OptionalBeerCategoryConfig[]>([])
   const [organizationConfig, setOrganizationConfig] =
     useState<InventoryOrganizationConfig | null>(null)
@@ -166,10 +168,10 @@ function CatalogPage() {
     })
   }, [availability, category, groups, query])
 
-  const pageCount = Math.max(1, Math.ceil(filteredGroups.length / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(filteredGroups.length / pageSize))
   const clampedPage = Math.min(page, pageCount)
-  const pageStart = (clampedPage - 1) * PAGE_SIZE
-  const pageGroups = filteredGroups.slice(pageStart, pageStart + PAGE_SIZE)
+  const pageStart = (clampedPage - 1) * pageSize
+  const pageGroups = filteredGroups.slice(pageStart, pageStart + pageSize)
   const pageEnd = pageStart + pageGroups.length
   const pageGroupIds = pageGroups.map((group) => group.id)
   const allVisibleSelected =
@@ -182,7 +184,7 @@ function CatalogPage() {
 
   useEffect(() => {
     setSelectedBulkGroupIds(new Set())
-  }, [availability, category, query, clampedPage])
+  }, [availability, category, query, clampedPage, pageSize])
 
   useEffect(() => {
     if (!bulkEditEnabled) setSelectedBulkGroupIds(new Set())
@@ -614,6 +616,33 @@ function CatalogPage() {
       <style>{`
         .inventory-catalog-page .inventory-catalog-toolbar {
           margin-block: 1rem;
+        }
+
+        .inventory-catalog-page .inventory-catalog-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: .65rem;
+          flex-wrap: wrap;
+        }
+
+        .inventory-catalog-page .inventory-catalog-page-size {
+          display: inline-flex;
+          align-items: center;
+          gap: .45rem;
+          margin-right: auto;
+          color: #4b5563;
+          font-size: .85rem;
+          font-weight: 700;
+        }
+
+        .inventory-catalog-page .inventory-catalog-page-size select {
+          min-height: 2.25rem;
+          border: 1px solid #d1d5db;
+          border-radius: .55rem;
+          background: #fff;
+          color: #111827;
+          padding: 0 .55rem;
         }
 
         .inventory-catalog-page .inventory-catalog-bulk-toolbar {
@@ -1063,8 +1092,25 @@ function CatalogPage() {
             </div>
           ) : null}
 
-          {filteredGroups.length > PAGE_SIZE ? (
+          {filteredGroups.length > PAGE_SIZE_OPTIONS[0] ? (
             <div className="inventory-catalog-pagination" aria-label="Catalog pagination">
+              <label className="inventory-catalog-page-size">
+                <span>Max records</span>
+                <select
+                  value={pageSize}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value))
+                    setPage(1)
+                  }}
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <button
                 type="button"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
