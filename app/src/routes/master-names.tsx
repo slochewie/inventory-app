@@ -194,18 +194,89 @@ function MasterNamesPage() {
     })
   }, [category, impact, items, organization, query])
 
+  const filteredCocktails = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+
+    return cocktailMasters.filter((master) => {
+      if (status === 'active' && !master.active) return false
+      if (status === 'inactive' && master.active) return false
+
+      if (!normalizedQuery) return true
+
+      return [master.name, master.normalizedName].some((value) =>
+        value.toLowerCase().includes(normalizedQuery),
+      )
+    })
+  }, [cocktailMasters, query, status])
+
+  const filteredLiquorMasters = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+
+    return liquorMasters.filter((master) => {
+      if (liquorPlacement !== 'all' && master.type !== liquorPlacement) {
+        return false
+      }
+
+      if (status === 'active' && !master.active) return false
+      if (status === 'inactive' && master.active) return false
+
+      if (!normalizedQuery) return true
+
+      return [
+        master.name,
+        master.normalizedName,
+        liquorPlacementLabel(master.type),
+      ].some((value) => value.toLowerCase().includes(normalizedQuery))
+    })
+  }, [liquorMasters, liquorPlacement, query, status])
+
   useEffect(() => {
     setPage(1)
-  }, [category, impact, organization, query])
+  }, [
+    category,
+    family,
+    impact,
+    liquorPlacement,
+    organization,
+    query,
+    status,
+    pageSize,
+  ])
 
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const currentCount =
+    family === 'items'
+      ? filteredItems.length
+      : family === 'cocktails'
+        ? filteredCocktails.length
+        : filteredLiquorMasters.length
+
+  const pageCount = Math.max(1, Math.ceil(currentCount / pageSize))
   const clampedPage = Math.min(page, pageCount)
-  const pageStart = (clampedPage - 1) * PAGE_SIZE
-  const pageItems = filteredItems.slice(pageStart, pageStart + PAGE_SIZE)
-  const pageEnd = pageStart + pageItems.length
+  const pageStart = (clampedPage - 1) * pageSize
+  const pageItems = filteredItems.slice(pageStart, pageStart + pageSize)
+  const pageCocktails = filteredCocktails.slice(pageStart, pageStart + pageSize)
+  const pageLiquorMasters = filteredLiquorMasters.slice(
+    pageStart,
+    pageStart + pageSize,
+  )
+  const pageEnd = Math.min(currentCount, pageStart + pageSize)
 
   const selectedItem =
     items.find((item) => item.id === selectedItemId) ?? null
+
+  const selectedCocktail =
+    selectedSharedMaster?.family === 'cocktails'
+      ? cocktailMasters.find((master) => master.id === selectedSharedMaster.id) ??
+        null
+      : null
+
+  const selectedLiquorMaster =
+    selectedSharedMaster?.family === 'liquor-mods'
+      ? liquorMasters.find((master) => master.id === selectedSharedMaster.id) ??
+        null
+      : null
+
+  const selectedShared = selectedCocktail ?? selectedLiquorMaster
 
   const selectedImpact = useMemo(() => {
     if (!selectedItem) {
@@ -247,22 +318,40 @@ function MasterNamesPage() {
     setError(null)
   }
 
+  function beginSharedRename(
+    nextFamily: Exclude<MasterFamily, 'items'>,
+    master: InventoryCocktailMaster | InventoryLiquorModifierMaster,
+  ) {
+    setSelectedSharedMaster({ family: nextFamily, id: master.id })
+    setSharedDraftName(master.name)
+    setSharedDraftActive(master.active)
+    setError(null)
+  }
+
   function cancelRename() {
     if (saving) return
     setSelectedItemId(null)
     setDraftName('')
   }
 
+  function cancelSharedRename() {
+    if (saving) return
+    setSelectedSharedMaster(null)
+    setSharedDraftName('')
+  }
+
   useEffect(() => {
-    if (!selectedItem) return
+    if (!selectedItem && !selectedShared) return
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') cancelRename()
+      if (event.key !== 'Escape') return
+      if (selectedItem) cancelRename()
+      else cancelSharedRename()
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItem, saving])
+  }, [selectedItem, selectedShared, saving])
 
   async function saveRename() {
     if (!activeOrganization?.id || !selectedItem || saving) return
@@ -292,6 +381,53 @@ function MasterNamesPage() {
       setSaving(false)
     }
   }
+
+  async function saveSharedRename() {
+    if (!activeOrganization?.id || !selectedShared || !selectedSharedMaster || saving) {
+      return
+    }
+
+    const nextName = sharedDraftName.trim()
+    if (!nextName) return
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      if (selectedSharedMaster.family === 'cocktails') {
+        await updateInventoryCocktailMaster({
+          organizationId: activeOrganization.id,
+          inventoryCocktailId: selectedShared.id,
+          name: nextName,
+          active: sharedDraftActive,
+        })
+      } else {
+        await updateInventoryLiquorModifierMaster({
+          organizationId: activeOrganization.id,
+          inventoryLiquorModifierId: selectedShared.id,
+          name: nextName,
+          active: sharedDraftActive,
+        })
+      }
+
+      await reload()
+      setSelectedSharedMaster(null)
+      setSharedDraftName('')
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : 'Unable to update the master record.',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const sharedChanged =
+    selectedShared !== null &&
+    (sharedDraftName.trim() !== selectedShared.name ||
+      sharedDraftActive !== selectedShared.active)
 
   return (
     <section className="inventory-content inventory-master-names-page">
