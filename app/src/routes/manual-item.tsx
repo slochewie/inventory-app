@@ -14,6 +14,7 @@ import {
 } from '#/features/menu-import/toast-destination'
 import { authClient } from '#/lib/auth-client'
 import {
+  addInventoryOrganizationVariant,
   getInventoryOrganizationConfig,
   getInventoryOrganizationBeerFormats,
   getOptionalBeerCategories,
