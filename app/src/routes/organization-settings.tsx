@@ -7,7 +7,7 @@ import {
 } from '#/components/authenticated-inventory-shell'
 import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
 import type { NormalizedMenuItem } from '#/features/menu-import/types'
-import { authClient } from '#/lib/auth-client'
+import { authBaseURL, authClient } from '#/lib/auth-client'
 import {
   ALL_HAPPY_HOUR_DAYS,
   getInventoryOrganizationConfig,
@@ -39,6 +39,17 @@ type BuiltInBeerFormatSettings = Pick<
   | 'bottleEnabled'
 >
 
+type MenuCategoryFlags = {
+  retailEnabled: boolean
+  openItemsEnabled: boolean
+}
+
+type OptionalMenuCategory = {
+  id: keyof MenuCategoryFlags
+  name: string
+  description: string
+}
+
 const DEFAULT_BUILT_IN_BEER_FORMATS: BuiltInBeerFormatSettings = {
   draft8Enabled: false,
   draft8ActualSizeOz: 8,
@@ -51,6 +62,24 @@ const DEFAULT_BUILT_IN_BEER_FORMATS: BuiltInBeerFormatSettings = {
   canEnabled: true,
   bottleEnabled: true,
 }
+
+const DEFAULT_MENU_CATEGORY_FLAGS: MenuCategoryFlags = {
+  retailEnabled: false,
+  openItemsEnabled: false,
+}
+
+const OPTIONAL_MENU_CATEGORIES: OptionalMenuCategory[] = [
+  {
+    id: 'retailEnabled',
+    name: 'Retail',
+    description: 'Adds Retail to Add Item and Toast export routing.',
+  },
+  {
+    id: 'openItemsEnabled',
+    name: 'Open Items',
+    description: 'Adds Open Items to Add Item and Toast export routing.',
+  },
+]
 
 const HAPPY_HOUR_DAY_OPTIONS: Array<{
   value: HappyHourDay
@@ -71,6 +100,10 @@ function OrganizationSettingsPage() {
   const [items, setItems] = useState<NormalizedMenuItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [happyHourExpanded, setHappyHourExpanded] = useState(true)
+  const [beerFormatsExpanded, setBeerFormatsExpanded] = useState(true)
+  const [timeRange2Expanded, setTimeRange2Expanded] = useState(false)
 
   const [happyHourEnabled, setHappyHourEnabled] = useState(false)
   const [happyHourStart, setHappyHourStart] = useState('')
@@ -98,6 +131,13 @@ function OrganizationSettingsPage() {
   ])
   const [savingHappyHour, setSavingHappyHour] = useState(false)
 
+  const [menuCategoryFlags, setMenuCategoryFlags] = useState<MenuCategoryFlags>(
+    DEFAULT_MENU_CATEGORY_FLAGS,
+  )
+  const [menuCategoryDraftFlags, setMenuCategoryDraftFlags] =
+    useState<MenuCategoryFlags>(DEFAULT_MENU_CATEGORY_FLAGS)
+  const [savingMenuCategories, setSavingMenuCategories] = useState(false)
+
   const [builtInBeerFormats, setBuiltInBeerFormats] =
     useState<BuiltInBeerFormatSettings>(DEFAULT_BUILT_IN_BEER_FORMATS)
   const [builtInBeerFormatEdits, setBuiltInBeerFormatEdits] =
@@ -110,6 +150,8 @@ function OrganizationSettingsPage() {
   useEffect(() => {
     if (!activeOrganization?.id) {
       setItems([])
+      setMenuCategoryFlags(DEFAULT_MENU_CATEGORY_FLAGS)
+      setMenuCategoryDraftFlags(DEFAULT_MENU_CATEGORY_FLAGS)
       return
     }
 
@@ -120,10 +162,13 @@ function OrganizationSettingsPage() {
     void Promise.all([
       listInventoryCatalog(activeOrganization.id, controller.signal),
       getInventoryOrganizationConfig(activeOrganization.id, controller.signal),
+      getMenuCategoryFlags(activeOrganization.id, controller.signal),
     ])
-      .then(([catalog, organizationConfig]) => {
+      .then(([catalog, organizationConfig, categoryFlags]) => {
         const catalogItems = catalog.items.map(catalogRowToNormalizedItem)
         setItems(catalogItems)
+        setMenuCategoryFlags(categoryFlags)
+        setMenuCategoryDraftFlags(categoryFlags)
 
         const start = organizationConfig.happyHourStart ?? ''
         const end = organizationConfig.happyHourEnd ?? ''
@@ -145,15 +190,17 @@ function OrganizationSettingsPage() {
         const range2Days = organizationConfig.happyHourRange2Days?.length
           ? organizationConfig.happyHourRange2Days
           : [...ALL_HAPPY_HOUR_DAYS]
+        const range2Enabled = organizationConfig.happyHourRange2Enabled === true
 
-        setHappyHourRange2Enabled(organizationConfig.happyHourRange2Enabled === true)
+        setHappyHourRange2Enabled(range2Enabled)
         setHappyHourRange2Start(range2Start)
         setHappyHourRange2End(range2End)
         setHappyHourRange2Days(range2Days)
-        setHappyHourRange2DraftEnabled(organizationConfig.happyHourRange2Enabled === true)
+        setHappyHourRange2DraftEnabled(range2Enabled)
         setHappyHourRange2DraftStart(range2Start)
         setHappyHourRange2DraftEnd(range2End)
         setHappyHourRange2DraftDays(range2Days)
+        setTimeRange2Expanded(range2Enabled)
 
         const nextBuiltInBeerFormats =
           getBuiltInBeerFormatSettings(organizationConfig)
@@ -237,6 +284,7 @@ function OrganizationSettingsPage() {
         happyHourRange2Days: happyHourRange2DraftDays,
         ...builtInBeerFormats,
         ...buildOptionalBeerCategoryConfig(optionalBeerCategories),
+        ...menuCategoryFlags,
       })
 
       const nextEnabled = config?.happyHourEnabled ?? happyHourDraftEnabled
@@ -271,6 +319,7 @@ function OrganizationSettingsPage() {
       setHappyHourRange2DraftStart(nextRange2Start || '')
       setHappyHourRange2DraftEnd(nextRange2End || '')
       setHappyHourRange2DraftDays(nextRange2Days)
+      setTimeRange2Expanded(nextRange2Enabled)
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -279,6 +328,51 @@ function OrganizationSettingsPage() {
       )
     } finally {
       setSavingHappyHour(false)
+    }
+  }
+
+  const menuCategoryFlagsHaveChanges =
+    menuCategoryDraftFlags.retailEnabled !== menuCategoryFlags.retailEnabled ||
+    menuCategoryDraftFlags.openItemsEnabled !== menuCategoryFlags.openItemsEnabled
+
+  async function saveMenuCategorySettings() {
+    if (
+      !canEdit ||
+      !activeOrganization?.id ||
+      !menuCategoryFlagsHaveChanges ||
+      savingMenuCategories
+    ) {
+      return
+    }
+
+    setSavingMenuCategories(true)
+    setError(null)
+
+    try {
+      await updateInventoryOrganizationConfig({
+        organizationId: activeOrganization.id,
+        happyHourEnabled,
+        happyHourStart: happyHourStart || null,
+        happyHourEnd: happyHourEnd || null,
+        happyHourDays,
+        happyHourRange2Enabled,
+        happyHourRange2Start: happyHourRange2Start || null,
+        happyHourRange2End: happyHourRange2End || null,
+        happyHourRange2Days,
+        ...builtInBeerFormats,
+        ...buildOptionalBeerCategoryConfig(optionalBeerCategories),
+        ...menuCategoryDraftFlags,
+      } as Parameters<typeof updateInventoryOrganizationConfig>[0])
+
+      setMenuCategoryFlags(menuCategoryDraftFlags)
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to save Menu Categories settings.',
+      )
+    } finally {
+      setSavingMenuCategories(false)
     }
   }
 
@@ -418,6 +512,7 @@ function OrganizationSettingsPage() {
         happyHourRange2Days,
         ...builtInBeerFormatEdits,
         ...buildOptionalBeerCategoryConfig(normalizedCategories),
+        ...menuCategoryFlags,
       })
 
       const savedBuiltInBeerFormats = getBuiltInBeerFormatSettings(
@@ -481,7 +576,7 @@ function OrganizationSettingsPage() {
             <p className="inventory-kicker">Settings</p>
             <h1>Organization Settings</h1>
             <p>
-              Configure Happy Hour and Beer Formats for{' '}
+              Configure Happy Hour, Menu Categories, and Beer Formats for{' '}
               {activeOrganization?.name ?? 'this organization'}.
             </p>
           </div>
@@ -500,14 +595,21 @@ function OrganizationSettingsPage() {
 
         {!loading && canEdit ? (
           <div className="inventory-organization-settings-content">
-            <section className="inventory-organization-settings-section inventory-happy-hour-settings">
-              <div className="inventory-happy-hour-copy">
-                <h2>Happy Hour</h2>
-                <p>
-                  Set when {activeOrganization?.name ?? 'this organization'} uses
-                  Happy Hour pricing.
-                </p>
-              </div>
+            <details
+              className="inventory-organization-settings-section inventory-happy-hour-settings"
+              open={happyHourExpanded}
+              onToggle={(event) => setHappyHourExpanded(event.currentTarget.open)}
+            >
+              <summary className="inventory-settings-card-summary">
+                <div className="inventory-happy-hour-copy">
+                  <h2>Happy Hour</h2>
+                  <p>
+                    Set when {activeOrganization?.name ?? 'this organization'} uses
+                    Happy Hour pricing.
+                  </p>
+                </div>
+                <span>{happyHourExpanded ? 'Collapse' : 'Expand'}</span>
+              </summary>
 
               <label className="inventory-inline-toggle inventory-happy-hour-toggle">
                 <input
@@ -569,26 +671,34 @@ function OrganizationSettingsPage() {
                 </div>
               </fieldset>
 
-              <div className="inventory-happy-hour-range2">
-                <div className="inventory-happy-hour-range2-heading">
+              <details
+                className="inventory-happy-hour-range2"
+                open={timeRange2Expanded}
+                onToggle={(event) =>
+                  setTimeRange2Expanded(event.currentTarget.open)
+                }
+              >
+                <summary className="inventory-happy-hour-range2-heading">
                   <div>
                     <h3>Time Range 2</h3>
                     <p>Optional second Happy Hour window.</p>
                   </div>
-                  <label className="inventory-inline-toggle">
-                    <input
-                      type="checkbox"
-                      checked={happyHourRange2DraftEnabled}
-                      disabled={!happyHourDraftEnabled || savingHappyHour}
-                      onChange={(event) =>
-                        setHappyHourRange2DraftEnabled(event.target.checked)
-                      }
-                    />
-                    <span>
-                      {happyHourRange2DraftEnabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </label>
-                </div>
+                  <span>{timeRange2Expanded ? 'Collapse' : 'Expand'}</span>
+                </summary>
+
+                <label className="inventory-inline-toggle">
+                  <input
+                    type="checkbox"
+                    checked={happyHourRange2DraftEnabled}
+                    disabled={!happyHourDraftEnabled || savingHappyHour}
+                    onChange={(event) =>
+                      setHappyHourRange2DraftEnabled(event.target.checked)
+                    }
+                  />
+                  <span>
+                    {happyHourRange2DraftEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </label>
 
                 <div className="inventory-happy-hour-range2-times">
                   <label className="inventory-search-control">
@@ -654,7 +764,7 @@ function OrganizationSettingsPage() {
                     ))}
                   </div>
                 </fieldset>
-              </div>
+              </details>
 
               <div className="inventory-happy-hour-actions">
                 <button
@@ -670,6 +780,7 @@ function OrganizationSettingsPage() {
                     setHappyHourRange2DraftStart(happyHourRange2Start)
                     setHappyHourRange2DraftEnd(happyHourRange2End)
                     setHappyHourRange2DraftDays(happyHourRange2Days)
+                    setTimeRange2Expanded(happyHourRange2Enabled)
                   }}
                 >
                   Cancel
@@ -683,18 +794,85 @@ function OrganizationSettingsPage() {
                   {savingHappyHour ? 'Saving…' : 'Update'}
                 </button>
               </div>
-            </section>
+            </details>
 
-            <section className="inventory-organization-settings-section inventory-draft-slots-settings">
+            <section className="inventory-organization-settings-section inventory-menu-category-card">
               <div className="inventory-draft-slots-copy">
-                <h2>Beer Formats</h2>
+                <h2>Menu Categories</h2>
                 <p>
-                  Built-in Toast draft formats stay fixed and exact-match only.
-                  Add custom draft or packaged formats here. Their order controls
-                  which hidden Optional Beer Category workbook slot they use, and
-                  the label is also used to recognize matching imports.
+                  Enable optional categories that should appear in Add Item and
+                  Toast export routing. Beer, Cocktails, and NA Bev are always
+                  available.
                 </p>
               </div>
+
+              <div className="inventory-draft-slots-grid">
+                {OPTIONAL_MENU_CATEGORIES.map((category) => (
+                  <label
+                    key={category.id}
+                    className="inventory-inline-toggle inventory-beer-format-toggle"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={menuCategoryDraftFlags[category.id]}
+                      disabled={savingMenuCategories}
+                      onChange={(event) =>
+                        setMenuCategoryDraftFlags((current) => ({
+                          ...current,
+                          [category.id]: event.target.checked,
+                        }))
+                      }
+                    />
+                    <span>
+                      {category.name} ·{' '}
+                      {menuCategoryDraftFlags[category.id]
+                        ? 'Enabled'
+                        : 'Disabled'}
+                    </span>
+                    <small>{category.description}</small>
+                  </label>
+                ))}
+              </div>
+
+              <div className="inventory-draft-slots-actions">
+                <button
+                  type="button"
+                  className="inventory-secondary-button"
+                  disabled={!menuCategoryFlagsHaveChanges || savingMenuCategories}
+                  onClick={() => setMenuCategoryDraftFlags(menuCategoryFlags)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="inventory-primary-button"
+                  disabled={!menuCategoryFlagsHaveChanges || savingMenuCategories}
+                  onClick={() => void saveMenuCategorySettings()}
+                >
+                  {savingMenuCategories ? 'Saving…' : 'Update'}
+                </button>
+              </div>
+            </section>
+
+            <details
+              className="inventory-organization-settings-section inventory-draft-slots-settings"
+              open={beerFormatsExpanded}
+              onToggle={(event) =>
+                setBeerFormatsExpanded(event.currentTarget.open)
+              }
+            >
+              <summary className="inventory-settings-card-summary">
+                <div className="inventory-draft-slots-copy">
+                  <h2>Beer Formats</h2>
+                  <p>
+                    Built-in Toast draft formats stay fixed and exact-match only.
+                    Add custom draft or packaged formats here. Their order controls
+                    which hidden Optional Beer Category workbook slot they use, and
+                    the label is also used to recognize matching imports.
+                  </p>
+                </div>
+                <span>{beerFormatsExpanded ? 'Collapse' : 'Expand'}</span>
+              </summary>
 
               <div className="inventory-draft-slots-copy">
                 <h3>Toast default formats</h3>
@@ -881,12 +1059,44 @@ function OrganizationSettingsPage() {
                   </button>
                 </div>
               ) : null}
-            </section>
+            </details>
           </div>
         ) : null}
       </section>
     </AuthenticatedInventoryShell>
   )
+}
+
+async function getMenuCategoryFlags(
+  organizationId: string,
+  signal: AbortSignal,
+): Promise<MenuCategoryFlags> {
+  const url = new URL(
+    `${authBaseURL.replace(/\/$/, '')}/api/auth/inventory/organization-config`,
+  )
+  url.searchParams.set('organizationId', organizationId)
+
+  const response = await fetch(url, {
+    credentials: 'include',
+    signal,
+  })
+  const result = (await response.json()) as {
+    config?: Partial<MenuCategoryFlags>
+    error?: string
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === 'string'
+        ? result.error
+        : 'Unable to load Menu Categories settings.',
+    )
+  }
+
+  return {
+    retailEnabled: result.config?.retailEnabled === true,
+    openItemsEnabled: result.config?.openItemsEnabled === true,
+  }
 }
 
 function getBeerFormatTitle(category: OptionalBeerCategoryConfig) {
