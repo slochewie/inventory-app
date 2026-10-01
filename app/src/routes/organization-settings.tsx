@@ -613,12 +613,10 @@ function OrganizationSettingsPage() {
                     {activeOrganization?.name ?? 'this organization'}.
                   </p>
                 </div>
-                <span>{happyHourExpanded ? 'Collapse' : 'Expand'}</span>
               </summary>
 
               <div className="inventory-happy-hour-ranges">
                 <HappyHourRangeCard
-                  eyebrow="Time Range 1"
                   title="Happy Hour"
                   description="Primary Toast Happy Hour window."
                   open={timeRange1Expanded}
@@ -635,7 +633,6 @@ function OrganizationSettingsPage() {
                 />
 
                 <HappyHourRangeCard
-                  eyebrow="Time Range 2"
                   title="Time Range 2"
                   description="Optional second Happy Hour window."
                   open={timeRange2Expanded}
@@ -646,7 +643,10 @@ function OrganizationSettingsPage() {
                   start={happyHourRange2DraftStart}
                   end={happyHourRange2DraftEnd}
                   days={happyHourRange2DraftDays}
-                  onEnabledChange={setHappyHourRange2DraftEnabled}
+                  onEnabledChange={(enabled) => {
+                    setHappyHourRange2DraftEnabled(enabled)
+                    if (!enabled) setTimeRange2Expanded(false)
+                  }}
                   onStartChange={setHappyHourRange2DraftStart}
                   onEndChange={setHappyHourRange2DraftEnd}
                   onDaysChange={setHappyHourRange2DraftDays}
@@ -955,7 +955,6 @@ function OrganizationSettingsPage() {
 }
 
 function HappyHourRangeCard({
-  eyebrow,
   title,
   description,
   open,
@@ -971,7 +970,6 @@ function HappyHourRangeCard({
   onEndChange,
   onDaysChange,
 }: {
-  eyebrow: string
   title: string
   description: string
   open: boolean
@@ -997,11 +995,9 @@ function HappyHourRangeCard({
     >
       <summary className="inventory-happy-hour-range-card-summary">
         <div>
-          <span>{eyebrow}</span>
           <h3>{title}</h3>
           <p>{description}</p>
         </div>
-        <strong>{open ? 'Collapse' : 'Expand'}</strong>
       </summary>
 
       <div className="inventory-happy-hour-range-card-body">
