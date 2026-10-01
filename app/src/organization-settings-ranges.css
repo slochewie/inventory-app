@@ -1,0 +1,130 @@
+.inventory-happy-hour-settings[open] {
+  display: block !important;
+}
+
+.inventory-happy-hour-ranges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.inventory-happy-hour-ranges + .inventory-happy-hour-actions {
+  margin-top: 1rem;
+}
+
+.inventory-happy-hour-range-card {
+  display: block;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.95rem;
+  background: #f8fafc;
+}
+
+.inventory-happy-hour-range-card-summary {
+  display: flex;
+  cursor: pointer;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  border-bottom: 1px solid #e5e7eb;
+  list-style: none;
+  padding: 0.9rem 1rem;
+}
+
+.inventory-happy-hour-range-card-summary::-webkit-details-marker {
+  display: none;
+}
+
+.inventory-happy-hour-range-card:not([open]) > .inventory-happy-hour-range-card-summary {
+  border-bottom: 0;
+}
+
+.inventory-happy-hour-range-card-summary::before {
+  content: '▾';
+  flex: 0 0 auto;
+  color: #475569;
+  font-size: 0.82rem;
+  line-height: 1.35rem;
+  transition: transform 140ms ease;
+}
+
+.inventory-happy-hour-range-card:not([open]) > .inventory-happy-hour-range-card-summary::before {
+  transform: rotate(-90deg);
+}
+
+.inventory-happy-hour-range-card-summary > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.inventory-happy-hour-range-card-summary span {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.inventory-happy-hour-range-card-summary h3,
+.inventory-happy-hour-range-card-summary p {
+  margin: 0;
+}
+
+.inventory-happy-hour-range-card-summary h3 {
+  color: #111827;
+  font-size: 0.98rem;
+  font-weight: 850;
+}
+
+.inventory-happy-hour-range-card-summary p {
+  margin-top: 0.18rem;
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.inventory-happy-hour-range-card-summary strong {
+  flex: 0 0 auto;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  padding: 0.24rem 0.62rem;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.inventory-happy-hour-range-card-body {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.95rem 1rem 1rem;
+}
+
+.inventory-happy-hour-range-card-body > .inventory-happy-hour-toggle {
+  width: fit-content;
+}
+
+.inventory-happy-hour-range-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.inventory-happy-hour-range-card .inventory-happy-hour-days {
+  background: #fff;
+}
+
+@media (max-width: 720px) {
+  .inventory-happy-hour-ranges,
+  .inventory-happy-hour-range-times {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-happy-hour-range-card-summary strong {
+    display: none;
+  }
+}
