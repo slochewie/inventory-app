@@ -108,6 +108,24 @@
   border-bottom: 0;
 }
 
+.liquor-mods-master-identity {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.liquor-mods-master-identity > span {
+  color: var(--inventory-muted, #667085);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.liquor-mods-master-identity > strong {
+  color: #101828;
+  font-size: 1rem;
+}
+
 .liquor-mods-row-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(6.75rem, 8rem);
