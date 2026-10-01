@@ -152,6 +152,50 @@ Examples:
 
 A master item can have variants that are used by different organizations without every organization carrying every variant.
 
+## Liquor modifier catalog
+
+Liquor modifiers follow the same shared-master / organization-variant separation used elsewhere in Inventory.
+
+### inventoryLiquorModifier
+
+Canonical shared Mixer or Bar Prep modifier.
+
+- `id`
+- `type` — `mixer` or `bar_prep`
+- `name`
+- `normalizedName`
+- `active`
+- `createdAt`
+- `updatedAt`
+- unique: `type + normalizedName`
+
+Master Mixers and Master Bar Prep are global catalog records. Admins manage them from `/master-mixers` and `/master-bar-prep`.
+
+### inventoryOrganizationLiquorModifier
+
+Joins one organization to one shared Liquor Mod master.
+
+- `id`
+- `organizationId`
+- `inventoryLiquorModifierId`
+- `enabled`
+- `exportToToast`
+- `nameOverride` — nullable organization-specific display/export name
+- `upchargeCents`
+- `sortOrder`
+- `createdAt`
+- `updatedAt`
+- unique: `organizationId + inventoryLiquorModifierId`
+
+The `/liquor-mods` page edits only this organization-specific state. Adding a Liquor Mod there selects an existing active master; it does not create a new canonical master.
+
+Important separation:
+
+- master `active` controls whether a canonical Mixer/Bar Prep entry may be newly assigned,
+- organization `enabled` means **Available here**,
+- organization `exportToToast` controls Toast export independently,
+- `nameOverride` changes only the selected organization's name and never renames the master.
+
 ## Organization catalog
 
 ### inventoryOrganizationVariant
