@@ -60,6 +60,7 @@ type LiquorRow = {
   itemName: string
   basePrice: number | null
   happyHourPrice: number | null
+  doublePrice: number | null
   liquorType: string
 }
 
@@ -292,6 +293,9 @@ export function validatePopulatedToastTemplateWorkbookWithLiquor({
       validateLiquorCell(issues, sheetDoc, workbookPackage.sharedStrings, slot.priceCol, rowNumber, row.basePrice, row.itemName + ' Liquor price')
       if (slot.happyHourCol) {
         validateLiquorCell(issues, sheetDoc, workbookPackage.sharedStrings, slot.happyHourCol, rowNumber, row.happyHourPrice, row.itemName + ' Liquor Happy Hour')
+      }
+      if (slot.doubleCol) {
+        validateLiquorCell(issues, sheetDoc, workbookPackage.sharedStrings, slot.doubleCol, rowNumber, row.doublePrice, row.itemName + ' Liquor Double')
       }
     })
   })
@@ -1951,11 +1955,12 @@ function getLiquorRows(
     const itemName = clean(row[0])
     const basePrice = parseDollars(row[1])
     const happyHourPrice = parseDollars(row[2])
-    const liquorType = clean(row[3]).toUpperCase()
+    const doublePrice = parseDollars(row[3])
+    const liquorType = clean(row[4]).toUpperCase()
 
     if (!itemName || basePrice === null || !liquorType) return []
 
-    return [{ itemName, basePrice, happyHourPrice, liquorType }]
+    return [{ itemName, basePrice, happyHourPrice, doublePrice, liquorType }]
   })
 }
 
@@ -1989,7 +1994,7 @@ function writeLiquorRowsToSheet(sheetDoc: Document, mapping: LiquorTemplateMappi
       writeCellValue(sheetDoc, slot.nameCol, rowNumber, liquorRow.itemName, mapping.dataStartRow)
       writeCellValue(sheetDoc, slot.priceCol, rowNumber, liquorRow.basePrice, mapping.dataStartRow)
       if (slot.happyHourCol) writeCellValue(sheetDoc, slot.happyHourCol, rowNumber, liquorRow.happyHourPrice, mapping.dataStartRow)
-      if (slot.doubleCol) clearCellValue(sheetDoc, slot.doubleCol, rowNumber)
+      if (slot.doubleCol) writeCellValue(sheetDoc, slot.doubleCol, rowNumber, liquorRow.doublePrice, mapping.dataStartRow)
     })
   })
 
