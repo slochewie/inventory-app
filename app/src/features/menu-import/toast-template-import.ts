@@ -147,6 +147,7 @@ function parseBeerSheet(workbookPackage: WorkbookPackage, sheet: WorkbookSheet) 
         toastDestination: destination,
         basePriceCents: price,
         happyHourPriceCents: happyHour,
+        doublePriceCents: doublePrice,
         rawRow: row,
       }))
     }
@@ -254,6 +255,7 @@ function parseLiquorSheet(workbookPackage: WorkbookPackage, sheet: WorkbookSheet
     const nameCol = groupHeaders.find((cell) => /item\s*name/i.test(cell.value))?.col ?? categoryCell.col
     const priceCol = groupHeaders.find((cell) => /price/i.test(cell.value))?.col ?? categoryCell.col + 1
     const happyHourCol = groupHeaders.find((cell) => /happy\s*hour/i.test(cell.value))?.col ?? null
+    const doubleCol = groupHeaders.find((cell) => /double/i.test(cell.value))?.col ?? null
 
     for (let rowNumber = dataStartRow; rowNumber <= lastRow; rowNumber += 1) {
       const name = getCellValue(sheetDoc, nameCol, rowNumber, workbookPackage.sharedStrings)
@@ -261,9 +263,21 @@ function parseLiquorSheet(workbookPackage: WorkbookPackage, sheet: WorkbookSheet
       const happyHour = happyHourCol
         ? parseMoney(getCellValue(sheetDoc, happyHourCol, rowNumber, workbookPackage.sharedStrings))
         : null
+      const doublePrice = doubleCol
+        ? parseMoney(getCellValue(sheetDoc, doubleCol, rowNumber, workbookPackage.sharedStrings))
+        : null
 
       if (!name || price === null) continue
-      const row = buildRawRow(sheet.name, rowNumber, liquorType, name, price, happyHour)
+      const row = buildRawRow(
+        sheet.name,
+        rowNumber,
+        liquorType,
+        name,
+        price,
+        happyHour,
+        '',
+        doublePrice,
+      )
       items.push(createItem({
         id: `toast-xlsx:liquor:${liquorType}:${nameCol}:${rowNumber}`,
         name,
@@ -330,6 +344,7 @@ function createItem({
   toastDestination,
   basePriceCents,
   happyHourPriceCents,
+  doublePriceCents = null,
   rawRow,
 }: {
   id: string
@@ -339,6 +354,7 @@ function createItem({
   toastDestination: string
   basePriceCents: number
   happyHourPriceCents: number | null
+  doublePriceCents?: number | null
   rawRow: RawMenuRow
 }): NormalizedMenuItem {
   return {
@@ -351,6 +367,7 @@ function createItem({
     toastDestination,
     basePriceCents,
     happyHourPriceCents,
+    doublePriceCents,
     happyHourWindow: happyHourPriceCents === null ? undefined : 'Imported from Toast template',
     effectiveTimes: [],
     sourceRowCount: 1,
@@ -386,7 +403,16 @@ function normalizeLiquorCategory(value: string) {
   return normalized.toUpperCase()
 }
 
-function buildRawRow(sheet: string, rowNumber: number, group: string, name: string, price: number, happyHour: number | null, groupValue = ''): RawMenuRow {
+function buildRawRow(
+  sheet: string,
+  rowNumber: number,
+  group: string,
+  name: string,
+  price: number,
+  happyHour: number | null,
+  groupValue = '',
+  doublePrice: number | null = null,
+): RawMenuRow {
   return {
     Sheet: sheet,
     Row: String(rowNumber),
@@ -394,6 +420,7 @@ function buildRawRow(sheet: string, rowNumber: number, group: string, name: stri
     Name: name,
     Price: (price / 100).toFixed(2),
     'Happy Hour': happyHour === null ? '' : (happyHour / 100).toFixed(2),
+    Double: doublePrice === null ? '' : (doublePrice / 100).toFixed(2),
   }
 }
 
@@ -561,3 +588,4 @@ function isLikelyInstructionRow(value: string) {
   const cleaned = clean(value).toLowerCase()
   return cleaned.includes('example') || cleaned.includes('enter your') || cleaned.includes('delete or replace')
 }
+
