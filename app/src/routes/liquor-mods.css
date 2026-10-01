@@ -56,6 +56,7 @@
 .liquor-mods-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(24rem, 1fr));
+  align-items: start;
   gap: 1rem;
   max-width: 76rem;
 }
@@ -84,12 +85,16 @@
 
 .liquor-mods-add-form {
   display: grid;
-  grid-template-columns: minmax(11rem, 1fr) minmax(6.75rem, 8rem) auto;
+  grid-template-columns: minmax(6.75rem, 8rem) auto;
   gap: 0.65rem;
   align-items: end;
   border-bottom: 1px solid var(--inventory-border, #eaecf0);
   background: #fcfcfd;
   padding: 0.9rem 1.25rem;
+}
+
+.liquor-mods-add-form > .liquor-mods-field:first-child {
+  grid-column: 1 / -1;
 }
 
 .liquor-mods-row {
