@@ -11,7 +11,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for operator/development instructions and [do
 - Better Auth sign-in and organization selection.
 - Inventory roles: Viewer, Staff, Manager, and Admin.
 - Shared canonical master items/categories with organization-specific availability, pricing, Happy Hour pricing, Toast-export state, display-name overrides, destinations, and Beer slot assignments.
-- Manual Add Item workflow.
+- Catalog page with integrated manual Add Item workflow.
 - Optional organization Menu Categories: Retail and Open Items. Beer, Cocktails, and NA Bev are built in.
 - Aloha CSV import, normalization, review, persistence, history, and source reconciliation.
 - Organization-scoped staging of populated Toast workbooks.
@@ -32,8 +32,8 @@ See [docs/HOWTO.md](docs/HOWTO.md) for operator/development instructions and [do
 
 | Route | Purpose | Capability |
 | --- | --- | --- |
-| `/` | Organization Catalog | Viewer |
-| `/manual-item` | Add Item | Manager/Admin edit capability |
+| `/` | Organization Catalog with integrated Add Item editor for Manager/Admin users | Viewer; Manager/Admin edit |
+| `/manual-item` | Compatibility redirect to `/` | Viewer |
 | `/menu-categories` | Enable optional Retail/Open Items categories | Manager/Admin edit capability |
 | `/organization-settings` | Happy Hour and Beer Formats | Manager/Admin |
 | `/import-review` | New Import, History, Mapping Review | Role-gated by tab/action |
