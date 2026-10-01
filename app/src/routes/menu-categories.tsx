@@ -1,34 +1,82 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
-import { authClient } from '#/lib/auth-client'
+import { authBaseURL, authClient } from '#/lib/auth-client'
 import {
-  deleteMenuCategory,
-  getMenuCategorySuggestions,
-  listSavedMenuCategories,
-  saveMenuCategory,
-  type InventoryMenuCategory,
-} from '#/lib/menu-categories'
+  getInventoryOrganizationConfig,
+  updateInventoryOrganizationConfig,
+} from '#/lib/inventory-access'
+import { getMenuCategorySuggestions } from '#/lib/menu-categories'
 import './manual-item.css'
 
 export const Route = createFileRoute('/menu-categories')({
   component: MenuCategoriesPage,
 })
 
+type MenuCategoryFlags = {
+  retailEnabled: boolean
+  openItemsEnabled: boolean
+}
+
+type MenuCategoryConfig = Awaited<
+  ReturnType<typeof getInventoryOrganizationConfig>
+> &
+  MenuCategoryFlags
+
+type MenuCategory = {
+  id: string
+  name: string
+}
+
+const OPTIONAL_MENU_CATEGORIES: MenuCategory[] = [
+  { id: 'retail', name: 'Retail' },
+  { id: 'open-items', name: 'Open Items' },
+]
+
 function MenuCategoriesPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
-  const [categories, setCategories] = useState<InventoryMenuCategory[]>([])
+  const [config, setConfig] = useState<MenuCategoryConfig | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [savingCategory, setSavingCategory] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     if (!activeOrganization?.id) {
-      setCategories([])
+      setConfig(null)
       return
     }
 
-    setCategories(listSavedMenuCategories(activeOrganization.id))
+    const controller = new AbortController()
+    setLoading(true)
+    setError(null)
+
+    void loadMenuCategoryConfig(activeOrganization.id, controller.signal)
+      .then((organizationConfig) => {
+        setConfig(organizationConfig)
+      })
+      .catch((caught) => {
+        if (caught instanceof DOMException && caught.name === 'AbortError') return
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : 'Unable to load menu categories.',
+        )
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+
+    return () => controller.abort()
   }, [activeOrganization?.id])
+
+  const categories = useMemo(() => {
+    if (!config) return []
+
+    return OPTIONAL_MENU_CATEGORIES.filter((category) =>
+      isCategoryEnabled(config, category.name),
+    )
+  }, [config])
 
   const suggestions = useMemo(() => {
     const existingNames = new Set(
@@ -40,37 +88,43 @@ function MenuCategoriesPage() {
     )
   }, [categories])
 
-  function reloadCategories() {
-    if (!activeOrganization?.id) return
-    setCategories(listSavedMenuCategories(activeOrganization.id))
-  }
+  async function setCategoryEnabled(name: string, enabled: boolean) {
+    if (!activeOrganization?.id || !config || savingCategory) return
 
-  function addSuggestion(name: string) {
-    if (!activeOrganization?.id) return
+    const patch = getMenuCategoryPatch(name, enabled)
+    if (!patch) return
+
+    const nextConfig: MenuCategoryConfig = {
+      ...config,
+      ...patch,
+    }
+
+    setSavingCategory(name)
+    setError(null)
+    setSuccess(null)
 
     try {
-      const category = saveMenuCategory(activeOrganization.id, {
-        name,
-        toastDestination: '',
+      const savedConfig = await updateInventoryOrganizationConfig({
+        organizationId: activeOrganization.id,
+        ...config,
+        ...patch,
+      } as Parameters<typeof updateInventoryOrganizationConfig>[0])
+
+      setConfig({
+        ...(savedConfig ?? config),
+        retailEnabled: nextConfig.retailEnabled,
+        openItemsEnabled: nextConfig.openItemsEnabled,
       })
-      reloadCategories()
-      setSuccess(`Added ${category.name}. It is now available in Add Item.`)
-      setError(null)
+      setSuccess(
+        enabled
+          ? `Added ${name}. It is now available in Add Item.`
+          : `Removed ${name}. Existing catalog items are unchanged.`,
+      )
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to save category.')
-      setSuccess(null)
+    } finally {
+      setSavingCategory(null)
     }
-  }
-
-  function removeCategory(category: InventoryMenuCategory) {
-    if (!activeOrganization?.id) return
-
-    const removed = deleteMenuCategory(activeOrganization.id, category.id)
-    if (!removed) return
-
-    reloadCategories()
-    setSuccess(`Removed ${category.name}. Existing catalog items are unchanged.`)
-    setError(null)
   }
 
   return (
@@ -101,8 +155,9 @@ function MenuCategoriesPage() {
 
           {error ? <p className="inventory-error">{error}</p> : null}
           {success ? <p className="inventory-success">{success}</p> : null}
+          {loading ? <p className="inventory-empty-note">Loading menu categories…</p> : null}
 
-          {categories.length ? (
+          {!loading && categories.length ? (
             <div className="inventory-menu-category-list">
               {categories.map((category) => (
                 <article key={category.id} className="inventory-menu-category-row">
@@ -114,7 +169,8 @@ function MenuCategoriesPage() {
                     <button
                       type="button"
                       className="inventory-secondary-button"
-                      onClick={() => removeCategory(category)}
+                      disabled={savingCategory === category.name}
+                      onClick={() => void setCategoryEnabled(category.name, false)}
                     >
                       Remove
                     </button>
@@ -122,13 +178,15 @@ function MenuCategoriesPage() {
                 </article>
               ))}
             </div>
-          ) : (
+          ) : null}
+
+          {!loading && !categories.length ? (
             <p className="inventory-empty-note">
               No optional categories are enabled.
             </p>
-          )}
+          ) : null}
 
-          {suggestions.length ? (
+          {!loading && suggestions.length ? (
             <div className="inventory-menu-category-suggestions">
               <span>Available to add</span>
               {suggestions.map((suggestion) => (
@@ -136,7 +194,8 @@ function MenuCategoriesPage() {
                   key={suggestion}
                   type="button"
                   className="inventory-primary-button"
-                  onClick={() => addSuggestion(suggestion)}
+                  disabled={savingCategory === suggestion}
+                  onClick={() => void setCategoryEnabled(suggestion, true)}
                 >
                   Add {suggestion}
                 </button>
@@ -147,4 +206,73 @@ function MenuCategoriesPage() {
       </section>
     </AuthenticatedInventoryShell>
   )
+}
+
+async function loadMenuCategoryConfig(
+  organizationId: string,
+  signal: AbortSignal,
+): Promise<MenuCategoryConfig> {
+  const [organizationConfig, flags] = await Promise.all([
+    getInventoryOrganizationConfig(organizationId, signal),
+    getMenuCategoryFlags(organizationId, signal),
+  ])
+
+  return {
+    ...organizationConfig,
+    ...flags,
+  }
+}
+
+async function getMenuCategoryFlags(
+  organizationId: string,
+  signal: AbortSignal,
+): Promise<MenuCategoryFlags> {
+  const url = new URL(
+    `${authBaseURL.replace(/\/$/, '')}/api/auth/inventory/organization-config`,
+  )
+  url.searchParams.set('organizationId', organizationId)
+
+  const response = await fetch(url, {
+    credentials: 'include',
+    signal,
+  })
+  const result = (await response.json()) as {
+    config?: Partial<MenuCategoryFlags>
+    error?: string
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      typeof result.error === 'string'
+        ? result.error
+        : 'Unable to load menu categories.',
+    )
+  }
+
+  return {
+    retailEnabled: result.config?.retailEnabled === true,
+    openItemsEnabled: result.config?.openItemsEnabled === true,
+  }
+}
+
+function isCategoryEnabled(config: MenuCategoryConfig, name: string) {
+  const key = normalizeCategoryKey(name)
+
+  if (key === 'retail') return config.retailEnabled
+  if (key === 'open items' || key === 'open item') return config.openItemsEnabled
+
+  return false
+}
+
+function getMenuCategoryPatch(name: string, enabled: boolean) {
+  const key = normalizeCategoryKey(name)
+
+  if (key === 'retail') return { retailEnabled: enabled }
+  if (key === 'open items' || key === 'open item') return { openItemsEnabled: enabled }
+
+  return null
+}
+
+function normalizeCategoryKey(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }
