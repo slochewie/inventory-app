@@ -105,7 +105,7 @@
 
 .liquor-mods-row-fields {
   display: grid;
-  grid-template-columns: minmax(11rem, 1fr) minmax(6.75rem, 8rem) auto;
+  grid-template-columns: minmax(11rem, 1fr) minmax(6.75rem, 8rem) minmax(10rem, auto);
   gap: 0.65rem;
   align-items: end;
 }
@@ -131,7 +131,8 @@
   text-transform: uppercase;
 }
 
-.liquor-mods-field input {
+.liquor-mods-field input,
+.liquor-mods-field select {
   min-width: 0;
   width: 100%;
   min-height: 2.45rem;
@@ -195,7 +196,8 @@
 
 .liquor-mods-add-form button:disabled,
 .liquor-mods-row-actions button:disabled,
-.liquor-mods-field input:disabled {
+.liquor-mods-field input:disabled,
+.liquor-mods-field select:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -205,6 +207,17 @@
   align-items: center;
   gap: 0.65rem;
   font-size: 0.8rem;
+}
+
+.liquor-mods-field small {
+  color: var(--inventory-muted, #667085);
+  font-size: 0.78rem;
+}
+
+.liquor-mods-toggles {
+  display: grid;
+  gap: 0.15rem;
+  align-self: end;
 }
 
 .liquor-mods-enabled {
