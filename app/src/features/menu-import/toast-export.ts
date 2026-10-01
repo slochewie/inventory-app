@@ -81,10 +81,6 @@ const LIQUOR_TYPE_OVERRIDES = new Map([
   ['tangueray', 'GIN'],
 ])
 
-const WELL_LIQUOR_NAMES = new Set([
-  'bourbon well', 'gin well', 'rum well', 'scotch well', 'tequila well', 'vodka well',
-])
-
 export function buildToastExportFiles(
   items: NormalizedMenuItem[],
   options: { happyHourEnabled?: boolean } = {},
@@ -125,7 +121,7 @@ export function buildToastExportFiles(
       filename: 'toast-liquor.csv',
       rows: [LIQUOR_EXPORT_HEADERS, ...liquorRows],
       rowCount: liquorRows.length,
-      note: 'Liquor staging uses the canonical Toast category for each Inventory item and only gives happy hour to well liquors by default.',
+      note: 'Liquor staging uses the canonical Toast category for each Inventory item and exports the saved Happy Hour price when configured.',
     },
     {
       id: 'audit',
@@ -276,8 +272,8 @@ function buildLiquorExportRows(
       itemName,
       basePrice: moneyBlank(item.basePriceCents),
       happyHourPrice:
-        happyHourEnabled && WELL_LIQUOR_NAMES.has(itemName.toLowerCase())
-          ? moneyBlank(item.happyHourPriceCents ?? getOneDollarOff(item.basePriceCents))
+        happyHourEnabled
+          ? moneyBlank(item.happyHourPriceCents)
           : '',
       doublePrice: moneyBlank(item.doublePriceCents ?? null),
       liquorType,
@@ -364,10 +360,6 @@ function titleBeerName(value: string) {
 
 function moneyBlank(cents: number | null) {
   return cents === null ? '' : (cents / 100).toFixed(2)
-}
-
-function getOneDollarOff(cents: number) {
-  return Math.max(0, cents - 100)
 }
 
 function escapeCsvCell(value: string) {
