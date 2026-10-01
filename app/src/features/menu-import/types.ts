@@ -30,6 +30,7 @@ export type NormalizedMenuItem = {
   toastSlot?: string | null
   basePriceCents: number | null
   happyHourPriceCents: number | null
+  doublePriceCents?: number | null
   happyHourWindow?: string
   effectiveTimes: string[]
   sourceRowCount: number
