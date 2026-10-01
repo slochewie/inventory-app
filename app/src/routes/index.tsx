@@ -20,6 +20,7 @@ import {
   type InventoryOrganizationConfig,
   type OptionalBeerCategoryConfig,
 } from '#/lib/inventory-access'
+import { ManualItemEditor } from './manual-item'
 
 export const Route = createFileRoute('/')({ component: CatalogPage })
 
@@ -587,6 +588,27 @@ function CatalogPage() {
     }
   }
 
+
+  async function refreshCatalogAfterManualAdd() {
+    if (!activeOrganization?.id) return
+
+    const catalog = await listInventoryCatalog(activeOrganization.id)
+    const catalogItems = catalog.items.map(catalogRowToNormalizedItem)
+
+    setItems(catalogItems)
+    setSelectedGroupId(null)
+    setPage(1)
+
+    if (organizationConfig) {
+      setOptionalBeerCategories(
+        getEffectiveOptionalBeerCategoriesForCatalog(
+          getOptionalBeerCategories(organizationConfig),
+          catalogItems,
+        ),
+      )
+    }
+  }
+
   return (
     <AuthenticatedInventoryShell currentPath="/">
       <style>{`
@@ -732,6 +754,10 @@ function CatalogPage() {
             </p>
           </div>
         </header>
+
+        {canEdit ? (
+          <ManualItemEditor onCreated={refreshCatalogAfterManualAdd} />
+        ) : null}
 
         <section className="inventory-catalog-toolbar" aria-label="Catalog filters">
           <label className="inventory-search-control inventory-catalog-search">
