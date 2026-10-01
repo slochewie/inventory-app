@@ -49,6 +49,21 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: ReactNode }) {
   useEffect(() => {
+    function usesMcCarthysBranding() {
+      return window.location.hostname
+        .toLowerCase()
+        .endsWith('mccarthysirishpub.com')
+    }
+
+    function syncPageTitleBranding() {
+      if (!usesMcCarthysBranding()) return
+
+      const brandedTitle = document.title.replace(/\bNiteOwl\s*/gi, '').trim()
+      if (brandedTitle && brandedTitle !== document.title) {
+        document.title = brandedTitle
+      }
+    }
+
     function wireSidebarToggle() {
       const brandIcons = Array.from(document.querySelectorAll<HTMLElement>('.inventory-brand-icon'))
 
@@ -74,12 +89,23 @@ function RootDocument({ children }: { children: ReactNode }) {
       })
     }
 
+    syncPageTitleBranding()
     wireSidebarToggle()
 
     const observer = new MutationObserver(wireSidebarToggle)
     observer.observe(document.body, { childList: true, subtree: true })
 
-    return () => observer.disconnect()
+    const titleObserver = new MutationObserver(syncPageTitleBranding)
+    titleObserver.observe(document.head, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    })
+
+    return () => {
+      observer.disconnect()
+      titleObserver.disconnect()
+    }
   }, [])
 
   return (
