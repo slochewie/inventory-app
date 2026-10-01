@@ -9,6 +9,7 @@ import {
   NiteOwlNavigationIcon,
   useCurrentHostname,
 } from "@niteowl/ui"
+import { Martini } from "lucide-react"
 
 import {
   Sidebar,
@@ -143,6 +144,8 @@ export function InventorySidebar({
                     >
                       {item.label === "Export to Toast" ? (
                         <ToastBrandIcon />
+                      ) : item.label === "Cocktails" ? (
+                        <Martini className="size-4 shrink-0" aria-hidden="true" />
                       ) : (
                         <NiteOwlNavigationIcon icon={item.icon} />
                       )}
@@ -174,6 +177,8 @@ export function InventorySidebar({
                     >
                       {item.label === "Export to Toast" ? (
                         <ToastBrandIcon />
+                      ) : item.label === "Cocktails" ? (
+                        <Martini className="size-4 shrink-0" aria-hidden="true" />
                       ) : (
                         <NiteOwlNavigationIcon icon={item.icon} />
                       )}
