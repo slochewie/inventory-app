@@ -85,7 +85,7 @@
 .liquor-mods-add-form,
 .liquor-mods-row {
   display: grid;
-  grid-template-columns: minmax(11rem, 1fr) minmax(7rem, 8.5rem) auto;
+  grid-template-columns: minmax(11rem, 1fr) minmax(6.75rem, 8rem) auto;
   gap: 0.65rem;
   align-items: end;
   padding: 0.9rem 1.25rem;
@@ -130,26 +130,29 @@
 }
 
 .liquor-mods-money-input {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  min-height: 2.45rem;
-  border: 1px solid var(--inventory-border, #d0d5dd);
-  border-radius: 0.65rem;
-  overflow: hidden;
-  background: #fff;
+  position: relative;
+  display: block;
+  min-width: 0;
 }
 
 .liquor-mods-money-input > span {
-  padding-left: 0.75rem;
+  position: absolute;
+  top: 50%;
+  left: 0.72rem;
+  z-index: 1;
+  transform: translateY(-50%);
   color: #667085;
+  font-size: 0.9rem;
   font-weight: 800;
+  pointer-events: none;
 }
 
 .liquor-mods-money-input input {
-  border: 0;
-  border-radius: 0;
-  min-height: 2.35rem;
+  min-height: 2.45rem;
+  padding-left: 1.55rem;
+  padding-right: 0.7rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .liquor-mods-add-form button,
