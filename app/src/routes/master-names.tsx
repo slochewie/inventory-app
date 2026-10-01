@@ -415,6 +415,10 @@ function MasterNamesPage() {
           grid-template-columns: minmax(20rem, 2fr) minmax(10rem, 1fr) minmax(10rem, 1fr);
         }
 
+        .inventory-master-names-page .master-names-toolbar.is-shared.is-cocktails {
+          grid-template-columns: minmax(20rem, 2fr) minmax(10rem, 1fr);
+        }
+
         .inventory-master-names-page .master-names-toolbar .inventory-search-control {
           min-width: 0;
         }
@@ -835,7 +839,14 @@ function MasterNamesPage() {
           </label>
         </section>
       ) : (
-        <section className="master-names-toolbar is-shared" aria-label="Shared master filters">
+        <section
+          className={
+            family === 'cocktails'
+              ? 'master-names-toolbar is-shared is-cocktails'
+              : 'master-names-toolbar is-shared'
+          }
+          aria-label="Shared master filters"
+        >
           <label className="inventory-search-control">
             <span>Search</span>
             <input type="search" value={query} placeholder={family === 'cocktails' ? 'Search Cocktail masters…' : 'Search Liquor Mod masters…'} onChange={(event) => setQuery(event.target.value)} />
@@ -849,7 +860,7 @@ function MasterNamesPage() {
                 <option value="bar_prep">Bar Prep</option>
               </select>
             </label>
-          ) : <div />}
+          ) : null}
           <label className="inventory-search-control">
             <span>Status</span>
             <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)}>
