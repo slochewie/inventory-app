@@ -2240,3 +2240,62 @@ function MoneyField({
 }
 
 function groupCatalogItems(items: NormalizedMenuItem[]): CatalogGroup[] {
+  const groups = new Map<string, NormalizedMenuItem[]>()
+
+  items.forEach((item) => {
+    const key = item.masterItemId ?? item.id
+    const existing = groups.get(key)
+
+    if (existing) existing.push(item)
+    else groups.set(key, [item])
+  })
+
+  return [...groups.entries()]
+    .map(([id, groupedItems]) => {
+      const sortedItems = [...groupedItems].sort((a, b) =>
+        (a.variantLabel || 'Standard').localeCompare(b.variantLabel || 'Standard'),
+      )
+      const first = sortedItems[0]
+
+      return {
+        id,
+        name: first?.name ?? 'Unnamed item',
+        category: first?.category || first?.toastCategory || 'Uncategorized',
+        categoryId: first?.masterCategoryId,
+        items: sortedItems,
+      }
+    })
+    .sort((a, b) =>
+      a.category.localeCompare(b.category) || a.name.localeCompare(b.name),
+    )
+}
+
+function getHappyHourRange(items: NormalizedMenuItem[]) {
+  const prices = items
+    .map((item) => item.happyHourPriceCents)
+    .filter((value): value is number => value !== null)
+
+  if (prices.length === 0) return '—'
+
+  const minimum = Math.min(...prices)
+  const maximum = Math.max(...prices)
+
+  return minimum === maximum
+    ? formatCurrency(minimum)
+    : `${formatCurrency(minimum)}–${formatCurrency(maximum)}`
+}
+
+function getPriceRange(items: NormalizedMenuItem[]) {
+  const prices = items
+    .map((item) => item.basePriceCents)
+    .filter((value): value is number => value !== null)
+
+  if (prices.length === 0) return '—'
+
+  const minimum = Math.min(...prices)
+  const maximum = Math.max(...prices)
+
+  return minimum === maximum
+    ? formatCurrency(minimum)
+    : `${formatCurrency(minimum)}–${formatCurrency(maximum)}`
+}
