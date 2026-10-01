@@ -40,13 +40,15 @@ const MODIFIER_TYPES: Array<{
     type: 'mixer',
     title: 'Mixers',
     singular: 'Mixer',
-    description: 'Writes to Liquor Mods A/B: modifier name and upcharge.',
+    description:
+      'Mixer options used for liquor drinks, including soda, tonic, ginger beer, and energy drink upcharges.',
   },
   {
     type: 'bar_prep',
     title: 'Bar Prep Modifiers',
     singular: 'Bar Prep Modifier',
-    description: 'Writes to Liquor Mods D/E: modifier name and upcharge.',
+    description:
+      'Prep and garnish options used for liquor drinks, such as rocks, tall, salted rim, or citrus garnish.',
   },
 ]
 
@@ -301,11 +303,11 @@ function LiquorModsPage() {
       <main className="inventory-page liquor-mods-page">
         <header className="liquor-mods-header">
           <div>
-            <p className="eyebrow">Toast workbook setup</p>
+            <p className="eyebrow">Liquor modifier setup</p>
             <h1>Liquor Mods</h1>
             <p>
-              Manage organization-specific Mixers and Bar Prep Modifiers for the
-              official Toast Liquor Mods tab.
+              Manage organization-specific Mixers and Bar Prep Modifiers for
+              liquor drinks.
             </p>
           </div>
           <p className="liquor-mods-note">
@@ -396,7 +398,7 @@ function LiquorModsPage() {
                           />
                         </label>
                         <div className="liquor-mods-row-meta">
-                          <span>Workbook order {index + 1}</span>
+                          <span>Display order {index + 1}</span>
                           {!draft.enabled ? <span>Disabled</span> : null}
                         </div>
                       </div>
