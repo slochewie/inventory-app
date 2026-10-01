@@ -1,0 +1,327 @@
+.inventory-organization-settings-content {
+  display: grid;
+  max-width: 58rem;
+  gap: 1rem;
+}
+
+.inventory-organization-settings-section {
+  display: block !important;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+  padding: 1rem;
+}
+
+.inventory-organization-settings-section h2,
+.inventory-organization-settings-section h3,
+.inventory-organization-settings-section p {
+  margin: 0;
+}
+
+.inventory-settings-card-summary,
+.inventory-happy-hour-range2-heading {
+  display: flex;
+  cursor: pointer;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  list-style: none;
+}
+
+.inventory-settings-card-summary::-webkit-details-marker,
+.inventory-happy-hour-range2-heading::-webkit-details-marker {
+  display: none;
+}
+
+.inventory-settings-card-summary {
+  margin: -1rem -1rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+  padding: 1rem;
+}
+
+.inventory-organization-settings-section:not([open]) > .inventory-settings-card-summary {
+  margin-bottom: -1rem;
+  border-bottom: 0;
+}
+
+.inventory-settings-card-summary::before,
+.inventory-happy-hour-range2-heading::before {
+  content: '▾';
+  flex: 0 0 auto;
+  color: #475569;
+  font-size: 0.85rem;
+  line-height: 1.5rem;
+  transition: transform 140ms ease;
+}
+
+.inventory-organization-settings-section:not([open]) > .inventory-settings-card-summary::before,
+.inventory-happy-hour-range2:not([open]) > .inventory-happy-hour-range2-heading::before {
+  transform: rotate(-90deg);
+}
+
+.inventory-settings-card-summary > div,
+.inventory-happy-hour-range2-heading > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.inventory-settings-card-summary > span,
+.inventory-happy-hour-range2-heading > span {
+  flex: 0 0 auto;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.inventory-happy-hour-copy,
+.inventory-draft-slots-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.inventory-happy-hour-copy h2,
+.inventory-draft-slots-copy h2,
+.inventory-menu-category-card h2 {
+  color: #111827;
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.inventory-draft-slots-copy h3,
+.inventory-happy-hour-range2 h3 {
+  color: #111827;
+  font-size: 0.93rem;
+  font-weight: 800;
+}
+
+.inventory-happy-hour-copy p,
+.inventory-draft-slots-copy p,
+.inventory-menu-category-card p,
+.inventory-happy-hour-range2 p,
+.inventory-menu-category-card small {
+  color: #64748b;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.inventory-happy-hour-settings[open] {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 0.9rem 1rem;
+}
+
+.inventory-happy-hour-settings > .inventory-settings-card-summary,
+.inventory-happy-hour-settings > .inventory-happy-hour-toggle,
+.inventory-happy-hour-settings > .inventory-happy-hour-days,
+.inventory-happy-hour-settings > .inventory-happy-hour-range2,
+.inventory-happy-hour-settings > .inventory-happy-hour-actions {
+  grid-column: 1 / -1;
+}
+
+.inventory-happy-hour-settings > .inventory-happy-hour-toggle {
+  width: fit-content;
+}
+
+.inventory-search-control {
+  min-width: 0;
+}
+
+.inventory-search-control > input[type='time'],
+.inventory-search-control > input[type='text'] {
+  width: 100%;
+}
+
+.inventory-happy-hour-days {
+  margin: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  padding: 0.85rem;
+}
+
+.inventory-happy-hour-days legend {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inventory-happy-hour-day-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.inventory-happy-hour-day-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  padding: 0.32rem 0.58rem;
+  font-weight: 750;
+}
+
+.inventory-happy-hour-range2 {
+  display: block !important;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.9rem;
+  background: #f8fafc;
+  padding: 0.9rem;
+}
+
+.inventory-happy-hour-range2[open] > .inventory-happy-hour-range2-heading {
+  margin-bottom: 0.85rem;
+}
+
+.inventory-happy-hour-range2 > .inventory-inline-toggle {
+  width: fit-content;
+  margin-bottom: 0.85rem;
+}
+
+.inventory-happy-hour-range2-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.inventory-happy-hour-range2-times + .inventory-happy-hour-days {
+  margin-top: 0.85rem;
+}
+
+.inventory-happy-hour-actions,
+.inventory-draft-slots-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.inventory-happy-hour-actions > button,
+.inventory-draft-slots-actions > button {
+  min-width: 6rem;
+}
+
+.inventory-menu-category-card {
+  display: grid !important;
+  gap: 1rem;
+}
+
+.inventory-menu-category-card .inventory-draft-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.75rem;
+}
+
+.inventory-menu-category-card .inventory-beer-format-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.15rem 0.55rem;
+  min-height: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  padding: 0.85rem;
+}
+
+.inventory-menu-category-card .inventory-beer-format-toggle small {
+  grid-column: 2;
+}
+
+.inventory-draft-slots-settings[open] {
+  display: grid !important;
+  gap: 1rem;
+}
+
+.inventory-draft-slots-settings > .inventory-settings-card-summary {
+  grid-column: 1 / -1;
+}
+
+.inventory-draft-slots-settings .inventory-draft-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.75rem;
+}
+
+.inventory-beer-format-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.35rem;
+}
+
+.inventory-draft-slot-field {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  grid-column: 1 / -1;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.9rem;
+  background: #fff;
+  padding: 0.9rem;
+}
+
+.inventory-draft-slot-field > .inventory-inline-toggle {
+  padding-right: 2.5rem;
+}
+
+.inventory-draft-slot-field > .inventory-format-remove-button {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  width: 2rem;
+  min-width: 0;
+  height: 2rem;
+  padding: 0;
+}
+
+.inventory-draft-slot-field .inventory-search-control {
+  width: 100%;
+}
+
+.inventory-draft-slot-field .inventory-draft-slots-actions {
+  margin-top: 0;
+}
+
+.inventory-draft-slots-settings > .inventory-secondary-button {
+  width: fit-content;
+}
+
+@media (max-width: 720px) {
+  .inventory-organization-settings-content {
+    max-width: none;
+  }
+
+  .inventory-happy-hour-settings[open],
+  .inventory-happy-hour-range2-times {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-settings-card-summary,
+  .inventory-happy-hour-range2-heading {
+    align-items: flex-start;
+  }
+
+  .inventory-settings-card-summary > span,
+  .inventory-happy-hour-range2-heading > span {
+    display: none;
+  }
+
+  .inventory-happy-hour-actions > button,
+  .inventory-draft-slots-actions > button,
+  .inventory-draft-slots-settings > .inventory-secondary-button {
+    flex: 1;
+    width: auto;
+  }
+}
