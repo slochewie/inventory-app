@@ -64,6 +64,10 @@ import {
   type NormalizedMenuItem,
   type ParsedMenuImport,
 } from '#/features/menu-import/types'
+import {
+  listInventoryLiquorModifiers,
+  type InventoryLiquorModifier,
+} from '#/lib/liquor-mods-access'
 
 export const Route = createFileRoute('/toast-workbook')({ component: ToastWorkbookRoute })
 
@@ -211,6 +215,9 @@ function ToastWorkbook() {
   const [masterCatalog, setMasterCatalog] = useState<InventoryCatalogRow[]>([])
   const [organizationCocktails, setOrganizationCocktails] = useState<
     InventoryOrganizationCocktail[]
+  >([])
+  const [organizationLiquorModifiers, setOrganizationLiquorModifiers] = useState<
+    InventoryLiquorModifier[]
   >([])
   const [reconciliationActive, setReconciliationActive] = useState(false)
   const [reconciliationScopeIds, setReconciliationScopeIds] = useState<Set<string> | null>(null)
@@ -362,6 +369,7 @@ function ToastWorkbook() {
       setImportFile(null)
       setItems([])
       setOrganizationCocktails([])
+      setOrganizationLiquorModifiers([])
       setReviewSource(null)
       setReviewSavedAt(null)
       return
@@ -415,12 +423,14 @@ function ToastWorkbook() {
     void Promise.all([
       listInventoryCatalog(organizationId, controller.signal),
       listInventoryCocktails(organizationId, controller.signal),
+      listInventoryLiquorModifiers(organizationId, controller.signal),
       getInventoryOrganizationConfig(organizationId, controller.signal),
     ])
-      .then(([catalog, cocktails, config]) => {
+      .then(([catalog, cocktails, liquorModifiers, config]) => {
         setOrganizationConfig(config)
         setMasterCatalog(catalog.items)
         setOrganizationCocktails(cocktails.cocktails)
+        setOrganizationLiquorModifiers(liquorModifiers.modifiers)
 
         if (savedReviewSession?.items.length) {
           const mappedItems = applyOrganizationBeerDraftImportMappings(
@@ -542,9 +552,10 @@ function ToastWorkbook() {
     setCatalogLoading(true)
 
     try {
-      const [catalog, cocktails, config] = await Promise.all([
+      const [catalog, cocktails, liquorModifiers, config] = await Promise.all([
         listInventoryCatalog(activeOrganization.id),
         listInventoryCocktails(activeOrganization.id),
+        listInventoryLiquorModifiers(activeOrganization.id),
         getInventoryOrganizationConfig(activeOrganization.id),
       ])
       const persistentItems = catalog.items.map(catalogRowToNormalizedItem)
@@ -552,6 +563,7 @@ function ToastWorkbook() {
       setOrganizationConfig(config)
       setMasterCatalog(catalog.items)
       setOrganizationCocktails(cocktails.cocktails)
+      setOrganizationLiquorModifiers(liquorModifiers.modifiers)
       setImportFile({
         sourceKind: 'toast-template-sheet',
         sourceName: 'Persistent Inventory catalog',
@@ -1073,6 +1085,7 @@ function ToastWorkbook() {
       draftSlotMappings,
       optionalBeerCategories,
       builtInFormatVisibility,
+      liquorModifiers: organizationLiquorModifiers,
     })
     const populatedWorkbookArrayBuffer = await populatedWorkbook.arrayBuffer()
     const validation = validatePopulatedToastTemplateWorkbookWithLiquor({
@@ -1089,6 +1102,7 @@ function ToastWorkbook() {
       draftSlotMappings,
       optionalBeerCategories,
       builtInFormatVisibility,
+      liquorModifiers: organizationLiquorModifiers,
     })
 
     if (!validation.valid) {
@@ -2998,392 +3012,3 @@ function getStagedDraftSizeOz(item: NormalizedMenuItem) {
   ].join(' ')
 
   const match = sourceText.match(/\b(?:draft\s*)?(\d+(?:\.\d+)?)\s*oz\b/i)
-  if (!match) return null
-
-  const sizeOz = Number(match[1])
-  return Number.isFinite(sizeOz) && sizeOz > 0 ? sizeOz : null
-}
-
-function getOrganizationDraftSizeOptions(
-  config: InventoryOrganizationConfig | null,
-) {
-  if (!config) return []
-
-  const bySize = new Map<number, StagedBeerDestinationOption>()
-
-  for (const option of getStagedBeerDestinationOptions(config)) {
-    const match = option.label.match(/\b(\d+(?:\.\d+)?)\s*oz\b/i)
-    if (!match || /\bcan\b/i.test(option.label)) continue
-
-    const sizeOz = Number(match[1])
-    if (!Number.isFinite(sizeOz) || sizeOz <= 0 || bySize.has(sizeOz)) continue
-    bySize.set(sizeOz, option)
-  }
-
-  return [...bySize.entries()]
-    .map(([sizeOz, option]) => ({ sizeOz, option }))
-    .sort((left, right) => left.sizeOz - right.sizeOz)
-}
-
-function applyOrganizationBeerDraftImportMappings(
-  sourceItems: NormalizedMenuItem[],
-  config: InventoryOrganizationConfig | null,
-) {
-  if (sourceItems.length === 0) return sourceItems
-
-  let changed = false
-  let stagedItems = sourceItems.map((item) => {
-    const wineMatch = [
-      item.toastDestination,
-      item.category ?? '',
-      item.toastCategory,
-    ]
-      .map((value) => clean(value).match(/^wine\s*(?:\/|:|·|-)\s*(.+)$/i))
-      .find((match) => Boolean(match?.[1]))
-
-    if (!wineMatch?.[1]) return item
-
-    const wineType = wineMatch[1].trim()
-    const destination = `Wine / ${wineType}`
-    const alreadyNormalized =
-      item.category === 'Wine' &&
-      item.toastCategory === 'Wine' &&
-      item.toastDestination === destination
-
-    if (alreadyNormalized) return item
-
-    changed = true
-    return {
-      ...item,
-      category: 'Wine',
-      toastCategory: 'Wine',
-      toastDestination: destination,
-    }
-  })
-
-  if (!config) return changed ? stagedItems : sourceItems
-
-  const destinationOptions = getOrganizationDraftSizeOptions(config)
-  if (destinationOptions.length === 0) {
-    return changed ? stagedItems : sourceItems
-  }
-
-  const sourceSizes = [
-    ...new Set(
-      stagedItems.flatMap((item) => {
-        const category = normalizeStagedMenuCategory(
-          item.category || item.toastCategory,
-        )
-        if (category.toLowerCase() !== 'beer') return []
-
-        const sizeOz = getStagedDraftSizeOz(item)
-        return sizeOz === null ? [] : [sizeOz]
-      }),
-    ),
-  ].sort((left, right) => left - right)
-
-  if (sourceSizes.length === 0) return changed ? stagedItems : sourceItems
-
-  const destinationBySize = new Map(
-    destinationOptions.map(({ sizeOz, option }) => [sizeOz, option]),
-  )
-  const exactSizes = new Set(
-    sourceSizes.filter((sizeOz) => destinationBySize.has(sizeOz)),
-  )
-  const unmatchedSourceSizes = sourceSizes.filter(
-    (sizeOz) => !exactSizes.has(sizeOz),
-  )
-  const unmatchedDestinationSizes = destinationOptions
-    .map(({ sizeOz }) => sizeOz)
-    .filter((sizeOz) => !exactSizes.has(sizeOz))
-
-  if (unmatchedSourceSizes.length !== unmatchedDestinationSizes.length) {
-    return changed ? stagedItems : sourceItems
-  }
-
-  const sizeMapping = new Map<number, number>()
-  exactSizes.forEach((sizeOz) => sizeMapping.set(sizeOz, sizeOz))
-  unmatchedSourceSizes.forEach((sourceSizeOz, index) => {
-    sizeMapping.set(sourceSizeOz, unmatchedDestinationSizes[index])
-  })
-
-  stagedItems = stagedItems.map((item) => {
-    const category = normalizeStagedMenuCategory(
-      item.category || item.toastCategory,
-    )
-    if (category.toLowerCase() !== 'beer') return item
-
-    const sourceSizeOz = getStagedDraftSizeOz(item)
-    if (sourceSizeOz === null) return item
-
-    const targetSizeOz = sizeMapping.get(sourceSizeOz)
-    if (targetSizeOz === undefined || targetSizeOz === sourceSizeOz) return item
-
-    const targetOption = destinationBySize.get(targetSizeOz)
-    if (!targetOption) return item
-
-    changed = true
-    const mappingNote =
-      `Organization Beer import mapping: ${sourceSizeOz}oz Draft → ${targetSizeOz}oz Draft.`
-
-    return {
-      ...item,
-      category: 'Beer',
-      toastCategory: 'Beer',
-      toastDestination: targetOption.value,
-      toastSlot: targetOption.toastSlot,
-      variantKind: 'draft',
-      variantSizeOz: targetSizeOz,
-      variantPackageType: null,
-      variantLabel: `${targetSizeOz}oz Draft`,
-      notes: item.notes.includes(mappingNote)
-        ? item.notes
-        : [...item.notes, mappingNote],
-    }
-  })
-
-  return changed ? stagedItems : sourceItems
-}
-
-function getStagedDestinationSelectValue(
-  item: NormalizedMenuItem,
-  beerOptions: StagedBeerDestinationOption[],
-) {
-  if (item.toastSlot) {
-    const bySlot = beerOptions.find(
-      (option) => option.toastSlot === item.toastSlot,
-    )
-    if (bySlot) return bySlot.value
-  }
-
-  if (beerOptions.some((option) => option.value === item.toastDestination)) {
-    return item.toastDestination
-  }
-
-  const normalizedDestination = clean(item.toastDestination).toLowerCase()
-  const byLabel = beerOptions.find((option) =>
-    normalizedDestination.includes(option.label.toLowerCase()),
-  )
-  return byLabel?.value ?? item.toastDestination
-}
-
-function formatStagedDestinationLabel(
-  value: string,
-  beerOptions: StagedBeerDestinationOption[],
-) {
-  return beerOptions.find((option) => option.value === value)?.label ?? value
-}
-
-function getStagedDraftSlotMappings(
-  importFile: ParsedMenuImport | null,
-): ToastDraftSlotMapping[] {
-  const raw = importFile?.meta?.draftSlotMappings
-  if (!raw) return []
-
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-
-    return parsed.flatMap((mapping): ToastDraftSlotMapping[] => {
-      if (
-        !mapping ||
-        typeof mapping !== 'object' ||
-        !('toastSizeOz' in mapping) ||
-        !('actualSizeOz' in mapping)
-      ) {
-        return []
-      }
-
-      const toastSizeOz =
-        mapping.toastSizeOz === null ? null : Number(mapping.toastSizeOz)
-      const actualSizeOz = Number(mapping.actualSizeOz)
-
-      if (
-        (toastSizeOz !== null &&
-          ![8, 16, 24].includes(toastSizeOz)) ||
-        !Number.isFinite(actualSizeOz) ||
-        actualSizeOz <= 0
-      ) {
-        return []
-      }
-
-      return [{ toastSizeOz, actualSizeOz }]
-    })
-  } catch {
-    return []
-  }
-}
-
-function isOrganizationCatalogExportItemEnabled(
-  item: NormalizedMenuItem,
-  config: InventoryOrganizationConfig | null,
-) {
-  if (!item.exportIncluded) return false
-  if (!config || getToastWorkbookCategory(item) !== 'Beer') return true
-
-  const optionalSlotMatch = item.toastSlot?.match(/^optional-beer-([1-5])$/)
-  if (optionalSlotMatch) {
-    const slot = Number(optionalSlotMatch[1])
-    return (
-      getOptionalBeerCategories(config).find(
-        (category) => category.slot === slot,
-      )?.enabled === true
-    )
-  }
-
-  if (item.variantKind === 'draft') {
-    if (item.variantSizeOz === 8) return config.draft8Enabled
-    if (item.variantSizeOz === 16) return config.draft16Enabled
-    if (item.variantSizeOz === 24) return config.draft24Enabled
-
-    if (
-      item.variantSizeOz === null &&
-      /^pitcher$/i.test(item.variantLabel ?? '')
-    ) {
-      return config.pitcherEnabled
-    }
-
-    return true
-  }
-
-  if (item.variantKind === 'can') return config.canEnabled
-  if (item.variantKind === 'bottle') return config.bottleEnabled
-
-  return true
-}
-
-function getOrganizationDraftSlotMappings(
-  config: InventoryOrganizationConfig | null,
-): ToastDraftSlotMapping[] {
-  const fixedDraftMappings: ToastDraftSlotMapping[] = [
-    { toastSizeOz: 8, actualSizeOz: 8 },
-    { toastSizeOz: 16, actualSizeOz: 16 },
-    { toastSizeOz: 24, actualSizeOz: 24 },
-  ]
-
-  if (!config) return fixedDraftMappings
-
-  const pitcherMapping = config.pitcherEnabled
-    ? [{
-        toastSizeOz: null,
-        actualSizeOz: config.pitcherActualSizeOz ?? null,
-      }]
-    : []
-
-  return [...fixedDraftMappings, ...pitcherMapping]
-}
-
-function formatHappyHourSetting(
-  config: InventoryOrganizationConfig | null,
-) {
-  if (!config?.happyHourEnabled) return 'Disabled'
-  const range1 = `${formatHappyHourDays(config.happyHourDays)} · ${formatHappyHourWindow(config)}`
-  if (!config.happyHourRange2Enabled) return range1
-
-  const range2Days =
-    config.happyHourRange2Days?.length > 0
-      ? config.happyHourRange2Days
-      : config.happyHourDays
-  const range2Window =
-    config.happyHourRange2Start && config.happyHourRange2End
-      ? `${formatTime(config.happyHourRange2Start)}–${formatTime(config.happyHourRange2End)}`
-      : 'Enabled'
-
-  return `${range1} · Range 2: ${formatHappyHourDays(range2Days)} · ${range2Window}`
-}
-
-function formatHappyHourDays(days: readonly string[]) {
-  if (days.length === 7) return 'Daily'
-
-  const labels: Record<string, string> = {
-    mon: 'Mon',
-    tue: 'Tue',
-    wed: 'Wed',
-    thu: 'Thu',
-    fri: 'Fri',
-    sat: 'Sat',
-    sun: 'Sun',
-  }
-
-  return days.map((day) => labels[day] ?? day).join(', ')
-}
-
-function formatHappyHourWindow(config: InventoryOrganizationConfig) {
-  if (!config.happyHourStart || !config.happyHourEnd) return 'Enabled'
-
-  return `${formatTime(config.happyHourStart)}–${formatTime(config.happyHourEnd)}`
-}
-
-function formatTime(value: string) {
-  const [hourText, minute = '00'] = value.split(':')
-  const hour = Number(hourText)
-  if (!Number.isFinite(hour)) return value
-
-  const suffix = hour >= 12 ? 'PM' : 'AM'
-  const displayHour = hour % 12 || 12
-  return `${displayHour}:${minute} ${suffix}`
-}
-
-function WorkbookInspectionCard({ workbook }: { workbook: WorkbookState }) {
-  return (
-    <section className="inventory-card inventory-template-inspection">
-      <div className="inventory-table-heading">
-        <div>
-          <p className="inventory-kicker">Template ready</p>
-          <h2>{workbook.info.fileName}</h2>
-        </div>
-        <p>
-          {workbook.info.warnings.length === 0
-            ? 'Template compatibility checked.'
-            : `${workbook.info.warnings.length} compatibility warning${workbook.info.warnings.length === 1 ? '' : 's'} detected.`}
-        </p>
-      </div>
-    </section>
-  )
-}
-
-function SummaryCard({ label, value }: { label: string; value: number }) {
-  return (
-    <article className="inventory-summary-card">
-      <span>{label}</span>
-      <strong>{value.toLocaleString()}</strong>
-    </article>
-  )
-}
-
-function isCocktailItem(item: NormalizedMenuItem) {
-  return (
-    /cocktail/i.test(item.category ?? '') ||
-    /cocktail/i.test(item.toastCategory) ||
-    /cocktail/i.test(item.toastDestination)
-  )
-}
-
-function isLiquorItem(item: NormalizedMenuItem) {
-  return LIQUOR_CATEGORIES.has(normalizeLiquorCategory(item.toastCategory))
-}
-
-const LIQUOR_CATEGORIES = new Set([
-  'BRANDY/COGNAC',
-  'GIN',
-  'LIQUEURS',
-  'RUM',
-  'SCOTCH',
-  'TEQUILA',
-  'VODKA',
-  'WHISKEY/BOURBON',
-])
-
-function normalizeLiquorCategory(value?: string) {
-  const category = clean(value).toUpperCase().replace(/&/g, '/')
-
-  if (category.includes('WHISKEY') || category.includes('BOURBON')) return 'WHISKEY/BOURBON'
-  if (category.includes('BRANDY') || category.includes('COGNAC')) return 'BRANDY/COGNAC'
-  if (category.includes('LIQUEUR') || category.includes('CORDIAL')) return 'LIQUEURS'
-
-  return category
-}
-
-function clean(value?: string) {
-  return String(value ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
-}
