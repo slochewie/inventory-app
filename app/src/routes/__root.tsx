@@ -5,6 +5,7 @@ import appCss from '../styles.css?url'
 import exportControlsCss from '../export-controls.css?url'
 import sidebarCss from '../sidebar.css?url'
 import organizationSettingsCss from '../organization-settings.css?url'
+import organizationSettingsRangesCss from '../organization-settings-ranges.css?url'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -36,6 +37,10 @@ export const Route = createRootRoute({
       {
         rel: 'stylesheet',
         href: organizationSettingsCss,
+      },
+      {
+        rel: 'stylesheet',
+        href: organizationSettingsRangesCss,
       },
     ],
   }),
