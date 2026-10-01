@@ -559,6 +559,10 @@ function CatalogPage() {
       payload.happyHourPriceCents = patch.happyHourPriceCents ?? null
     }
 
+    if (Object.hasOwn(patch, 'doublePriceCents')) {
+      payload.doublePriceCents = patch.doublePriceCents ?? null
+    }
+
     if (Object.hasOwn(patch, 'toastSlot')) {
       payload.toastSlot = patch.toastSlot ?? null
     }
@@ -1394,6 +1398,7 @@ function CatalogDrawer({
     categoryOptions.find((option) => option.id === draftCategoryId)?.name ??
     group.category
   const selectedCategoryIsBeer = isBeerCategoryName(selectedCategoryName)
+  const selectedCategoryIsLiquor = isLiquorCategoryName(selectedCategoryName)
   const carriedCount =
     selectedCategoryIsBeer && organizationConfig
       ? draftItems.filter(
@@ -1438,6 +1443,7 @@ function CatalogDrawer({
       draftItem.exportToToast !== original.exportToToast ||
       draftItem.basePriceCents !== original.basePriceCents ||
       draftItem.happyHourPriceCents !== original.happyHourPriceCents ||
+      draftItem.doublePriceCents !== original.doublePriceCents ||
       draftItem.toastSlot !== original.toastSlot
     )
   })
@@ -1491,6 +1497,9 @@ function CatalogDrawer({
         }
         if (draftItem.happyHourPriceCents !== original.happyHourPriceCents) {
           patch.happyHourPriceCents = draftItem.happyHourPriceCents
+        }
+        if (draftItem.doublePriceCents !== original.doublePriceCents) {
+          patch.doublePriceCents = draftItem.doublePriceCents
         }
         if (!selectedCategoryIsBeer) {
           if (draftItem.toastSlot !== null || original.toastSlot !== null) {
@@ -1677,6 +1686,17 @@ function CatalogDrawer({
                       updateDraft(item.id, { happyHourPriceCents: value })
                     }
                   />
+
+                  {selectedCategoryIsLiquor ? (
+                    <MoneyField
+                      label="Double price"
+                      value={item.doublePriceCents ?? null}
+                      disabled={!canEdit || saving || updating}
+                      onCommit={(value) =>
+                        updateDraft(item.id, { doublePriceCents: value })
+                      }
+                    />
+                  ) : null}
                 </div>
 
                 <div className="inventory-variant-meta">
@@ -2073,6 +2093,28 @@ function getCatalogWorkbookCategoryName(categoryName: string) {
   return null
 }
 
+function isLiquorCategoryName(categoryName: string) {
+  const normalized = categoryName
+    .trim()
+    .toUpperCase()
+    .replace(/&/g, '/')
+    .replace(/\s+/g, ' ')
+
+  return (
+    normalized.includes('VODKA') ||
+    normalized.includes('GIN') ||
+    normalized.includes('RUM') ||
+    normalized.includes('TEQUILA') ||
+    normalized.includes('SCOTCH') ||
+    normalized.includes('WHISKEY') ||
+    normalized.includes('BOURBON') ||
+    normalized.includes('LIQUEUR') ||
+    normalized.includes('CORDIAL') ||
+    normalized.includes('BRANDY') ||
+    normalized.includes('COGNAC')
+  )
+}
+
 function isBeerCategoryName(categoryName: string) {
   return normalizeCatalogCategoryName(categoryName) === 'beer'
 }
@@ -2198,62 +2240,3 @@ function MoneyField({
 }
 
 function groupCatalogItems(items: NormalizedMenuItem[]): CatalogGroup[] {
-  const groups = new Map<string, NormalizedMenuItem[]>()
-
-  items.forEach((item) => {
-    const key = item.masterItemId ?? item.id
-    const existing = groups.get(key)
-
-    if (existing) existing.push(item)
-    else groups.set(key, [item])
-  })
-
-  return [...groups.entries()]
-    .map(([id, groupedItems]) => {
-      const sortedItems = [...groupedItems].sort((a, b) =>
-        (a.variantLabel || 'Standard').localeCompare(b.variantLabel || 'Standard'),
-      )
-      const first = sortedItems[0]
-
-      return {
-        id,
-        name: first?.name ?? 'Unnamed item',
-        category: first?.category || first?.toastCategory || 'Uncategorized',
-        categoryId: first?.masterCategoryId,
-        items: sortedItems,
-      }
-    })
-    .sort((a, b) =>
-      a.category.localeCompare(b.category) || a.name.localeCompare(b.name),
-    )
-}
-
-function getHappyHourRange(items: NormalizedMenuItem[]) {
-  const prices = items
-    .map((item) => item.happyHourPriceCents)
-    .filter((value): value is number => value !== null)
-
-  if (prices.length === 0) return '—'
-
-  const minimum = Math.min(...prices)
-  const maximum = Math.max(...prices)
-
-  return minimum === maximum
-    ? formatCurrency(minimum)
-    : `${formatCurrency(minimum)}–${formatCurrency(maximum)}`
-}
-
-function getPriceRange(items: NormalizedMenuItem[]) {
-  const prices = items
-    .map((item) => item.basePriceCents)
-    .filter((value): value is number => value !== null)
-
-  if (prices.length === 0) return '—'
-
-  const minimum = Math.min(...prices)
-  const maximum = Math.max(...prices)
-
-  return minimum === maximum
-    ? formatCurrency(minimum)
-    : `${formatCurrency(minimum)}–${formatCurrency(maximum)}`
-}
