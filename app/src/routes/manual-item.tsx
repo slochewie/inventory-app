@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import {
   useEffect,
   useId,
@@ -8,7 +8,6 @@ import {
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
-import { AuthenticatedInventoryShell } from '#/components/authenticated-inventory-shell'
 import {
   getBuiltInToastDestinations,
   isBeerToastDestination,
@@ -35,7 +34,11 @@ import {
 } from '#/lib/menu-categories'
 import './manual-item.css'
 
-export const Route = createFileRoute('/manual-item')({ component: ManualItemPage })
+export const Route = createFileRoute('/manual-item')({
+  beforeLoad: () => {
+    throw redirect({ to: '/' })
+  },
+})
 
 type ManualItemDraft = {
   name: string
@@ -68,7 +71,11 @@ const EMPTY_DRAFT: ManualItemDraft = {
   exportToToast: true,
 }
 
-function ManualItemPage() {
+export function ManualItemEditor({
+  onCreated,
+}: {
+  onCreated?: () => void | Promise<void>
+}) {
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [draft, setDraft] = useState<ManualItemDraft>(EMPTY_DRAFT)
   const [catalogCategoryOptions, setCatalogCategoryOptions] = useState<string[]>([])
@@ -358,6 +365,7 @@ function ManualItemPage() {
         setSuccess(
           `Added existing master item ${selectedMaster.name} to ${activeOrganization.name ?? 'this organization'}.`,
         )
+        await onCreated?.()
         return
       }
 
@@ -421,6 +429,7 @@ function ManualItemPage() {
           ? `Added ${name} to ${activeOrganization.name ?? 'this organization'}.`
           : `Added ${name}. Refresh the catalog if it does not appear immediately.`,
       )
+      await onCreated?.()
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -433,34 +442,17 @@ function ManualItemPage() {
   }
 
   return (
-    <AuthenticatedInventoryShell currentPath="/manual-item" requiredCapability="edit">
-      <section className="inventory-content">
-        <header className="inventory-page-heading">
-          <div>
-            <p className="inventory-kicker">Catalog</p>
-            <h1>Add manual item</h1>
-            <p>
-              Add a catalog item for {activeOrganization?.name ?? 'the selected organization'} without uploading a POS export.
-            </p>
-          </div>
-          <div className="inventory-page-heading-actions">
+    <section className="inventory-card inventory-manual-item-editor">
+          <div className="inventory-table-heading">
+            <div>
+              <h2>Add item</h2>
+              <p>
+                Add a catalog item for {activeOrganization?.name ?? 'the selected organization'} without uploading a POS export.
+              </p>
+            </div>
             <a className="inventory-secondary-link" href="/menu-categories">
               Menu Categories
             </a>
-            <a className="inventory-secondary-link" href="/">
-              Back to Catalog
-            </a>
-          </div>
-        </header>
-
-        <section className="inventory-card">
-          <div className="inventory-table-heading">
-            <div>
-              <h2>Item details</h2>
-              <p>
-                Manual items are saved into the catalog and can be edited later from the Catalog page.
-              </p>
-            </div>
           </div>
 
           {loadingOptions ? <p>Loading catalog options…</p> : null}
@@ -607,9 +599,7 @@ function ManualItemPage() {
               </div>
             </div>
           </form>
-        </section>
-      </section>
-    </AuthenticatedInventoryShell>
+    </section>
   )
 }
 
