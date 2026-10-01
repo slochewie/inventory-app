@@ -112,6 +112,17 @@ function RootDocument({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => {
+  const host = window.location.hostname.toLowerCase()
+  if (!host.endsWith('mccarthysirishpub.com')) return
+
+  const brandedTitle = document.title.replace(/\\bNiteOwl\\s*/gi, '').trim()
+  if (brandedTitle) document.title = brandedTitle
+})()`,
+          }}
+        />
       </head>
       <body>
         {children}
