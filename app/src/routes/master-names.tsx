@@ -6,10 +6,19 @@ import {
 } from '#/components/authenticated-inventory-shell'
 import { authClient } from '#/lib/auth-client'
 import {
+  listInventoryCocktailMasters,
   listInventoryMasterItems,
   renameInventoryMasterItem,
+  updateInventoryCocktailMaster,
+  type InventoryCocktailMaster,
   type InventoryMasterItem,
 } from '#/lib/inventory-access'
+import {
+  listInventoryLiquorModifierMasters,
+  updateInventoryLiquorModifierMaster,
+  type InventoryLiquorModifierMaster,
+  type InventoryLiquorModifierType,
+} from '#/lib/liquor-mods-access'
 
 export const Route = createFileRoute('/master-names')({
   component: MasterNamesRoute,
@@ -27,6 +36,14 @@ function MasterNamesRoute() {
     </AuthenticatedInventoryShell>
   )
 }
+
+type MasterFamily = 'items' | 'cocktails' | 'liquor-mods'
+type ImpactFilter = 'all' | 'affected' | 'override' | 'unused'
+type LiquorPlacementFilter = 'all' | InventoryLiquorModifierType
+type StatusFilter = 'all' | 'active' | 'inactive'
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 250] as const
+const DEFAULT_PAGE_SIZE = 25
 
 function MasterNamesPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
