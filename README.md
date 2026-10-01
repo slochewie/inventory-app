@@ -40,9 +40,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for operator/development instructions and [do
 | `/toast-template-import` | Direct populated Toast workbook import compatibility workflow | Staff+ |
 | `/toast-workbook` | Export to Toast plus organization-scoped Toast workbook staging/reconciliation | Staff+ |
 | `/master-names` | Shared item master naming with organization impact review | Admin |
-| `/master-mixers` | Shared Mixer master catalog | Admin |
-| `/master-bar-prep` | Shared Bar Prep modifier master catalog | Admin |
-| `/liquor-mods` | Organization Mixer/Bar Prep assignments, overrides, upcharges, availability, export state, and order | Viewer; Manager/Admin edit |
+| `/liquor-mods` | Cocktail-style Mixer/Bar Prep create/reuse flow plus organization upcharges, availability, export state, and overrides | Manager/Admin edit |
 | `/assignments` | Inventory access/roles | Admin |
 | `/imports` | Standalone history compatibility view | Viewer |
 | `/reconcile` | Standalone mapping-review compatibility view | Manager/Admin |
