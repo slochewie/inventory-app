@@ -7,7 +7,7 @@ import {
 } from '#/components/authenticated-inventory-shell'
 import { catalogRowToNormalizedItem } from '#/features/menu-import/catalog'
 import type { NormalizedMenuItem } from '#/features/menu-import/types'
-import { authBaseURL, authClient } from '#/lib/auth-client'
+import { authClient } from '#/lib/auth-client'
 import {
   ALL_HAPPY_HOUR_DAYS,
   getInventoryOrganizationConfig,
@@ -102,8 +102,9 @@ function OrganizationSettingsPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [happyHourExpanded, setHappyHourExpanded] = useState(true)
-  const [beerFormatsExpanded, setBeerFormatsExpanded] = useState(true)
+  const [timeRange1Expanded, setTimeRange1Expanded] = useState(true)
   const [timeRange2Expanded, setTimeRange2Expanded] = useState(false)
+  const [beerFormatsExpanded, setBeerFormatsExpanded] = useState(true)
 
   const [happyHourEnabled, setHappyHourEnabled] = useState(false)
   const [happyHourStart, setHappyHourStart] = useState('')
@@ -162,13 +163,12 @@ function OrganizationSettingsPage() {
     void Promise.all([
       listInventoryCatalog(activeOrganization.id, controller.signal),
       getInventoryOrganizationConfig(activeOrganization.id, controller.signal),
-      getMenuCategoryFlags(activeOrganization.id, controller.signal),
     ])
-      .then(([catalog, organizationConfig, categoryFlags]) => {
+      .then(([catalog, organizationConfig]) => {
         const catalogItems = catalog.items.map(catalogRowToNormalizedItem)
         setItems(catalogItems)
-        setMenuCategoryFlags(categoryFlags)
-        setMenuCategoryDraftFlags(categoryFlags)
+        setMenuCategoryFlags(getMenuCategoryFlags(organizationConfig))
+        setMenuCategoryDraftFlags(getMenuCategoryFlags(organizationConfig))
 
         const start = organizationConfig.happyHourStart ?? ''
         const end = organizationConfig.happyHourEnd ?? ''
@@ -184,6 +184,7 @@ function OrganizationSettingsPage() {
         setHappyHourDraftStart(start)
         setHappyHourDraftEnd(end)
         setHappyHourDraftDays(days)
+        setTimeRange1Expanded(true)
 
         const range2Start = organizationConfig.happyHourRange2Start ?? ''
         const range2End = organizationConfig.happyHourRange2End ?? ''
@@ -255,6 +256,7 @@ function OrganizationSettingsPage() {
       (!happyHourDraftStart || !happyHourDraftEnd || happyHourDraftDays.length === 0)
     ) {
       setError('Set a Happy Hour start, end, and at least one day.')
+      setTimeRange1Expanded(true)
       return
     }
 
@@ -265,6 +267,7 @@ function OrganizationSettingsPage() {
         happyHourRange2DraftDays.length === 0)
     ) {
       setError('Set a Time Range 2 start, end, and at least one day.')
+      setTimeRange2Expanded(true)
       return
     }
 
@@ -528,6 +531,7 @@ function OrganizationSettingsPage() {
           happyHourRange2Days,
           ...builtInBeerFormatEdits,
           ...buildOptionalBeerCategoryConfig(normalizedCategories),
+          ...menuCategoryFlags,
         } satisfies InventoryOrganizationConfig),
       )
 
@@ -544,6 +548,7 @@ function OrganizationSettingsPage() {
           happyHourRange2Days,
           ...builtInBeerFormatEdits,
           ...buildOptionalBeerCategoryConfig(normalizedCategories),
+          ...menuCategoryFlags,
         } satisfies InventoryOrganizationConfig),
       )
 
@@ -604,167 +609,49 @@ function OrganizationSettingsPage() {
                 <div className="inventory-happy-hour-copy">
                   <h2>Happy Hour</h2>
                   <p>
-                    Set when {activeOrganization?.name ?? 'this organization'} uses
-                    Happy Hour pricing.
+                    Configure Toast Happy Hour time ranges for{' '}
+                    {activeOrganization?.name ?? 'this organization'}.
                   </p>
                 </div>
                 <span>{happyHourExpanded ? 'Collapse' : 'Expand'}</span>
               </summary>
 
-              <label className="inventory-inline-toggle inventory-happy-hour-toggle">
-                <input
-                  type="checkbox"
-                  checked={happyHourDraftEnabled}
-                  disabled={savingHappyHour}
-                  onChange={(event) =>
-                    setHappyHourDraftEnabled(event.target.checked)
-                  }
+              <div className="inventory-happy-hour-ranges">
+                <HappyHourRangeCard
+                  eyebrow="Time Range 1"
+                  title="Happy Hour"
+                  description="Primary Toast Happy Hour window."
+                  open={timeRange1Expanded}
+                  onOpenChange={setTimeRange1Expanded}
+                  enabled={happyHourDraftEnabled}
+                  saving={savingHappyHour}
+                  start={happyHourDraftStart}
+                  end={happyHourDraftEnd}
+                  days={happyHourDraftDays}
+                  onEnabledChange={setHappyHourDraftEnabled}
+                  onStartChange={setHappyHourDraftStart}
+                  onEndChange={setHappyHourDraftEnd}
+                  onDaysChange={setHappyHourDraftDays}
                 />
-                <span>{happyHourDraftEnabled ? 'Enabled' : 'Disabled'}</span>
-              </label>
 
-              <label className="inventory-search-control">
-                <span>Start</span>
-                <input
-                  type="time"
-                  value={happyHourDraftStart}
-                  disabled={!happyHourDraftEnabled || savingHappyHour}
-                  onChange={(event) => setHappyHourDraftStart(event.target.value)}
+                <HappyHourRangeCard
+                  eyebrow="Time Range 2"
+                  title="Time Range 2"
+                  description="Optional second Happy Hour window."
+                  open={timeRange2Expanded}
+                  onOpenChange={setTimeRange2Expanded}
+                  enabled={happyHourRange2DraftEnabled}
+                  disabled={!happyHourDraftEnabled}
+                  saving={savingHappyHour}
+                  start={happyHourRange2DraftStart}
+                  end={happyHourRange2DraftEnd}
+                  days={happyHourRange2DraftDays}
+                  onEnabledChange={setHappyHourRange2DraftEnabled}
+                  onStartChange={setHappyHourRange2DraftStart}
+                  onEndChange={setHappyHourRange2DraftEnd}
+                  onDaysChange={setHappyHourRange2DraftDays}
                 />
-              </label>
-
-              <label className="inventory-search-control">
-                <span>End</span>
-                <input
-                  type="time"
-                  value={happyHourDraftEnd}
-                  disabled={!happyHourDraftEnabled || savingHappyHour}
-                  onChange={(event) => setHappyHourDraftEnd(event.target.value)}
-                />
-              </label>
-
-              <fieldset
-                className="inventory-happy-hour-days"
-                disabled={!happyHourDraftEnabled || savingHappyHour}
-              >
-                <legend>Days</legend>
-                <div className="inventory-happy-hour-day-options">
-                  {HAPPY_HOUR_DAY_OPTIONS.map((option) => (
-                    <label key={option.value}>
-                      <input
-                        type="checkbox"
-                        checked={happyHourDraftDays.includes(option.value)}
-                        onChange={(event) => {
-                          setHappyHourDraftDays((current) =>
-                            event.target.checked
-                              ? ALL_HAPPY_HOUR_DAYS.filter(
-                                  (day) =>
-                                    day === option.value || current.includes(day),
-                                )
-                              : current.filter((day) => day !== option.value),
-                          )
-                        }}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              <details
-                className="inventory-happy-hour-range2"
-                open={timeRange2Expanded}
-                onToggle={(event) =>
-                  setTimeRange2Expanded(event.currentTarget.open)
-                }
-              >
-                <summary className="inventory-happy-hour-range2-heading">
-                  <div>
-                    <h3>Time Range 2</h3>
-                    <p>Optional second Happy Hour window.</p>
-                  </div>
-                  <span>{timeRange2Expanded ? 'Collapse' : 'Expand'}</span>
-                </summary>
-
-                <label className="inventory-inline-toggle">
-                  <input
-                    type="checkbox"
-                    checked={happyHourRange2DraftEnabled}
-                    disabled={!happyHourDraftEnabled || savingHappyHour}
-                    onChange={(event) =>
-                      setHappyHourRange2DraftEnabled(event.target.checked)
-                    }
-                  />
-                  <span>
-                    {happyHourRange2DraftEnabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                </label>
-
-                <div className="inventory-happy-hour-range2-times">
-                  <label className="inventory-search-control">
-                    <span>Start</span>
-                    <input
-                      type="time"
-                      value={happyHourRange2DraftStart}
-                      disabled={
-                        !happyHourDraftEnabled ||
-                        !happyHourRange2DraftEnabled ||
-                        savingHappyHour
-                      }
-                      onChange={(event) =>
-                        setHappyHourRange2DraftStart(event.target.value)
-                      }
-                    />
-                  </label>
-                  <label className="inventory-search-control">
-                    <span>End</span>
-                    <input
-                      type="time"
-                      value={happyHourRange2DraftEnd}
-                      disabled={
-                        !happyHourDraftEnabled ||
-                        !happyHourRange2DraftEnabled ||
-                        savingHappyHour
-                      }
-                      onChange={(event) =>
-                        setHappyHourRange2DraftEnd(event.target.value)
-                      }
-                    />
-                  </label>
-                </div>
-
-                <fieldset
-                  className="inventory-happy-hour-days"
-                  disabled={
-                    !happyHourDraftEnabled ||
-                    !happyHourRange2DraftEnabled ||
-                    savingHappyHour
-                  }
-                >
-                  <legend>Days</legend>
-                  <div className="inventory-happy-hour-day-options">
-                    {HAPPY_HOUR_DAY_OPTIONS.map((option) => (
-                      <label key={option.value}>
-                        <input
-                          type="checkbox"
-                          checked={happyHourRange2DraftDays.includes(option.value)}
-                          onChange={(event) => {
-                            setHappyHourRange2DraftDays((current) =>
-                              event.target.checked
-                                ? ALL_HAPPY_HOUR_DAYS.filter(
-                                    (day) =>
-                                      day === option.value || current.includes(day),
-                                  )
-                                : current.filter((day) => day !== option.value),
-                            )
-                          }}
-                        />
-                        <span>{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              </details>
+              </div>
 
               <div className="inventory-happy-hour-actions">
                 <button
@@ -1067,35 +954,126 @@ function OrganizationSettingsPage() {
   )
 }
 
-async function getMenuCategoryFlags(
-  organizationId: string,
-  signal: AbortSignal,
-): Promise<MenuCategoryFlags> {
-  const url = new URL(
-    `${authBaseURL.replace(/\/$/, '')}/api/auth/inventory/organization-config`,
+function HappyHourRangeCard({
+  eyebrow,
+  title,
+  description,
+  open,
+  onOpenChange,
+  enabled,
+  disabled = false,
+  saving,
+  start,
+  end,
+  days,
+  onEnabledChange,
+  onStartChange,
+  onEndChange,
+  onDaysChange,
+}: {
+  eyebrow: string
+  title: string
+  description: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  enabled: boolean
+  disabled?: boolean
+  saving: boolean
+  start: string
+  end: string
+  days: HappyHourDay[]
+  onEnabledChange: (enabled: boolean) => void
+  onStartChange: (value: string) => void
+  onEndChange: (value: string) => void
+  onDaysChange: (days: HappyHourDay[]) => void
+}) {
+  const controlsDisabled = disabled || !enabled || saving
+
+  return (
+    <details
+      className="inventory-happy-hour-range-card"
+      open={open}
+      onToggle={(event) => onOpenChange(event.currentTarget.open)}
+    >
+      <summary className="inventory-happy-hour-range-card-summary">
+        <div>
+          <span>{eyebrow}</span>
+          <h3>{title}</h3>
+          <p>{description}</p>
+        </div>
+        <strong>{open ? 'Collapse' : 'Expand'}</strong>
+      </summary>
+
+      <div className="inventory-happy-hour-range-card-body">
+        <label className="inventory-inline-toggle inventory-happy-hour-toggle">
+          <input
+            type="checkbox"
+            checked={enabled}
+            disabled={disabled || saving}
+            onChange={(event) => onEnabledChange(event.target.checked)}
+          />
+          <span>{enabled ? 'Enabled' : 'Disabled'}</span>
+        </label>
+
+        <div className="inventory-happy-hour-range-times">
+          <label className="inventory-search-control">
+            <span>Start</span>
+            <input
+              type="time"
+              value={start}
+              disabled={controlsDisabled}
+              onChange={(event) => onStartChange(event.target.value)}
+            />
+          </label>
+
+          <label className="inventory-search-control">
+            <span>End</span>
+            <input
+              type="time"
+              value={end}
+              disabled={controlsDisabled}
+              onChange={(event) => onEndChange(event.target.value)}
+            />
+          </label>
+        </div>
+
+        <fieldset
+          className="inventory-happy-hour-days"
+          disabled={controlsDisabled}
+        >
+          <legend>Days</legend>
+          <div className="inventory-happy-hour-day-options">
+            {HAPPY_HOUR_DAY_OPTIONS.map((option) => (
+              <label key={option.value}>
+                <input
+                  type="checkbox"
+                  checked={days.includes(option.value)}
+                  onChange={(event) => {
+                    onDaysChange(
+                      event.target.checked
+                        ? ALL_HAPPY_HOUR_DAYS.filter(
+                            (day) => day === option.value || days.includes(day),
+                          )
+                        : days.filter((day) => day !== option.value),
+                    )
+                  }}
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      </div>
+    </details>
   )
-  url.searchParams.set('organizationId', organizationId)
+}
 
-  const response = await fetch(url, {
-    credentials: 'include',
-    signal,
-  })
-  const result = (await response.json()) as {
-    config?: Partial<MenuCategoryFlags>
-    error?: string
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      typeof result.error === 'string'
-        ? result.error
-        : 'Unable to load Menu Categories settings.',
-    )
-  }
-
+function getMenuCategoryFlags(
+  config: InventoryOrganizationConfig,
+): MenuCategoryFlags {
   return {
-    retailEnabled: result.config?.retailEnabled === true,
-    openItemsEnabled: result.config?.openItemsEnabled === true,
+    retailEnabled: config.retailEnabled === true,
+    openItemsEnabled: config.openItemsEnabled === true,
   }
 }
 
