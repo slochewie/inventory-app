@@ -82,37 +82,44 @@
   line-height: 1.45;
 }
 
-.liquor-mods-add-form,
-.liquor-mods-row {
+.liquor-mods-add-form {
   display: grid;
   grid-template-columns: minmax(11rem, 1fr) minmax(6.75rem, 8rem) auto;
   gap: 0.65rem;
-  padding: 0.9rem 1.25rem;
-}
-
-.liquor-mods-add-form {
   align-items: end;
   border-bottom: 1px solid var(--inventory-border, #eaecf0);
   background: #fcfcfd;
+  padding: 0.9rem 1.25rem;
 }
 
 .liquor-mods-row {
-  align-items: start;
+  display: grid;
+  gap: 0.7rem;
   border-bottom: 1px solid var(--inventory-border, #eaecf0);
+  padding: 0.9rem 1.25rem;
 }
 
 .liquor-mods-row:last-child {
   border-bottom: 0;
 }
 
+.liquor-mods-row-fields {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1fr) minmax(6.75rem, 8rem) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.liquor-mods-row-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .liquor-mods-field {
   display: grid;
   gap: 0.35rem;
-}
-
-.liquor-mods-row > .liquor-mods-field,
-.liquor-mods-row-body {
-  align-self: start;
 }
 
 .liquor-mods-field > span,
@@ -193,11 +200,6 @@
   opacity: 0.55;
 }
 
-.liquor-mods-row-body {
-  display: grid;
-  gap: 0.4rem;
-}
-
 .liquor-mods-row-meta {
   display: flex;
   align-items: center;
@@ -210,7 +212,7 @@
   align-items: center;
   gap: 0.45rem;
   min-height: 2.45rem;
-  margin-top: 1.18rem;
+  padding: 0 0.35rem;
 }
 
 .liquor-mods-enabled input {
@@ -219,9 +221,9 @@
 }
 
 .liquor-mods-row-actions {
-  display: grid;
-  grid-auto-flow: column;
-  align-self: start;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.35rem;
 }
 
@@ -229,7 +231,6 @@
   display: inline-grid;
   place-items: center;
   width: 2.45rem;
-  margin-top: 1.18rem;
   padding: 0;
 }
 
@@ -279,17 +280,16 @@
   }
 
   .liquor-mods-add-form,
-  .liquor-mods-row {
+  .liquor-mods-row-fields {
     grid-template-columns: 1fr;
   }
 
-  .liquor-mods-enabled,
-  .liquor-mods-row-actions button {
-    margin-top: 0;
+  .liquor-mods-row-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .liquor-mods-row-actions {
-    grid-auto-flow: column;
     justify-content: start;
   }
 }
