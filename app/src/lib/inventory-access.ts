@@ -666,6 +666,40 @@ export async function listInventoryCocktailMasters(
   return Array.isArray(result.cocktails) ? result.cocktails : []
 }
 
+export async function updateInventoryCocktailMaster(input: {
+  organizationId: string
+  inventoryCocktailId: string
+  name?: string
+  active?: boolean
+}) {
+  const response = await fetch(
+    authEndpoint("/api/auth/inventory/cocktail-master"),
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  )
+  const result = (await response.json()) as {
+    updated?: boolean
+    cocktail?: InventoryCocktailMaster
+    error?: string
+  }
+
+  if (!response.ok || result.updated !== true || !result.cocktail) {
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "Unable to update Cocktail master.",
+    )
+  }
+
+  return result.cocktail
+}
+
 export async function listInventoryCocktails(
   organizationId: string,
   signal?: AbortSignal,
