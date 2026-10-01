@@ -26,6 +26,26 @@ import {
 
 const INVENTORY_APP = appDefinitionsById.inventory
 
+function ToastBrandIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-4 shrink-0"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="11" fill="#ff4c00" />
+      <path
+        d="M7.25 16.5c-.55-1.05-.65-2.9-.65-4.5 0-1.35.7-2.55 1.8-3.25-.5-.45-.8-1-.8-1.6 0-1.5 1.95-2.65 4.4-2.65s4.4 1.15 4.4 2.65c0 .6-.3 1.15-.8 1.6 1.1.7 1.8 1.9 1.8 3.25 0 1.6-.1 3.45-.65 4.5-.45.85-1.25 1.15-2.05.95a11.7 11.7 0 0 0-5.4 0c-.8.2-1.6-.1-2.05-.95Z"
+        fill="none"
+        stroke="white"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function SidebarIdentityToggle({
   href,
   brand,
@@ -121,7 +141,11 @@ export function InventorySidebar({
                       tooltip={item.label}
                       onClick={() => window.location.assign(item.href)}
                     >
-                      <NiteOwlNavigationIcon icon={item.icon} />
+                      {item.label === "Export to Toast" ? (
+                        <ToastBrandIcon />
+                      ) : (
+                        <NiteOwlNavigationIcon icon={item.icon} />
+                      )}
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -148,7 +172,11 @@ export function InventorySidebar({
                       tooltip={item.label}
                       onClick={() => window.location.assign(item.href)}
                     >
-                      <NiteOwlNavigationIcon icon={item.icon} />
+                      {item.label === "Export to Toast" ? (
+                        <ToastBrandIcon />
+                      ) : (
+                        <NiteOwlNavigationIcon icon={item.icon} />
+                      )}
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
