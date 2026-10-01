@@ -39,7 +39,10 @@ See [docs/HOWTO.md](docs/HOWTO.md) for operator/development instructions and [do
 | `/import-review` | New Import, History, Mapping Review | Role-gated by tab/action |
 | `/toast-template-import` | Direct populated Toast workbook import compatibility workflow | Staff+ |
 | `/toast-workbook` | Export to Toast plus organization-scoped Toast workbook staging/reconciliation | Staff+ |
-| `/master-names` | Shared master naming with organization impact review | Admin |
+| `/master-names` | Shared item master naming with organization impact review | Admin |
+| `/master-mixers` | Shared Mixer master catalog | Admin |
+| `/master-bar-prep` | Shared Bar Prep modifier master catalog | Admin |
+| `/liquor-mods` | Organization Mixer/Bar Prep assignments, overrides, upcharges, availability, export state, and order | Viewer; Manager/Admin edit |
 | `/assignments` | Inventory access/roles | Admin |
 | `/imports` | Standalone history compatibility view | Viewer |
 | `/reconcile` | Standalone mapping-review compatibility view | Manager/Admin |
@@ -282,6 +285,7 @@ The frontend does not connect to Postgres directly. Persistent Inventory operati
 Current API responsibilities include:
 
 - access/assignments,
+- shared Mixer and Bar Prep master catalogs plus organization-specific Liquor Mod variants,
 - catalog reads,
 - single/bulk organization-variant updates,
 - organization config,
