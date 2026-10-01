@@ -47,6 +47,7 @@ type ManualItemDraft = {
   toastDestination: string
   price: string
   happyHourPrice: string
+  doublePrice: string
   toastSlot: string
   availableHere: boolean
   exportToToast: boolean
@@ -67,6 +68,7 @@ const EMPTY_DRAFT: ManualItemDraft = {
   toastDestination: '',
   price: '',
   happyHourPrice: '',
+  doublePrice: '',
   toastSlot: '',
   availableHere: true,
   exportToToast: true,
@@ -265,6 +267,7 @@ export function ManualItemEditor({
     normalizedCategory ||
     'Uncategorized'
   const isBeerItem = workbookCategory.toLowerCase() === 'beer'
+  const isLiquorItem = isLiquorCategoryName(workbookCategory)
   const showToastBeerSlot = isBeerItem && enabledOptionalBeerCategories.length > 0
   const allDestinationOptions = useMemo(
     () =>
@@ -330,6 +333,12 @@ export function ManualItemEditor({
       return
     }
 
+    const doublePrice = parseMoneyToCents(draft.doublePrice)
+    if (doublePrice.kind === 'invalid') {
+      setError('Enter a valid dollar amount for Double price, such as 12 or 12.50.')
+      return
+    }
+
     const sourceId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const category = normalizedCategory || workbookCategory
     const toastDestination = draft.toastDestination.trim()
@@ -356,6 +365,7 @@ export function ManualItemEditor({
           exportToToast,
           priceOverrideCents: basePrice.value,
           happyHourPriceCents: happyHourPrice.value,
+          doublePriceCents: isLiquorItem ? doublePrice.value : null,
           toastCategoryOverride: workbookCategory,
           toastDestinationOverride: toastDestination || null,
           toastSlot,
@@ -417,6 +427,7 @@ export function ManualItemEditor({
           exportToToast,
           priceOverrideCents: basePrice.value,
           happyHourPriceCents: happyHourPrice.value,
+          doublePriceCents: isLiquorItem ? doublePrice.value : null,
           toastCategoryOverride: workbookCategory,
           toastDestinationOverride: toastDestination || null,
           toastSlot,
@@ -531,6 +542,16 @@ export function ManualItemEditor({
                 placeholder="Optional"
                 onChange={(value) => updateDraft({ happyHourPrice: value })}
               />
+
+              {isLiquorItem ? (
+                <ManualMoneyField
+                  label="Double price"
+                  value={draft.doublePrice}
+                  disabled={saving}
+                  placeholder="Optional"
+                  onChange={(value) => updateDraft({ doublePrice: value })}
+                />
+              ) : null}
             </div>
 
             {showToastBeerSlot ? (
@@ -994,6 +1015,28 @@ function ManualCombobox({
 type ParsedMoney =
   | { kind: 'valid'; value: number | null }
   | { kind: 'invalid'; value: null }
+
+function isLiquorCategoryName(value: string) {
+  const normalized = value
+    .trim()
+    .toUpperCase()
+    .replace(/&/g, '/')
+    .replace(/\s+/g, ' ')
+
+  return (
+    normalized.includes('VODKA') ||
+    normalized.includes('GIN') ||
+    normalized.includes('RUM') ||
+    normalized.includes('TEQUILA') ||
+    normalized.includes('SCOTCH') ||
+    normalized.includes('WHISKEY') ||
+    normalized.includes('BOURBON') ||
+    normalized.includes('LIQUEUR') ||
+    normalized.includes('CORDIAL') ||
+    normalized.includes('BRANDY') ||
+    normalized.includes('COGNAC')
+  )
+}
 
 function parseMoneyToCents(input: string): ParsedMoney {
   const trimmed = input.trim()
