@@ -671,7 +671,8 @@ function MasterNamesPage() {
           }
 
           .inventory-master-names-page .master-names-toolbar,
-          .inventory-master-names-page .master-names-toolbar.is-shared {
+          .inventory-master-names-page .master-names-toolbar.is-shared,
+          .inventory-master-names-page .master-names-toolbar.is-shared.is-cocktails {
             grid-template-columns: 1fr;
           }
 
