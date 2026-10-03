@@ -37,13 +37,13 @@ Server-side access checks are enforced by the Auth service.
 
 ## 2. Add an item manually
 
-Open:
+Open the Catalog:
 
 ```text
-/manual-item
+/
 ```
 
-Use **Add Item** when a product should be created without an Aloha/Toast import.
+Use the integrated **Add Item** workflow when a product should be created without an Aloha/Toast import. The older `/manual-item` route is retained only as a compatibility redirect to the Catalog.
 
 Choose:
 
@@ -258,17 +258,31 @@ Organization-specific variant data includes:
 
 Changing a shared canonical category affects the master item across organizations. Local availability/pricing changes affect only the selected organization.
 
-### Master item names
+### Shared master names
 
-The shared master item name is currently read-only in the UI.
+Inventory Admins manage global master records on:
 
-You can:
+```text
+/master-names
+```
 
-- edit organization-specific variant names,
-- change canonical category,
-- merge duplicate master items.
+The page has three master families:
 
-There is not yet a dedicated shared master-item rename control.
+- **Catalog Items**
+- **Cocktails**
+- **Liquor Mods**
+
+Search and **Organization** filters are available across all three families. The Organization filter represents every organization currently assigned to a shared master; it is not limited to the organization selected in the application header.
+
+Additional filters:
+
+- Catalog Items — Category and Rename impact
+- Cocktails — Status
+- Liquor Mods — Placement and Status
+
+Catalog Item rename review shows organization impact before saving, including linked variants, affected Toast exports, and organization-specific Toast name overrides that remain local. A successful Catalog Item rename preserves the old shared name as an alias for later reconciliation.
+
+Cocktail and Liquor Mod master names can also be renamed from this workspace. These renames are global; organization-specific Cocktail/Liquor Mod state and local name overrides are not rewritten.
 
 ## 11. Add an organization Beer format to an existing master item
 
@@ -494,6 +508,8 @@ Persistent storage belongs to the Auth service Inventory plugin.
 The frontend uses authenticated API operations for:
 
 - access/assignments,
+- shared Catalog Item, Cocktail, and Liquor Mod master administration,
+- cross-organization assignment metadata for Cocktail/Liquor Mod master filtering,
 - catalog,
 - organization config,
 - organization-variant updates,
@@ -505,6 +521,8 @@ The frontend uses authenticated API operations for:
 - source mappings,
 - mapping confirmation,
 - canonical category updates,
+- master-item rename/impact review,
+- Cocktail/Liquor Mod master rename,
 - master-item merge.
 
 Database/schema work is done in the Auth repository, not directly in this frontend.
