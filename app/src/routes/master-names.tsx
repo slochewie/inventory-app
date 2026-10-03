@@ -45,6 +45,28 @@ type StatusFilter = 'all' | 'active' | 'inactive'
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250] as const
 const DEFAULT_PAGE_SIZE = 25
 
+function sharedMasterOrganizations(
+  master: {
+    assigned?: boolean
+    organizations?: Array<{
+      organizationId: string
+      organizationName: string
+    }>
+  },
+  activeOrganization?: { id: string; name: string } | null,
+) {
+  if (master.organizations) return master.organizations
+
+  return master.assigned && activeOrganization
+    ? [
+        {
+          organizationId: activeOrganization.id,
+          organizationName: activeOrganization.name,
+        },
+      ]
+    : []
+}
+
 function MasterNamesPage() {
   const { data: activeOrganization } = authClient.useActiveOrganization()
   const [family, setFamily] = useState<MasterFamily>('items')
@@ -128,12 +150,30 @@ function MasterNamesPage() {
 
   const organizations = useMemo(
     () =>
-      [...new Set(
-        items.flatMap((item) =>
-          item.organizations.map((entry) => entry.organizationName),
-        ),
-      )].sort((left, right) => left.localeCompare(right)),
-    [items],
+      [
+        ...new Set([
+          ...items.flatMap((item) =>
+            item.organizations.map((entry) => entry.organizationName),
+          ),
+          ...cocktailMasters.flatMap((master) =>
+            sharedMasterOrganizations(master, activeOrganization).map(
+              (entry) => entry.organizationName,
+            ),
+          ),
+          ...liquorMasters.flatMap((master) =>
+            sharedMasterOrganizations(master, activeOrganization).map(
+              (entry) => entry.organizationName,
+            ),
+          ),
+        ]),
+      ].sort((left, right) => left.localeCompare(right)),
+    [
+      activeOrganization?.id,
+      activeOrganization?.name,
+      cocktailMasters,
+      items,
+      liquorMasters,
+    ],
   )
 
   const filteredItems = useMemo(() => {
@@ -192,26 +232,63 @@ function MasterNamesPage() {
   const filteredCocktails = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return cocktailMasters.filter((master) => {
+      const masterOrganizations = sharedMasterOrganizations(
+        master,
+        activeOrganization,
+      )
+      if (
+        organization !== 'all' &&
+        !masterOrganizations.some(
+          (entry) => entry.organizationName === organization,
+        )
+      ) {
+        return false
+      }
       if (status === 'active' && !master.active) return false
       if (status === 'inactive' && master.active) return false
       if (!normalizedQuery) return true
-      return [master.name, master.normalizedName].some((value) =>
-        value.toLowerCase().includes(normalizedQuery),
-      )
+      return [
+        master.name,
+        master.normalizedName,
+        ...masterOrganizations.map((entry) => entry.organizationName),
+      ].some((value) => value.toLowerCase().includes(normalizedQuery))
     })
-  }, [cocktailMasters, query, status])
+  }, [activeOrganization, cocktailMasters, organization, query, status])
 
   const filteredLiquorMasters = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return liquorMasters.filter((master) => {
+      const masterOrganizations = sharedMasterOrganizations(
+        master,
+        activeOrganization,
+      )
+      if (
+        organization !== 'all' &&
+        !masterOrganizations.some(
+          (entry) => entry.organizationName === organization,
+        )
+      ) {
+        return false
+      }
       if (liquorPlacement !== 'all' && master.type !== liquorPlacement) return false
       if (status === 'active' && !master.active) return false
       if (status === 'inactive' && master.active) return false
       if (!normalizedQuery) return true
-      return [master.name, master.normalizedName, liquorPlacementLabel(master.type)]
-        .some((value) => value.toLowerCase().includes(normalizedQuery))
+      return [
+        master.name,
+        master.normalizedName,
+        liquorPlacementLabel(master.type),
+        ...masterOrganizations.map((entry) => entry.organizationName),
+      ].some((value) => value.toLowerCase().includes(normalizedQuery))
     })
-  }, [liquorMasters, liquorPlacement, query, status])
+  }, [
+    activeOrganization,
+    liquorMasters,
+    liquorPlacement,
+    organization,
+    query,
+    status,
+  ])
 
   useEffect(() => {
     setPage(1)
@@ -412,11 +489,11 @@ function MasterNamesPage() {
         }
 
         .inventory-master-names-page .master-names-toolbar.is-shared {
-          grid-template-columns: minmax(20rem, 2fr) minmax(10rem, 1fr) minmax(10rem, 1fr);
+          grid-template-columns: minmax(20rem, 2fr) repeat(3, minmax(10rem, 1fr));
         }
 
         .inventory-master-names-page .master-names-toolbar.is-shared.is-cocktails {
-          grid-template-columns: minmax(20rem, 2fr) minmax(10rem, 1fr);
+          grid-template-columns: minmax(20rem, 2fr) repeat(2, minmax(10rem, 1fr));
         }
 
         .inventory-master-names-page .master-names-toolbar .inventory-search-control {
@@ -863,6 +940,13 @@ function MasterNamesPage() {
             </label>
           ) : null}
           <label className="inventory-search-control">
+            <span>Organization</span>
+            <select value={organization} onChange={(event) => setOrganization(event.target.value)}>
+              <option value="all">All organizations</option>
+              {organizations.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
+          <label className="inventory-search-control">
             <span>Status</span>
             <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)}>
               <option value="all">All records</option>
@@ -914,13 +998,13 @@ function MasterNamesPage() {
         {!loading && family === 'cocktails' && filteredCocktails.length > 0 ? (
           <div className="inventory-table-scroll">
             <table className="inventory-table">
-              <thead><tr><th>Master name</th><th>Status</th><th>Selected organization</th><th /></tr></thead>
+              <thead><tr><th>Master name</th><th>Status</th><th>Organizations</th><th /></tr></thead>
               <tbody>
                 {pageCocktails.map((master) => (
                   <tr key={master.id}>
                     <td data-label="Master name"><strong>{master.name}</strong></td>
                     <td data-label="Status">{master.active ? 'Active' : 'Inactive'}</td>
-                    <td data-label="Selected organization">{master.assigned ? 'Assigned' : 'Not assigned'}</td>
+                    <td data-label="Organizations">{sharedMasterOrganizations(master, activeOrganization).length}</td>
                     <td data-label="Actions"><button className="inventory-template-download" type="button" onClick={() => beginSharedRename('cocktails', master)}>Review / Rename</button></td>
                   </tr>
                 ))}
@@ -932,14 +1016,14 @@ function MasterNamesPage() {
         {!loading && family === 'liquor-mods' && filteredLiquorMasters.length > 0 ? (
           <div className="inventory-table-scroll">
             <table className="inventory-table">
-              <thead><tr><th>Master name</th><th>Placement</th><th>Status</th><th>Selected organization</th><th /></tr></thead>
+              <thead><tr><th>Master name</th><th>Placement</th><th>Status</th><th>Organizations</th><th /></tr></thead>
               <tbody>
                 {pageLiquorMasters.map((master) => (
                   <tr key={master.id}>
                     <td data-label="Master name"><strong>{master.name}</strong></td>
                     <td data-label="Placement">{liquorPlacementLabel(master.type)}</td>
                     <td data-label="Status">{master.active ? 'Active' : 'Inactive'}</td>
-                    <td data-label="Selected organization">{master.assigned ? 'Assigned' : 'Not assigned'}</td>
+                    <td data-label="Organizations">{sharedMasterOrganizations(master, activeOrganization).length}</td>
                     <td data-label="Actions"><button className="inventory-template-download" type="button" onClick={() => beginSharedRename('liquor-mods', master)}>Review / Rename</button></td>
                   </tr>
                 ))}
