@@ -12,6 +12,10 @@ export type InventoryLiquorModifierMaster = {
   updatedAt: string
   organizationModifierId?: string | null
   assigned?: boolean
+  organizations?: Array<{
+    organizationId: string
+    organizationName: string
+  }>
 }
 
 export type InventoryLiquorModifier = {
