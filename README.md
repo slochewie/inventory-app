@@ -39,7 +39,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for operator/development instructions and [do
 | `/organization-settings` | Happy Hour and Beer Formats | Manager/Admin |
 | `/import-review` | New Import, History, Mapping Review | Role-gated by tab/action |
 | `/toast-template-import` | Direct populated Toast workbook import compatibility workflow | Staff+ |
-| `/toast-workbook` | Export to Toast plus organization-scoped Toast workbook staging/reconciliation | Staff+ |
+| `/toast-workbook` | Export to Toast plus organization-scoped Toast workbook staging/reconciliation; Viewer can open the page read-only | Viewer read-only; Staff+ actions |
 | `/master-names` | Shared Catalog Item, Cocktail, and Liquor Mod master maintenance with organization filtering and impact review | Admin |
 | `/liquor-mods` | Cocktail-style Mixer/Bar Prep create/reuse flow plus organization upcharges, availability, export state, and overrides | Manager/Admin edit |
 | `/assignments` | Inventory access/roles | Admin |
@@ -56,7 +56,7 @@ Permissions are scoped to the selected organization.
 
 | Role | View | Import/export | Edit catalog/settings/mappings | Assignments / master merge |
 | --- | ---: | ---: | ---: | ---: |
-| Viewer | Yes | No | No | No |
+| Viewer | Yes | Read-only Export to Toast page | No | No |
 | Staff | Yes | Yes | No | No |
 | Manager | Yes | Yes | Yes | No |
 | Admin | Yes | Yes | Yes | Yes |
