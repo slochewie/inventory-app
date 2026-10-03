@@ -113,7 +113,7 @@ Canonical shared product identity.
 
 Examples: Guinness, Coors Original, Jameson.
 
-The shared master name is currently not editable from the Inventory UI. Canonical category can be changed, and duplicate master items can be merged.
+Inventory Admins can rename the shared master item from `/master-names`. A Catalog Item rename updates the canonical name/normalized name and preserves the previous name as an alias for reconciliation. Canonical category can also be changed, and duplicate master items can be merged.
 
 ### inventoryItemAlias
 
@@ -152,6 +152,51 @@ Examples:
 
 A master item can have variants that are used by different organizations without every organization carrying every variant.
 
+## Cocktail catalog
+
+Cocktails use the same shared-master / organization-variant separation as Catalog Items and Liquor Mods.
+
+### inventoryCocktail
+
+Canonical shared Cocktail identity.
+
+- `id`
+- `name`
+- `normalizedName`
+- `active`
+- `createdAt`
+- `updatedAt`
+
+The master record is global. Inventory Admins can rename it or change its active state from `/master-names`.
+
+### inventoryOrganizationCocktail
+
+Joins one organization to one shared Cocktail master.
+
+- `id`
+- `organizationId`
+- `inventoryCocktailId`
+- `enabled`
+- `exportToToast`
+- `section`
+- `description` — nullable
+- `priceCents` — nullable
+- `happyHourPriceCents` — nullable
+- `toastNameOverride` — nullable organization-specific Toast/display name
+- `sortOrder`
+- `createdAt`
+- `updatedAt`
+- unique: `organizationId + inventoryCocktailId`
+
+Important separation:
+
+- master `active` controls whether the global Cocktail master is available for assignment,
+- organization `enabled` means **Available here**,
+- organization `exportToToast` controls Toast export,
+- pricing, Happy Hour pricing, description, section, sort order, and Toast name override are organization-local.
+
+The Cocktail master-list API also returns derived organization-assignment metadata for Admin filtering. That assignment list is produced from `inventoryOrganizationCocktail`; it is not a separate persistence table.
+
 ## Liquor modifier catalog
 
 Liquor modifiers follow the same shared-master / organization-variant separation used elsewhere in Inventory.
@@ -169,7 +214,7 @@ Canonical shared Mixer or Bar Prep modifier.
 - `updatedAt`
 - unique: `type + normalizedName`
 
-Mixer and Bar Prep masters remain global catalog records, but they are created/reused through the single `/liquor-mods` workflow rather than separate master-management pages.
+Mixer and Bar Prep masters remain global catalog records. They are created/reused through the single `/liquor-mods` operational workflow, while Inventory Admins can rename or activate/deactivate their global master records from `/master-names`.
 
 ### inventoryOrganizationLiquorModifier
 
@@ -195,6 +240,8 @@ Important separation:
 - organization `enabled` means **Available here**,
 - organization `exportToToast` controls Toast export independently,
 - `nameOverride` changes only the selected organization's name and never renames the master.
+
+The Liquor Mod master-list API returns derived organization-assignment metadata from `inventoryOrganizationLiquorModifier` so `/master-names` can filter the global master list by organization. This is API metadata, not a separate table.
 
 ## Organization catalog
 
