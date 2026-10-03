@@ -28,8 +28,8 @@ The organization selector in the header controls which location you are viewing 
 
 | Role | Main abilities |
 | --- | --- |
-| Viewer | Browse Catalog and history |
-| Staff | Viewer + import/export |
+| Viewer | Browse Catalog/history and open Export to Toast read-only |
+| Staff | Viewer + import/export actions |
 | Manager | Staff + edit Catalog, settings, categories, mappings |
 | Admin | Manager + Assignments and shared master-item merge |
 
@@ -368,6 +368,8 @@ Open:
 ```
 
 Normal export source: the selected organization's persistent Catalog.
+
+Viewer users may open this page to inspect the export workflow, but its export/staging controls remain disabled. Staff, Manager, and Admin roles can perform export/import actions.
 
 The pristine workbook is loaded from:
 
