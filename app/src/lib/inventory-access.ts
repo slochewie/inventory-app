@@ -81,6 +81,10 @@ export type InventoryCocktailMaster = {
   active: boolean
   organizationCocktailId: string | null
   assigned: boolean
+  organizations?: Array<{
+    organizationId: string
+    organizationName: string
+  }>
 }
 
 export type InventoryOrganizationCocktail = {
