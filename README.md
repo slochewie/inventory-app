@@ -10,7 +10,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for operator/development instructions and [do
 
 - Better Auth sign-in and organization selection.
 - Inventory roles: Viewer, Staff, Manager, and Admin.
-- Shared canonical master items/categories with organization-specific availability, pricing, Happy Hour pricing, Toast-export state, display-name overrides, destinations, and Beer slot assignments.
+- Shared canonical master catalogs for Items, Cocktails, and Liquor Mods, with organization-specific availability, pricing/upcharges, Happy Hour pricing, Toast-export state, display-name overrides, destinations, and Beer slot assignments.
 - Catalog page with integrated manual Add Item workflow.
 - Optional organization Menu Categories: Retail and Open Items. Beer, Cocktails, and NA Bev are built in.
 - Aloha CSV import, normalization, review, persistence, history, and source reconciliation.
@@ -20,6 +20,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for operator/development instructions and [do
 - Persistent Mapping Review with confirmed mappings.
 - Duplicate master-item merge for Inventory Admins.
 - Dedicated Organization Settings for Happy Hour and Beer Formats.
+- Admin Master Names workspace for global Catalog Item, Cocktail, and Liquor Mod master maintenance, including organization-aware filtering and rename impact review.
 - Built-in Toast Beer format enable/disable controls: 8oz Draft, 16oz Draft, 24oz Draft, Pitcher, Can, and Bottle.
 - Up to five custom Beer formats backed by Toast Optional Beer Category slots.
 - Catalog bulk edit mode for availability, Toast export state, and reviewed bulk price changes.
@@ -39,7 +40,7 @@ See [docs/HOWTO.md](docs/HOWTO.md) for operator/development instructions and [do
 | `/import-review` | New Import, History, Mapping Review | Role-gated by tab/action |
 | `/toast-template-import` | Direct populated Toast workbook import compatibility workflow | Staff+ |
 | `/toast-workbook` | Export to Toast plus organization-scoped Toast workbook staging/reconciliation | Staff+ |
-| `/master-names` | Shared item master naming with organization impact review | Admin |
+| `/master-names` | Shared Catalog Item, Cocktail, and Liquor Mod master maintenance with organization filtering and impact review | Admin |
 | `/liquor-mods` | Cocktail-style Mixer/Bar Prep create/reuse flow plus organization upcharges, availability, export state, and overrides | Manager/Admin edit |
 | `/assignments` | Inventory access/roles | Admin |
 | `/imports` | Standalone history compatibility view | Viewer |
@@ -81,9 +82,15 @@ The Catalog groups variants by shared master item. Canonical category changes af
 
 ### Master naming
 
-Inventory Admins use `/master-names` to rename the shared `inventoryItem.name`. The page shows the organization-level impact before saving, including linked/carried variants, Toast exports that follow the master name, and organization-specific Toast name overrides that will remain unchanged.
+Inventory Admins use `/master-names` to maintain the shared Catalog Item, Cocktail, and Liquor Mod master catalogs.
 
-A successful rename updates the shared canonical name and normalized name while retaining the previous master name as an alias for future reconciliation. Renaming is global; organization-specific Toast name overrides are not rewritten.
+The workspace has separate **Catalog Items**, **Cocktails**, and **Liquor Mods** views. All three support search and organization filtering. Catalog Items additionally support Category and Rename impact filters; Cocktails support Status; Liquor Mods support Placement and Status.
+
+For Catalog Items, the page shows organization-level impact before saving, including linked/carried variants, Toast exports that follow the master name, and organization-specific Toast name overrides that remain unchanged.
+
+A successful Catalog Item rename updates the shared canonical name and normalized name while retaining the previous master name as an alias for future reconciliation. Cocktail and Liquor Mod renames update their shared master records. All master renames are global; organization-specific overrides are not rewritten.
+
+The Cocktail and Liquor Mod master APIs return the organizations currently assigned to each master so the Admin workspace can filter those global catalogs by organization rather than only by the organization selected in the application header.
 
 ## Catalog bulk edit
 
@@ -283,7 +290,9 @@ The frontend does not connect to Postgres directly. Persistent Inventory operati
 Current API responsibilities include:
 
 - access/assignments,
+- shared Cocktail masters plus organization-specific Cocktail variants,
 - shared Mixer and Bar Prep master catalogs plus organization-specific Liquor Mod variants,
+- cross-organization assignment metadata for shared Cocktail and Liquor Mod master administration,
 - catalog reads,
 - single/bulk organization-variant updates,
 - organization config,
@@ -310,4 +319,4 @@ See `bash-scripts/README.md` for CLI-only behavior.
 
 ## Status
 
-The persistent authenticated architecture is active. Current work is centered on improving shared master-catalog management, organization-specific editing, reconciliation, mobile/tablet UX, and complete Toast workbook generation without mutating the pristine template in place.
+The persistent authenticated architecture is active. Shared Catalog Item, Cocktail, and Liquor Mod master administration is organization-aware, while operational edits remain scoped to the selected organization. Current work is centered on reconciliation, organization-specific editing, mobile/tablet UX, and complete Toast workbook generation without mutating the pristine template in place.
