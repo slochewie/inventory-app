@@ -210,6 +210,11 @@ function ToastWorkbook() {
   const stagedBulkHelpRef = useRef<HTMLDivElement>(null)
   const [selectedStagedItemId, setSelectedStagedItemId] =
     useState<string | null>(null)
+  const [hasStoredStagedImport, setHasStoredStagedImport] = useState(
+    () =>
+      loadReviewSession()?.importFile?.meta?.source ===
+      'toast-workbook-staging',
+  )
   const [importingReviewedItems, setImportingReviewedItems] = useState(false)
   const [importReviewedError, setImportReviewedError] = useState<string | null>(null)
   const [masterCatalog, setMasterCatalog] = useState<InventoryCatalogRow[]>([])
@@ -1181,19 +1186,10 @@ function ToastWorkbook() {
                 Using saved reviewed state{reviewSavedAt ? ` from ${new Date(reviewSavedAt).toLocaleString()}` : ''}.
               </p>
             ) : reviewSource === 'toast-workbook' ? (
-              <div>
-                <p>
-                  <strong>Staged Toast workbook — not saved to Inventory.</strong>{' '}
-                  Review and normalize this source before any future master import.
-                </p>
-                <button
-                  type="button"
-                  className="inventory-secondary-button"
-                  onClick={() => void handleClearStagedImport()}
-                >
-                  Clear staged import
-                </button>
-              </div>
+              <p>
+                <strong>Staged Toast workbook — not saved to Inventory.</strong>{' '}
+                Review and normalize this source before any future master import.
+              </p>
             ) : reviewSource === 'review-csv' ? (
               <div>
                 <p>
@@ -1232,6 +1228,15 @@ function ToastWorkbook() {
                 onChange={handleToastWorkbookChange}
               />
             </label>
+            {hasStoredStagedImport ? (
+              <button
+                type="button"
+                className="inventory-secondary-button"
+                onClick={() => void handleClearStagedImport()}
+              >
+                Clear staged import
+              </button>
+            ) : null}
             <label className="inventory-upload-control">
               <span>Stage export preview CSV for review</span>
               <input type="file" accept=".csv,text/csv" onChange={handleReviewCsvChange} />
